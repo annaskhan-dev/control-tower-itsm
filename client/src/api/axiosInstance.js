@@ -1,24 +1,24 @@
 import axios from 'axios';
 
-// This logic checks for your Netlify environment variable first.
-// If it doesn't find it (like when you run it locally), it defaults to localhost:5001
+// Logic to determine the base URL
 const apiBaseUrl = import.meta.env?.VITE_API_URL || process.env?.REACT_APP_API_URL || 'http://localhost:5001';
 
 const axiosInstance = axios.create({
-  // We append /api here so you don't have to include it in your environment variable
+  // We append /api here
   baseURL: `${apiBaseUrl}/api`,
   timeout: 10000,
 });
 
+// DEBUGGING: This will print the actual URL your app is using to your browser console
+console.log("Axios Base URL is set to:", axiosInstance.defaults.baseURL);
+
 // Request Interceptor
 axiosInstance.interceptors.request.use((config) => {
-  // Attach Authorization Header
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  // Attach Company ID
   const userString = localStorage.getItem('user');
   if (userString) {
     try {
