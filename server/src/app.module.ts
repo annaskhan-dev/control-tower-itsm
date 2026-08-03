@@ -8,7 +8,6 @@ import { AuthModule } from './auth/auth.module';
 import { DriverSupportModule } from './driver-support/driver-support.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { RoadAlertsModule } from './road-alerts/road-alerts.module';
-// 1. Import your UsersModule
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -18,12 +17,14 @@ import { UsersModule } from './users/users.module';
       isGlobal: true,
       envFilePath: '.env', 
     }),
-    MongooseModule.forRoot('mongodb://127.0.0.1:27017/control-tower-db'),
+    
+    // 2. Updated to use environment variable for database connection
+    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/control-tower-db'),
+    
     AuthModule,
     DriverSupportModule,
     TicketsModule,
     RoadAlertsModule,
-    // 2. Add UsersModule here
     UsersModule,
   ],
   controllers: [AppController],
@@ -33,6 +34,8 @@ export class AppModule {
   constructor() {
     console.log('--- DEBUG: AppModule check ---');
     console.log('JWT_SECRET is defined:', !!process.env.JWT_SECRET);
+    // Added a log to confirm if MONGODB_URI is loaded in production
+    console.log('MONGODB_URI is defined:', !!process.env.MONGODB_URI);
   }
 
   configure(consumer: any) {
