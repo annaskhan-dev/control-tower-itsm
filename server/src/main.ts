@@ -6,11 +6,11 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // Correct CORS configuration for Railway + Netlify
+  // Updated CORS configuration to include 'x-company-id'
   app.enableCors({
     origin: 'https://control-tower-itsm.netlify.app', 
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Accept, Authorization',
+    allowedHeaders: 'Content-Type, Accept, Authorization, x-company-id', 
     credentials: true,
   });
 
