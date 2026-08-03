@@ -6,7 +6,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // UPDATE: Specific origin is required when using credentials: true
+  // Correct CORS configuration for Railway + Netlify
   app.enableCors({
     origin: 'https://control-tower-itsm.netlify.app', 
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
@@ -14,15 +14,15 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Use the port provided by Railway, or default to 5000
+  // Use the port provided by Railway (5000), or default to 5000 if not found
   const port = parseInt(process.env.PORT || '5000', 10);
 
-  // Listen on 0.0.0.0 for external access
+  // CRITICAL: Bind to '0.0.0.0' so Railway can route traffic to this port
   await app.listen(port, '0.0.0.0');
   console.log(`Application is successfully running on port: ${port}`);
 }
 
-// Global error handling
+// Global error handling to catch startup failures
 bootstrap().catch((err) => {
   console.error('CRITICAL STARTUP ERROR:', err);
   process.exit(1);
