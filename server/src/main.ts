@@ -14,17 +14,18 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // Updated CORS configuration:
-  // Restricted to your specific frontend URL
+  // Using a broader approach to ensure the preflight request is handled
   app.enableCors({
-    origin: 'https://control-tower-itsm.netlify.app',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    origin: '*', // Temporarily test with '*' to confirm if origin mismatch is the cause
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Accept, Authorization',
     credentials: true,
   });
 
   // Use PORT from environment or default to 5000
   const port = process.env.PORT || 5000;
 
-  await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}/api`);
+  await app.listen(port, '0.0.0.0'); // Listen on all network interfaces
+  console.log(`Application is running on port: ${port}`);
 }
 bootstrap();
