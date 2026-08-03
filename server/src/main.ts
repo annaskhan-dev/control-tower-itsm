@@ -12,7 +12,14 @@ async function bootstrap() {
 
   // Global prefix setup
   app.setGlobalPrefix('api');
-  app.enableCors();
+
+  // Updated CORS configuration:
+  // Restricted to your specific frontend URL
+  app.enableCors({
+    origin: 'https://control-tower-itsm.netlify.app',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+  });
 
   // Use PORT from environment or default to 5000
   const port = process.env.PORT || 5000;
