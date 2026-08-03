@@ -14,7 +14,12 @@ export class UpdateTicketDto extends PartialType(CreateTicketDto) {
   @IsArray()
   comments?: any[];
 
-  // Note: We don't need to redeclare status, assignee, etc., 
-  // because PartialType(CreateTicketDto) already handles them!
-  // If you must redeclare them, you MUST add @IsOptional() to them.
+  // Explicitly add these so the service can read them
+  @IsOptional()
+  @IsString()
+  assignee?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
 }
