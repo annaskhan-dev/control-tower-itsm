@@ -1,0 +1,41 @@
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+
+export class CreateTicketDto {
+  @IsString()
+  @IsNotEmpty()
+  title!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  type!: string; // Marked as required for logic processing
+
+  @IsString()
+  @IsNotEmpty()
+  priority!: string; // Marked as required for logic processing
+
+  @IsString()
+  @IsNotEmpty()
+  category!: string; // Marked as required for SLA lookup
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsString()
+  @IsOptional()
+  source?: string;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
+
+  @IsString()
+  @IsOptional()
+  assignee?: string;
+
+  // companyId is usually handled by the controller via req.user, 
+  // but keeping it here as requested.
+  @IsOptional()
+  @IsString()
+  companyId?: string; 
+}

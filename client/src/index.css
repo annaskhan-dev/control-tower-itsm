@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@import url('https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Font Utilities */
+.font-clash {
+  font-family: 'Clash Display', sans-serif;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f8fafc;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevents unwanted full-page scrollbars */
+}
+
+/* Custom Brand Sidebar Color */
+.bg-brand-navy {
+  background-color: #13203B;
+}
+
+/* Chrome Autofill fix */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: white;
+  -webkit-box-shadow: 0 0 0px 1000px #1e2a3a inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* --- Optimized Sidebar DatePicker Styles --- */
+
+/* Keep only clean popper z-index in index.css */
+.react-datepicker-popper {
+  z-index: 99999 !important;
+}
+
+.react-datepicker-wrapper {
+  width: 100%;
+}
