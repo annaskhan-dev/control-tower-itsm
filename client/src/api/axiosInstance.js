@@ -1,7 +1,12 @@
 import axios from 'axios';
 
+// This logic checks for your Netlify environment variable first.
+// If it doesn't find it (like when you run it locally), it defaults to localhost:5001
+const apiBaseUrl = import.meta.env?.VITE_API_URL || process.env?.REACT_APP_API_URL || 'http://localhost:5001';
+
 const axiosInstance = axios.create({
-  baseURL: 'http://localhost:5001/api', // This handles the prefix automatically
+  // We append /api here so you don't have to include it in your environment variable
+  baseURL: `${apiBaseUrl}/api`,
   timeout: 10000,
 });
 
@@ -31,7 +36,7 @@ axiosInstance.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
-// Response Interceptor (Keep your existing logic here)
+// Response Interceptor
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
