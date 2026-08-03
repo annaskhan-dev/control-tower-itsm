@@ -2,18 +2,19 @@ import React, { useEffect, useState } from 'react';
 import axiosInstance from '../api/axiosInstance';
 
 export default function DriverSupportLogs() {
-  const [logs, setLogs] = useState([]);
+  const [logs, setLogs] = useState([]); // Initialized as array
   const [loading, setLoading] = useState(true);
 
   const fetchLogs = async () => {
     try {
-      // FIXED: Removed the /api prefix here. 
-      // Because your axiosInstance baseURL already includes /api, 
-      // you just need the endpoint path '/driver-support'
       const res = await axiosInstance.get('/driver-support');
-      setLogs(res.data);
+      
+      // Safety Check: Ensure the data is actually an array before setting state
+      // If res.data is an object or null, fallback to empty array
+      setLogs(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Failed to fetch logs:', err);
+      setLogs([]); // Ensure logs is an array even if the request fails
     } finally {
       setLoading(false);
     }
@@ -42,7 +43,8 @@ export default function DriverSupportLogs() {
             </tr>
           </thead>
           <tbody>
-            {logs.map((log) => (
+            {/* Safe Map: (logs || []) ensures it never crashes if logs is null */}
+            {(logs || []).map((log) => (
               <tr key={log._id} className="border-b border-slate-800 hover:bg-slate-800/50">
                 <td className="p-3 font-mono text-indigo-400">{log.supportId}</td>
                 <td className="p-3 font-medium text-slate-200">{log.driverName}</td>
