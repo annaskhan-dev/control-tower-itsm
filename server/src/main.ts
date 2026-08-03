@@ -13,7 +13,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = parseInt(process.env.PORT, 10) || 5000;
+const port = parseInt(process.env.PORT || '5000', 10);
 
   // Listen on 0.0.0.0 for external access
   await app.listen(port, '0.0.0.0');
