@@ -46,7 +46,7 @@ export class TicketsController {
   }
 
   @Get('sla-configs')
-  @Roles('Manager', 'Super Admin')
+  @Roles('Manager', 'Super Admin', 'Operator', 'Transporter', 'Shipper Ops', 'Sales Person')
   async findAllSla(@Req() req: AuthenticatedRequest) {
     return await this.ticketsService.findAllSla(req.user.companyId);
   }
