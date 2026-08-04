@@ -28,7 +28,15 @@ export class AuthService {
 
     // SECURITY WARNING: In a production app, do not allow public
     // registration of 'Super Admin' roles.
-    const validRoles = ['Operator', 'Manager', 'Super Admin'];
+    const validRoles = [
+      'Operator', 
+      'Manager', 
+      'Super Admin', 
+      'Transporter', 
+      'Shipper Ops', 
+      'Sales Person'
+    ];
+    
     if (!validRoles.includes(role)) {
       throw new BadRequestException('Invalid role selected');
     }
