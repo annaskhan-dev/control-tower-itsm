@@ -55,30 +55,30 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user }) => {
   };
 
   return (
-    <aside className="w-56 bg-[#13203B] text-slate-200 flex flex-col justify-between p-3.5 h-screen shrink-0 font-sans border-r border-slate-800 z-20 select-none overflow-hidden">
+    <aside className="w-72 bg-[#13203B] text-slate-200 flex flex-col justify-between p-5 h-screen shrink-0 font-sans border-r border-slate-800 z-25 select-none overflow-hidden">
       
       {/* Top Section */}
-      <div className="shrink-0 space-y-3 mb-4">
-        <div className="flex items-center gap-2.5 px-2 py-1 border-b border-white/10">
-          <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center font-bold text-white text-xs shadow-sm">CT</div>
+      <div className="shrink-0 space-y-4 mb-6">
+        <div className="flex items-center gap-3 px-2 py-2 border-b border-white/10">
+          <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center font-bold text-white text-sm shadow-md">CT</div>
           <div>
-            <h1 className="font-semibold text-white text-[13px] tracking-wide leading-tight">Control Tower</h1>
-            <span className="text-[9px] text-slate-400 block leading-none">ITSM Platform</span>
+            <h1 className="font-bold text-white text-base tracking-wide leading-tight">Control Tower</h1>
+            <span className="text-xs text-slate-400 block leading-none mt-1">ITSM Platform</span>
           </div>
         </div>
 
         <button
           type="button"
           onClick={handleNewTicketClick}
-          className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-xl text-xs font-semibold transition-all shadow-md"
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-2xl text-sm font-semibold transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
         >
-          <PlusCircle size={15} />
+          <PlusCircle size={18} />
           <span>New Ticket</span>
         </button>
       </div>
 
       {/* Middle Section: Navigation with hidden scrollbar */}
-      <nav className="flex-1 overflow-y-auto space-y-1 pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <nav className="flex-1 overflow-y-auto space-y-1.5 pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = checkIsActive(item.path);
@@ -86,11 +86,11 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user }) => {
             <NavLink
               key={item.path}
               to={item.path}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                isActive ? 'bg-blue-600/30 text-white border-l-2 border-blue-400 font-semibold shadow-2xs' : 'text-slate-400 hover:text-white hover:bg-white/5'
+              className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${
+                isActive ? 'bg-blue-600/30 text-white border-l-4 border-blue-400 font-semibold shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Icon size={15} className={isActive ? 'text-blue-400' : 'text-slate-400'} />
+              <Icon size={18} className={isActive ? 'text-blue-400' : 'text-slate-400'} />
               <span className="truncate">{item.label}</span>
             </NavLink>
           );
@@ -98,21 +98,21 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user }) => {
       </nav>
 
       {/* Bottom Section: Footer (Pinned) */}
-      <div className="shrink-0 border-t border-white/10 pt-3 mt-2">
-        <div className="flex items-center justify-between px-2.5 py-2 rounded-xl bg-black/40 border border-white/5">
-          <div className="flex items-center gap-2 truncate min-w-0">
-            <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+      <div className="shrink-0 border-t border-white/10 pt-4 mt-3">
+        <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl bg-black/40 border border-white/5">
+          <div className="flex items-center gap-3 truncate min-w-0">
+            <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-md">
               {getInitials(user?.name)}
             </div>
             <div className="flex flex-col truncate">
-              <span className="text-xs font-semibold text-white leading-tight truncate">{user?.name || 'User'}</span>
-              <span className="text-[9px] text-blue-300 flex items-center gap-0.5 truncate">
-                <ShieldCheck size={9} /> {user?.role || 'User'}
+              <span className="text-sm font-semibold text-white leading-tight truncate">{user?.name || 'User'}</span>
+              <span className="text-xs text-blue-300 flex items-center gap-1 truncate mt-0.5">
+                <ShieldCheck size={12} /> {user?.role || 'User'}
               </span>
             </div>
           </div>
-          <button type="button" onClick={handleLogoutClick} className="p-2 text-slate-300 hover:text-rose-400 rounded-lg hover:bg-white/10 transition cursor-pointer shrink-0">
-            <LogOut size={15} />
+          <button type="button" onClick={handleLogoutClick} className="p-2.5 text-slate-300 hover:text-rose-400 rounded-xl hover:bg-white/10 transition cursor-pointer shrink-0">
+            <LogOut size={18} />
           </button>
         </div>
       </div>
