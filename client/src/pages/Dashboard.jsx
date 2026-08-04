@@ -198,7 +198,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           onClick={handleExportExcel}
           className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm flex items-center gap-2"
         >
-          <Download size={16} /> Export Last 1 Month to Excel
+          <Download size={16} /> Export to Excel
         </button>
       </div>
 
