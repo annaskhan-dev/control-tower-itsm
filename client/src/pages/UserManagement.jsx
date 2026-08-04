@@ -36,7 +36,6 @@ export const UserManagement = () => {
       }
 
       try {
-        // FIXED: Replaced api.users() with the correct API method
         const response = await api.get("/users");
         
         const filteredUsers = response.data.filter(
@@ -136,13 +135,13 @@ export const UserManagement = () => {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-3 font-sans overflow-hidden p-4">
-      <div className="flex justify-between items-center shrink-0">
+    <div className="h-full flex flex-col font-sans bg-white text-slate-800">
+      <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 shrink-0">
         <div>
-          <h2 className="font-bold text-xl text-[#13203B]">
+          <h1 className="text-xl font-bold text-[#13203B]">
             User & Role Management
-          </h2>
-          <p className="text-xs text-slate-500">
+          </h1>
+          <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold mt-0.5">
             Managing team members for Company:{" "}
             {user?.companyName || "Loading..."}
           </p>
@@ -151,104 +150,113 @@ export const UserManagement = () => {
         {isAdmin && (
           <button
             onClick={handleOpenCreate}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5"
           >
-            <UserPlus size={14} /> Add User
+            <UserPlus size={16} /> Add User
           </button>
         )}
       </div>
 
-      <div className="flex-1 border border-slate-200 rounded-2xl overflow-y-auto bg-white shadow-sm">
-        {isLoading ? (
-          <div className="flex justify-center p-10">
-            <Loader2 className="animate-spin text-blue-600" />
-          </div>
-        ) : (
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 font-semibold text-slate-500">
-              <tr>
-                <th className="p-3">User</th>
-                <th className="p-3">Email</th>
-                <th className="p-3">Role</th>
-                <th className="p-3">Status</th>
-                {isAdmin && <th className="p-3 text-right">Actions</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {users.length > 0 ? (
-                users.map((u) => (
-                  <tr
-                    key={u.id}
-                    className="hover:bg-slate-50/80 transition-colors"
-                  >
-                    <td className="p-3 font-semibold text-slate-800 flex items-center gap-2">
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
-                        style={{ backgroundColor: u.avatarColor }}
-                      >
-                        {u.name?.charAt(0).toUpperCase()}
-                      </div>
-                      {u.name}
-                    </td>
-                    <td className="p-3 text-slate-600">{u.email}</td>
-                    <td className="p-3 font-medium text-slate-700">{u.role}</td>
-                    <td className="p-3">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${u.status === "Active" ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"}`}
-                      >
-                        {u.status || "Active"}
-                      </span>
-                    </td>
-                    {isAdmin && (
-                      <td className="p-3 text-right space-x-1">
-                        <button
-                          onClick={() => handleOpenEdit(u)}
-                          className="p-1.5 hover:bg-slate-100 rounded text-slate-600"
-                        >
-                          <Edit3 size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleToggleStatus(u)}
-                          className="p-1.5 hover:bg-slate-100 rounded text-slate-600"
-                        >
-                          {u.status === "Active" ? (
-                            <UserX size={14} className="text-rose-500" />
-                          ) : (
-                            <UserCheck size={14} className="text-emerald-500" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(u.id)}
-                          className="p-1.5 hover:bg-slate-100 rounded text-rose-500"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))
-              ) : (
+      <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+        <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+          {isLoading ? (
+            <div className="flex justify-center p-12">
+              <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
+            </div>
+          ) : (
+            <table className="w-full text-left text-sm text-slate-600 border-collapse">
+              <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
                 <tr>
-                  <td colSpan="5" className="p-10 text-center text-slate-500">
-                    No users found for this company.
-                  </td>
+                  <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">User</th>
+                  <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Email</th>
+                  <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Role</th>
+                  <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Status</th>
+                  {isAdmin && <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider text-right">Actions</th>}
                 </tr>
-              )}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {users.length > 0 ? (
+                  users.map((u) => (
+                    <tr
+                      key={u.id}
+                      className="hover:bg-slate-50 transition-colors text-sm"
+                    >
+                      <td className="p-4 font-semibold text-slate-900 flex items-center gap-3">
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
+                          style={{ backgroundColor: u.avatarColor }}
+                        >
+                          {u.name?.charAt(0).toUpperCase()}
+                        </div>
+                        {u.name}
+                      </td>
+                      <td className="p-4 text-slate-600">{u.email}</td>
+                      <td className="p-4 font-medium text-slate-700">{u.role}</td>
+                      <td className="p-4">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            u.status === "Active" 
+                              ? "bg-emerald-100 text-emerald-800" 
+                              : "bg-slate-200 text-slate-600"
+                          }`}
+                        >
+                          {u.status || "Active"}
+                        </span>
+                      </td>
+                      {isAdmin && (
+                        <td className="p-4 text-right space-x-1">
+                          <button
+                            onClick={() => handleOpenEdit(u)}
+                            className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition"
+                            title="Edit User"
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleToggleStatus(u)}
+                            className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition"
+                            title="Toggle Status"
+                          >
+                            {u.status === "Active" ? (
+                              <UserX size={16} className="text-rose-500" />
+                            ) : (
+                              <UserCheck size={16} className="text-emerald-500" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(u.id)}
+                            className="p-2 hover:bg-slate-100 rounded-lg text-rose-500 transition"
+                            title="Delete User"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="5" className="p-12 text-center text-slate-400 italic text-base">
+                      No users found for this company.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-sm w-full p-6 shadow-2xl">
-            <h3 className="font-bold text-sm text-slate-800 mb-4 flex items-center gap-2">
-              <ShieldAlert size={16} className="text-blue-600" />
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-2xl">
+            <h3 className="font-bold text-base text-slate-800 mb-5 flex items-center gap-2">
+              <ShieldAlert size={20} className="text-blue-600" />
               {editingUser ? "Edit User Details" : "Create New User"}
             </h3>
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            <form onSubmit={handleSubmit} className="space-y-4 text-sm">
               <div>
-                <label className="block font-semibold text-slate-600 mb-1">
+                <label className="block font-semibold text-slate-700 mb-1.5 text-xs uppercase tracking-wider">
                   Full Name
                 </label>
                 <input
@@ -258,11 +266,11 @@ export const UserManagement = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block font-semibold text-slate-600 mb-1">
+                <label className="block font-semibold text-slate-700 mb-1.5 text-xs uppercase tracking-wider">
                   Email
                 </label>
                 <input
@@ -272,11 +280,11 @@ export const UserManagement = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, email: e.target.value })
                   }
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block font-semibold text-slate-600 mb-1">
+                <label className="block font-semibold text-slate-700 mb-1.5 text-xs uppercase tracking-wider">
                   Password
                 </label>
                 <input
@@ -290,12 +298,12 @@ export const UserManagement = () => {
                       ? "Leave blank to keep current"
                       : "Enter password"
                   }
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-semibold text-slate-600 mb-1">
+                  <label className="block font-semibold text-slate-700 mb-1.5 text-xs uppercase tracking-wider">
                     Role
                   </label>
                   <select
@@ -303,7 +311,7 @@ export const UserManagement = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, role: e.target.value })
                     }
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {USER_ROLES.map((role) => (
                       <option key={role} value={role}>
@@ -313,7 +321,7 @@ export const UserManagement = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-600 mb-1">
+                  <label className="block font-semibold text-slate-700 mb-1.5 text-xs uppercase tracking-wider">
                     Avatar Color
                   </label>
                   <input
@@ -322,21 +330,21 @@ export const UserManagement = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, avatarColor: e.target.value })
                     }
-                    className="w-full h-9 rounded-xl cursor-pointer border-0"
+                    className="w-full h-10 rounded-xl cursor-pointer border border-slate-300 bg-slate-50 p-1"
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-4">
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-xl font-semibold hover:bg-slate-50"
+                  className="px-4 py-2 border border-slate-300 rounded-xl font-semibold text-slate-700 hover:bg-slate-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition shadow-sm"
                 >
                   Save User
                 </button>
