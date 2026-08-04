@@ -113,7 +113,15 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
                 onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
                 className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
               >
-                {["Unassigned", "Admin", "Operator", "Dispatcher"].map(o => <option key={o} value={o}>{o}</option>)}
+                {[
+                  "Unassigned", 
+                  "Admin", 
+                  "Operator", 
+                  "Dispatcher", 
+                  "Transporter", 
+                  "Shipper Ops", 
+                  "Sales Person"
+                ].map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
 
@@ -151,14 +159,14 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-semibold"
+              className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-semibold cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-sm flex items-center gap-2 disabled:opacity-50"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting && <Loader2 size={12} className="animate-spin" />}
               {isSubmitting ? "Creating..." : "Create Ticket"}

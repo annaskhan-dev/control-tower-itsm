@@ -25,7 +25,14 @@ export class TicketsService {
 
   private authorize(userRole: string, allowedRoles: string[]) {
     if (userRole === 'Super Admin') return;
-    if (!allowedRoles.includes(userRole)) {
+    
+    // Normalize string comparisons to match variations (e.g. spaces vs underscores)
+    const normalizedUserRole = userRole.replace(/\s+/g, '_').toLowerCase();
+    const isAllowed = allowedRoles.some(
+      role => role.replace(/\s+/g, '_').toLowerCase() === normalizedUserRole
+    );
+
+    if (!isAllowed) {
       throw new ForbiddenException(`You do not have permission to perform this action.`);
     }
   }
@@ -33,8 +40,6 @@ export class TicketsService {
   async create(createTicketDto: CreateTicketDto, companyId: string, userRole: string): Promise<Ticket> {
     try {
       const category = createTicketDto.category || 'fleet-coordination';
-      // Note: If your SLA lookup now requires priority, update this line to: 
-      // await this.slaConfigModel.findOne({ category, priority: createTicketDto.priority, companyId }).exec();
       const slaConfig = await this.slaConfigModel.findOne({ category, companyId }).exec();
       const hoursAllowed = slaConfig ? slaConfig.hours : 24;
       const deadline = new Date(Date.now() + hoursAllowed * 60 * 60 * 1000);
@@ -62,7 +67,6 @@ export class TicketsService {
     }
   }
 
-  // UPDATED: Now accepts category and priority to match the Controller/DTO
   async createSlaCategory(
     companyId: string, 
     category: string, 
@@ -72,16 +76,20 @@ export class TicketsService {
     const newSla = new this.slaConfigModel({
       companyId,
       category, 
-      priority, // Added priority field
+      priority,
       hours,
     });
     return await newSla.save();
   }
 
   async update(id: string, updateTicketDto: UpdateTicketDto, companyId: string, userRole: string): Promise<Ticket> {
-    if (userRole === 'Operator') {
+    // Treat Transporter, Shipper Ops, and Sales Person like Operators (restricted from updating Assignee or Category)
+    const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
+    const restrictedUpdateRoles = ['operator', 'transporter', 'shipper_ops', 'sales_person'];
+
+    if (restrictedUpdateRoles.includes(normalizedRole)) {
       if (updateTicketDto.assignee !== undefined || updateTicketDto.category !== undefined) {
-        throw new ForbiddenException('Operators are not allowed to update Assignee or Category.');
+        throw new ForbiddenException('You are not allowed to update Assignee or Category.');
       }
     }
 
@@ -172,7 +180,6 @@ export class TicketsService {
   }
 
   async removeSlaConfig(id: string, companyId: string) {
-  // Ensure your logic filters by companyId to prevent unauthorized deletions
-  return await this.slaConfigModel.findOneAndDelete({ _id: id, companyId }).exec();
-}
+    return await this.slaConfigModel.findOneAndDelete({ _id: id, companyId }).exec();
+  }
 }

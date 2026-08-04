@@ -6,6 +6,9 @@ export const ROLES = {
   SUPER_ADMIN: "Super Admin",
   MANAGER: "Manager",
   OPERATOR: "Operator",
+  TRANSPORTER: "Transporter",
+  SHIPPER_OPS: "Shipper Ops",
+  SALES_PERSON: "Sales Person",
 };
 
 export const PERMISSIONS = {
@@ -21,6 +24,21 @@ export const PERMISSIONS = {
   },
   [ROLES.OPERATOR]: {
     canEdit: ["description", "status"],
+    canDelete: false,
+    canManageUsers: false,
+  },
+  [ROLES.TRANSPORTER]: {
+    canEdit: [],
+    canDelete: false,
+    canManageUsers: false,
+  },
+  [ROLES.SHIPPER_OPS]: {
+    canEdit: [],
+    canDelete: false,
+    canManageUsers: false,
+  },
+  [ROLES.SALES_PERSON]: {
+    canEdit: [],
     canDelete: false,
     canManageUsers: false,
   },

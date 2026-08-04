@@ -11,9 +11,16 @@ export class RolesGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (!requiredRoles) return true; // Public route`
+    if (!requiredRoles) return true; // Public route
 
     const { user } = context.switchToHttp().getRequest();
-    return requiredRoles.includes(user.role);
+    if (!user || !user.role) return false;
+
+    // Normalize user role and required roles to handle casing and spacing variations (e.g. "Shipper Ops" vs "shipper_ops")
+    const normalizedUserRole = user.role.replace(/\s+/g, '_').toLowerCase();
+    
+    return requiredRoles.some(
+      role => role.replace(/\s+/g, '_').toLowerCase() === normalizedUserRole
+    );
   }
 }

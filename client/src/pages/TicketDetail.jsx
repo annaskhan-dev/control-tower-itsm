@@ -155,7 +155,7 @@ export const TicketDetail = () => {
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={!canEditDesc}
                 rows={8} // Shortened box height
-                className="w-full p-4 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-slate-50"
+                className="w-full p-4 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-slate-50 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 placeholder="No description provided..."
               />
             </div>
@@ -170,7 +170,7 @@ export const TicketDetail = () => {
 
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Status</label>
-                <select disabled={!canEditStatus} value={ticket.status || ""} onChange={(e) => handleUpdate({ status: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg text-xs">
+                <select disabled={!canEditStatus} value={ticket.status || ""} onChange={(e) => handleUpdate({ status: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed">
                   {["Open", "In Progress", "Resolved", "Closed"].map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
@@ -182,7 +182,7 @@ export const TicketDetail = () => {
 
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Category</label>
-                <select disabled={!canEditCategory} value={ticket.category || ""} onChange={(e) => handleUpdate({ category: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg text-xs">
+                <select disabled={!canEditCategory} value={ticket.category || ""} onChange={(e) => handleUpdate({ category: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed">
                   <option value="">Select Category</option>
                   {categoryOptions.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>

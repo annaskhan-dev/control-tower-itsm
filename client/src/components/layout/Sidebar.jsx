@@ -36,15 +36,26 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user }) => {
     if (onOpenCreateTicket) onOpenCreateTicket();
   };
 
+  // Define nav items with allowed roles matching backend permissions
   const navItems = [
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'All Work', path: '/tickets?queue=all', icon: Inbox },
-    { label: 'My Work', path: '/tickets?queue=my-work', icon: UserCheck },
-    { label: 'Unassigned', path: '/tickets?queue=unassigned', icon: InboxIcon },
-    { label: 'SLA Risk', path: '/tickets?queue=sla-risk', icon: AlertTriangle },
-    { label: 'SLA Settings', path: '/sla', icon: Clock },
-    { label: 'User Management', path: '/users', icon: Users },
+    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person'] },
+    { label: 'All Work', path: '/tickets?queue=all', icon: Inbox, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person'] },
+    { label: 'My Work', path: '/tickets?queue=my-work', icon: UserCheck, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person'] },
+    { label: 'Unassigned', path: '/tickets?queue=unassigned', icon: InboxIcon, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person'] },
+    { label: 'SLA Risk', path: '/tickets?queue=sla-risk', icon: AlertTriangle, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person'] },
+    { label: 'SLA Settings', path: '/sla', icon: Clock, roles: ['Super Admin', 'Manager'] },
+    { label: 'User Management', path: '/users', icon: Users, roles: ['Super Admin', 'Manager'] },
   ];
+
+  // Normalize user role or fallback to empty string
+  const userRole = user?.role || '';
+
+  // Filter navigation items based on user role permissions
+  const filteredNavItems = navItems.filter(item => {
+    if (!item.roles) return true;
+    // Case-insensitive / format tolerant role matching
+    return item.roles.some(r => r.toLowerCase() === userRole.toLowerCase() || r.replace(/\s+/g, '_').toLowerCase() === userRole.replace(/\s+/g, '_').toLowerCase());
+  });
 
   const checkIsActive = (itemPath) => {
     const currentFull = location.pathname + location.search;
@@ -79,7 +90,7 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user }) => {
 
       {/* Middle Section: Navigation with hidden scrollbar */}
       <nav className="flex-1 overflow-y-auto space-y-1.5 pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        {navItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = checkIsActive(item.path);
           return (

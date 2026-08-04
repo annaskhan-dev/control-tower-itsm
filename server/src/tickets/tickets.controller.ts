@@ -61,22 +61,20 @@ export class TicketsController {
     return await this.ticketsService.updateSla(id, hours, req.user.companyId, req.user.role);
   }
 
-  // --- ADD THIS METHOD TO FIX THE 404 ERROR ---
   @Delete('sla-configs/:id')
   @Roles('Manager', 'Super Admin')
   async removeSla(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     return await this.ticketsService.removeSlaConfig(id, req.user.companyId);
   }
-  // ---------------------------------------------
 
   @Post()
-  @Roles('Operator', 'Manager', 'Super Admin', 'Agent')
+  @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async create(@Req() req: AuthenticatedRequest, @Body() createTicketDto: CreateTicketDto) {
     return await this.ticketsService.create(createTicketDto, req.user.companyId, req.user.role);
   }
 
   @Get()
-  @Roles('Operator', 'Manager', 'Super Admin', 'Agent')
+  @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async findAll(@Req() req: AuthenticatedRequest, @Query('search') search: string, @Query('queue') queue: string) {
     return this.ticketsService.findAll(search, queue, req.user.companyId);
   }
@@ -88,7 +86,7 @@ export class TicketsController {
   }
 
   @Get(':id')
-  @Roles('Operator', 'Manager', 'Super Admin', 'Agent')
+  @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async findOne(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     const ticket = await this.ticketsService.findOne(id, req.user.companyId);
     if (!ticket) throw new NotFoundException(`Ticket with ID ${id} not found`);

@@ -82,6 +82,9 @@ export const Register = () => {
                 <option value="Operator">Operator</option>
                 <option value="Manager">Manager</option>
                 <option value="Super Admin">Super Admin</option>
+                <option value="Transporter">Transporter</option>
+                <option value="Shipper Ops">Shipper Ops</option>
+                <option value="Sales Person">Sales Person</option>
               </select>
             </div>
             
