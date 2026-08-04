@@ -68,20 +68,16 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     }
   }, [propTickets]);
 
-  // FIXED: Fetching Logic with Auth Gatekeeper
   useEffect(() => {
     if (propTickets.length === 0) {
       const fetchTickets = async () => {
-        // 1. GATEKEEPER: Check if a token actually exists before requesting
         const token = localStorage.getItem('access_token');
         if (!token) {
           setLoading(false);
-          return; // Stop execution if not logged in
+          return;
         }
 
         try {
-          // 2. PATH FIX: Using '/tickets'. Since your axiosInstance baseURL
-          // is '.../api', this avoids the double '/api/api' error.
           const response = await axiosInstance.get('/tickets');
           setTickets(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
@@ -138,82 +134,142 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     };
   }, [normalizedTickets]);
 
-  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
+  if (loading) return <div className="h-96 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
 
   return (
-    <div className="h-full w-full flex flex-col justify-between overflow-hidden font-sans text-slate-800 p-0.5">
-      {/* ... [Rest of your UI code remains exactly the same] ... */}
-      <div className="shrink-0 flex justify-between items-center mb-1">
+    <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 font-sans text-slate-800 p-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-bold text-[#13203B] tracking-tight leading-none">Operational Dashboard</h2>
-          <p className="text-[11px] text-slate-500 font-medium mt-1">Real-time ticketing analytics and SLA monitoring</p>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Operational Dashboard</h2>
+          <p className="text-sm text-slate-500 mt-1">Real-time ticketing analytics and SLA monitoring</p>
         </div>
       </div>
-      {/* Grid items and table remain unchanged */}
-      <div className="grid grid-cols-4 gap-2.5 shrink-0">
-         {/* ... mapped stats items ... */}
-         {[
+
+      {/* Top Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
           { label: "Total Tickets", val: stats.total, icon: Ticket, color: "blue", route: "/tickets?queue=all" },
           { label: "Open Work", val: stats.open, icon: Clock, color: "indigo", route: "/tickets?queue=all" },
           { label: "Unassigned", val: stats.unassigned, icon: UserX, color: "amber", route: "/tickets?queue=unassigned" },
           { label: "SLA Risk", val: stats.slaRisk, icon: AlertTriangle, color: "rose", route: "/tickets?queue=sla-risk" },
         ].map((item) => (
-          <div key={item.label} onClick={() => navigate(item.route)} className="p-2.5 bg-white border border-slate-200/90 rounded-xl flex items-center justify-between shadow-2xs cursor-pointer hover:border-blue-300 transition-all">
+          <div 
+            key={item.label} 
+            onClick={() => navigate(item.route)} 
+            className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-sm cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+          >
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
-              <h3 className={`text-base font-bold ${item.color === 'rose' ? 'text-rose-600' : 'text-slate-800'} mt-0.5`}>{item.val}</h3>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
+              <h3 className={`text-2xl font-bold ${item.color === 'rose' ? 'text-rose-600' : 'text-slate-900'} mt-1`}>{item.val}</h3>
             </div>
-            <div className={`p-1.5 bg-${item.color}-50 text-${item.color}-600 rounded-lg`}><item.icon size={16} /></div>
+            <div className={`p-3 bg-slate-50 text-slate-600 rounded-xl`}>
+              <item.icon size={22} />
+            </div>
           </div>
         ))}
       </div>
-      {/* ... [Rest of your return statement continues as normal] ... */}
-      <div className="grid grid-cols-4 gap-2.5 shrink-0 my-1">
-        <div className="p-2 border border-slate-200/90 rounded-xl bg-white flex flex-col justify-between">
-          <h4 className="text-[11px] font-bold text-slate-800">Priority Distribution</h4>
-          <div className="h-[90px] w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={chartData.priority} margin={{ top: 5, left: -30 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" /><XAxis dataKey="name" stroke="#94a3b8" fontSize={8} tickLine={false} /><YAxis stroke="#94a3b8" fontSize={8} tickLine={false} /><Tooltip contentStyle={{ fontSize: "10px", borderRadius: "6px" }} /><Bar dataKey="count" fill="#3b82f6" radius={[3, 3, 0, 0]} /></BarChart></ResponsiveContainer></div>
+
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
+          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Priority Distribution</h4>
+          <div className="h-40 w-full mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData.priority} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
+                <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
+                <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-        <div className="p-2 border border-slate-200/90 rounded-xl bg-white flex flex-col justify-between">
-          <h4 className="text-[11px] font-bold text-slate-800">Ticket Type Split</h4>
-          <div className="h-[90px] w-full"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={chartData.type} innerRadius="40%" outerRadius="65%" paddingAngle={3} dataKey="value">{chartData.type.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></div>
+
+        <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
+          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Ticket Type Split</h4>
+          <div className="h-40 w-full mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={chartData.type} innerRadius="45% " outerRadius="70%" paddingAngle={4} dataKey="value">
+                  {chartData.type.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
+                </Pie>
+                <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-        <div className="p-2 border border-slate-200/90 rounded-xl bg-white flex flex-col justify-between">
-          <h4 className="text-[11px] font-bold text-slate-800">SLA Health</h4>
-          <div className="h-[90px] w-full"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={chartData.sla} innerRadius="40%" outerRadius="65%" paddingAngle={3} dataKey="value">{chartData.sla.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></div>
+
+        <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
+          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">SLA Health</h4>
+          <div className="h-40 w-full mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={chartData.sla} innerRadius="45%" outerRadius="70%" paddingAngle={4} dataKey="value">
+                  {chartData.sla.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
+                </Pie>
+                <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-        <div className="p-2 border border-slate-200/90 rounded-xl bg-white flex flex-col justify-between">
-          <h4 className="text-[11px] font-bold text-slate-800">7-Day Velocity</h4>
-          <div className="h-[90px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData.trend} margin={{ top: 5, left: -30 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" /><XAxis dataKey="day" stroke="#94a3b8" fontSize={8} tickLine={false} /><YAxis stroke="#94a3b8" fontSize={8} tickLine={false} /><Tooltip /><Line type="monotone" dataKey="tickets" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} /></LineChart></ResponsiveContainer></div>
+
+        <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
+          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">7-Day Velocity</h4>
+          <div className="h-40 w-full mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData.trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
+                <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
+                <Line type="monotone" dataKey="tickets" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
-      <div className="shrink-0 p-1.5 border border-slate-200/80 rounded-xl bg-white shadow-2xs">
-        <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-slate-100">
-          <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Recent Tickets</h4>
-          <Link to="/tickets" className="text-[10px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">View All Work <ArrowRight size={11} /></Link>
+
+      {/* Recent Tickets Table */}
+      <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-sm">
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Recent Tickets</h4>
+          <Link to="/tickets" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+            View All Work <ArrowRight size={14} />
+          </Link>
         </div>
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-left border-collapse table-fixed">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100">
-                <th className="py-2 px-2 w-[15%]">Ticket ID</th>
-                <th className="py-2 px-2 w-[25%]">Title</th>
-                <th className="py-2 px-2 w-[10%]">Type</th>
-                <th className="py-2 px-2 w-[15%]">Priority</th>
-                <th className="py-2 px-2 w-[10%]">Assignee</th>
-                <th className="py-2 px-2 w-[10%]">SLA</th>
-                <th className="py-2 px-2 w-[15%] text-right">Status</th>
+              <tr className="text-xs font-bold text-slate-400 uppercase border-b border-slate-100">
+                <th className="py-3 px-3">Ticket ID</th>
+                <th className="py-3 px-3">Title</th>
+                <th className="py-3 px-3">Type</th>
+                <th className="py-3 px-3">Priority</th>
+                <th className="py-3 px-3">Assignee</th>
+                <th className="py-3 px-3">SLA</th>
+                <th className="py-3 px-3 text-right">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-[9px] font-medium text-slate-700">
+            <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
               {normalizedTickets.slice(0, 5).map((t, index) => (
                 <tr key={t.id || index} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-2 px-2 font-bold text-blue-600 truncate">{t.id.toString().substring(0, 10)}</td>
-                  <td className="py-2 px-2 font-semibold text-slate-800 truncate">{t.title}</td>
-                  <td className="py-2 px-2 text-slate-500 truncate">{t.type}</td>
-                  <td className="py-2 px-2"><span className={`px-2 py-0.5 rounded font-bold ${t.priority === "Critical" ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>{t.priority}</span></td>
-                  <td className="py-2 px-2 truncate">{t.assignee}</td>
-                  <td className="py-2 px-2"><span className={`px-2 py-0.5 rounded font-bold ${t.sla === "Breached" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>{t.sla}</span></td>
-                  <td className="py-2 px-2 text-right uppercase font-bold text-slate-500">{t.status}</td>
+                  <td className="py-3 px-3 font-bold text-blue-600">{t.id.toString().substring(0, 10)}</td>
+                  <td className="py-3 px-3 font-semibold text-slate-800">{t.title}</td>
+                  <td className="py-3 px-3 text-slate-500">{t.type}</td>
+                  <td className="py-3 px-3">
+                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${t.priority === "Critical" ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
+                      {t.priority}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3">{t.assignee}</td>
+                  <td className="py-3 px-3">
+                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${t.sla === "Breached" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>
+                      {t.sla}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-right uppercase font-bold text-slate-500 text-[11px]">{t.status}</td>
                 </tr>
               ))}
             </tbody>
