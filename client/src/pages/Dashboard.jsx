@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
 } from "recharts";
-import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2 } from "lucide-react";
+import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download } from "lucide-react";
 
 /**
  * Normalization Helper
@@ -93,6 +93,56 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
+  // Function to filter last 1 month and export tickets to Excel (CSV format)
+  const handleExportExcel = () => {
+    const currentDate = new Date();
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(currentDate.getMonth() - 1);
+
+    // Filter tickets created within the last 1 month
+    const recentTickets = normalizedTickets.filter((t) => {
+      if (!t.createdAt) return false;
+      const ticketDate = new Date(t.createdAt);
+      return ticketDate >= oneMonthAgo && ticketDate <= currentDate;
+    });
+
+    if (recentTickets.length === 0) {
+      alert("No ticket data found within the last 1 month to export.");
+      return;
+    }
+
+    // Define CSV headers
+    const headers = ["Ticket ID", "Title", "Type", "Priority", "Assignee", "SLA", "Status", "Created At"];
+
+    // Map ticket data to CSV rows
+    const csvRows = recentTickets.map((t) => {
+      const formattedDate = t.createdAt ? new Date(t.createdAt).toLocaleString() : "";
+      const ticketId = `"${(t.id || "").toString().replace(/"/g, '""')}"`;
+      const title = `"${(t.title || "").replace(/"/g, '""')}"`;
+      const type = `"${(t.type || "").replace(/"/g, '""')}"`;
+      const priority = `"${(t.priority || "").replace(/"/g, '""')}"`;
+      const assignee = `"${(t.assignee || "").replace(/"/g, '""')}"`;
+      const sla = `"${(t.sla || "").replace(/"/g, '""')}"`;
+      const status = `"${(t.status || "").replace(/"/g, '""')}"`;
+      const createdAt = `"${formattedDate}"`;
+
+      return [ticketId, title, type, priority, assignee, sla, status, createdAt].join(",");
+    });
+
+    // Combine headers and rows
+    const csvContent = [headers.join(","), ...csvRows].join("\n");
+
+    // Create a downloadable blob and trigger file download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `tickets_last_1_month_${currentDate.toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const stats = useMemo(() => ({
     total: normalizedTickets.length,
     open: normalizedTickets.filter((t) => !["closed", "resolved"].includes(t.status)).length,
@@ -144,6 +194,12 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Operational Dashboard</h2>
           <p className="text-sm text-slate-500 mt-1">Real-time ticketing analytics and SLA monitoring</p>
         </div>
+        <button
+          onClick={handleExportExcel}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm flex items-center gap-2"
+        >
+          <Download size={16} /> Export Last 1 Month to Excel
+        </button>
       </div>
 
       {/* Top Metric Cards */}
@@ -192,7 +248,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           <div className="h-40 w-full mt-2">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={chartData.type} innerRadius="45% " outerRadius="70%" paddingAngle={4} dataKey="value">
+                <Pie data={chartData.type} innerRadius="45%" outerRadius="70%" paddingAngle={4} dataKey="value">
                   {chartData.type.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
                 </Pie>
                 <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
