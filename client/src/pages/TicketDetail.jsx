@@ -107,10 +107,9 @@ export const TicketDetail = () => {
     payload.slaDeadline = calculateDeadline(newCategory, newPriority);
 
     if ('subAssignment' in payload) {
-      const finalVal = payload.subAssignment === "custom" ? customSubAssignment : payload.subAssignment;
+      const finalVal = subAssignment === "custom" ? customSubAssignment : payload.subAssignment;
       payload.subAssignment = finalVal;
       
-      // Calculate subAssignmentAt dynamically depending on state changes
       if (finalVal && !ticket.subAssignment) {
         payload.subAssignmentAt = new Date().toISOString();
       } else if (finalVal && ticket.subAssignment !== finalVal) {
@@ -242,9 +241,7 @@ export const TicketDetail = () => {
                     type="text"
                     value={customSubAssignment}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      setCustomSubAssignment(val);
-                      setSubAssignment(val);
+                      setCustomSubAssignment(e.target.value);
                     }}
                     placeholder="Enter custom sub assignment text..."
                     className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
