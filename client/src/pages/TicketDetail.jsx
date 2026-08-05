@@ -121,14 +121,9 @@ export const TicketDetail = () => {
     setIsUpdating(true);
     updateLocalTicket(ticket._id, payload);
     try {
-      const res = await axiosInstance.patch(`/tickets/${ticket._id}`, payload);
-      // Ensure local state instantly updates with the fresh backend response document
-      if (res.data) {
-        updateLocalTicket(ticket._id, res.data);
-      }
+      await axiosInstance.patch(`/tickets/${ticket._id}`, payload);
       await fetchTickets();
     } catch (err) {
-      console.error("Update failed:", err);
       alert("Update failed. Check your permissions.");
       await fetchTickets();
     } finally {
