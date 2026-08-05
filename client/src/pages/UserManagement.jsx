@@ -60,13 +60,14 @@ export const UserManagement = () => {
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (user) => {
-    setEditingUser(user);
+  const handleOpenEdit = (userObj) => {
+    const normalizedUser = { ...userObj, _id: userObj._id || userObj.id };
+    setEditingUser(normalizedUser);
     setFormData({
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      avatarColor: user.avatarColor,
+      name: normalizedUser.name,
+      email: normalizedUser.email,
+      role: normalizedUser.role,
+      avatarColor: normalizedUser.avatarColor,
       password: "",
     });
     setIsModalOpen(true);
@@ -74,12 +75,13 @@ export const UserManagement = () => {
 
   const handleToggleStatus = async (targetUser) => {
     if (!isAdmin) return;
+    const targetId = targetUser._id || targetUser.id;
     const newStatus = targetUser.status === "Active" ? "Inactive" : "Active";
     try {
-      await api.patch(`/users/${targetUser._id}`, { status: newStatus });
+      await api.patch(`/users/${targetId}`, { status: newStatus });
       setUsers(
         users.map((u) =>
-          u._id === targetUser._id ? { ...u, status: newStatus } : u,
+          (u._id || u.id) === targetId ? { ...u, status: newStatus } : u,
         ),
       );
     } catch (error) {
@@ -96,7 +98,7 @@ export const UserManagement = () => {
     ) {
       try {
         await api.delete(`/users/${id}`);
-        setUsers(users.filter((u) => u._id !== id));
+        setUsers(users.filter((u) => (u._id || u.id) !== id));
       } catch (error) {
         alert(
           "Failed to delete user: " +
@@ -115,8 +117,13 @@ export const UserManagement = () => {
       }
 
       if (editingUser) {
-        const { data } = await api.patch(`/users/${editingUser._id}`, payload);
-        setUsers(users.map((u) => (u._id === editingUser._id ? data : u)));
+        const userId = editingUser._id || editingUser.id;
+        if (!userId) {
+          alert("Error: User ID is missing. Please close the modal and try editing again.");
+          return;
+        }
+        const { data } = await api.patch(`/users/${userId}`, payload);
+        setUsers(users.map((u) => ((u._id || u.id) === userId ? data : u)));
       } else {
         const { data } = await api.post("/users", payload);
         setUsers([...users, data]);
@@ -176,64 +183,67 @@ export const UserManagement = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {users.length > 0 ? (
-                  users.map((u) => (
-                    <tr
-                      key={u._id}
-                      className="hover:bg-slate-50 transition-colors text-sm"
-                    >
-                      <td className="p-4 font-semibold text-slate-900 flex items-center gap-3">
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
-                          style={{ backgroundColor: u.avatarColor }}
-                        >
-                          {u.name?.charAt(0).toUpperCase()}
-                        </div>
-                        {u.name}
-                      </td>
-                      <td className="p-4 text-slate-600">{u.email}</td>
-                      <td className="p-4 font-medium text-slate-700">{u.role}</td>
-                      <td className="p-4">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                            u.status === "Active" 
-                              ? "bg-emerald-100 text-emerald-800" 
-                              : "bg-slate-200 text-slate-600"
-                          }`}
-                        >
-                          {u.status || "Active"}
-                        </span>
-                      </td>
-                      {isAdmin && (
-                        <td className="p-4 text-right space-x-1">
-                          <button
-                            onClick={() => handleOpenEdit(u)}
-                            className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition"
-                            title="Edit User"
+                  users.map((u) => {
+                    const rowId = u._id || u.id;
+                    return (
+                      <tr
+                        key={rowId}
+                        className="hover:bg-slate-50 transition-colors text-sm"
+                      >
+                        <td className="p-4 font-semibold text-slate-900 flex items-center gap-3">
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
+                            style={{ backgroundColor: u.avatarColor }}
                           >
-                            <Edit3 size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleToggleStatus(u)}
-                            className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition"
-                            title="Toggle Status"
-                          >
-                            {u.status === "Active" ? (
-                              <UserX size={16} className="text-rose-500" />
-                            ) : (
-                              <UserCheck size={16} className="text-emerald-500" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => handleDelete(u._id)}
-                            className="p-2 hover:bg-slate-100 rounded-lg text-rose-500 transition"
-                            title="Delete User"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                            {u.name?.charAt(0).toUpperCase()}
+                          </div>
+                          {u.name}
                         </td>
-                      )}
-                    </tr>
-                  ))
+                        <td className="p-4 text-slate-600">{u.email}</td>
+                        <td className="p-4 font-medium text-slate-700">{u.role}</td>
+                        <td className="p-4">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                              u.status === "Active" 
+                                ? "bg-emerald-100 text-emerald-800" 
+                                : "bg-slate-200 text-slate-600"
+                            }`}
+                          >
+                            {u.status || "Active"}
+                          </span>
+                        </td>
+                        {isAdmin && (
+                          <td className="p-4 text-right space-x-1">
+                            <button
+                              onClick={() => handleOpenEdit(u)}
+                              className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition"
+                              title="Edit User"
+                            >
+                              <Edit3 size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleToggleStatus(u)}
+                              className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition"
+                              title="Toggle Status"
+                            >
+                              {u.status === "Active" ? (
+                                <UserX size={16} className="text-rose-500" />
+                              ) : (
+                                <UserCheck size={16} className="text-emerald-500" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleDelete(rowId)}
+                              className="p-2 hover:bg-slate-100 rounded-lg text-rose-500 transition"
+                              title="Delete User"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td colSpan="5" className="p-12 text-center text-slate-400 italic text-base">
