@@ -44,15 +44,18 @@ export class TicketsService {
       const hoursAllowed = slaConfig ? slaConfig.hours : 24;
       const deadline = new Date(Date.now() + hoursAllowed * 60 * 60 * 1000);
       const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
+      const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
 
       const ticketData = {
         ...createTicketDto,
         category,
         status: 'Open',
         assignee: isAssigned ? createTicketDto.assignee : 'Unassigned',
+        subAssignment: isSubAssigned ? createTicketDto.subAssignment : null,
         ticketId: `INC-${Math.floor(10000 + Math.random() * 90000)}`,
         slaDeadline: deadline,
         assignedAt: isAssigned ? new Date() : null,
+        subAssignmentAt: isSubAssigned ? new Date() : null,
         companyId: companyId,
       };
 
@@ -102,6 +105,11 @@ export class TicketsService {
     if (updateData.assignee !== undefined && updateData.assignee !== existingTicket.assignee) {
       const isActuallyAssigned = updateData.assignee !== 'Unassigned' && updateData.assignee !== '';
       updateData.assignedAt = isActuallyAssigned ? new Date() : null;
+    }
+
+    if (updateData.subAssignment !== undefined && updateData.subAssignment !== existingTicket.subAssignment) {
+      const isActuallySubAssigned = updateData.subAssignment !== 'Unassigned' && updateData.subAssignment !== '';
+      updateData.subAssignmentAt = isActuallySubAssigned ? new Date() : null;
     }
 
     const updatedTicket = await this.ticketModel

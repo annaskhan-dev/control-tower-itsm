@@ -30,6 +30,12 @@ export class Ticket extends Document {
   @Prop()
   assignedAt!: Date;
 
+  @Prop()
+  subAssignment!: string;
+
+  @Prop()
+  subAssignmentAt!: Date;
+
   @Prop({ default: 'fleet-coordination' })
   category!: string;
 

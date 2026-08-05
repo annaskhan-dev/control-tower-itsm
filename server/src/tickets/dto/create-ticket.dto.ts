@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsDate } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateTicketDto {
   @IsString()
@@ -32,6 +33,15 @@ export class CreateTicketDto {
   @IsString()
   @IsOptional()
   assignee?: string;
+
+  @IsString()
+  @IsOptional()
+  subAssignment?: string;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  subAssignmentAt?: Date;
 
   // companyId is usually handled by the controller via req.user, 
   // but keeping it here as requested.

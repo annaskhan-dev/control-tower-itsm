@@ -29,8 +29,6 @@ interface AuthenticatedRequest extends Request {
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
 
-  // ... (Keep existing methods)
-
   @Post('sla-configs/categories')
   @Roles('Manager', 'Super Admin')
   async createSlaCategory(
@@ -94,7 +92,7 @@ export class TicketsController {
   }
 
   @Patch(':id')
-  @Roles('Operator', 'Manager', 'Super Admin', 'Agent')
+  @Roles('Manager', 'Super Admin')
   async update(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,

@@ -4,7 +4,6 @@ import { IsOptional, IsDate, IsArray, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateTicketDto extends PartialType(CreateTicketDto) {
-  
   @IsOptional()
   @Type(() => Date)
   @IsDate()
@@ -14,7 +13,6 @@ export class UpdateTicketDto extends PartialType(CreateTicketDto) {
   @IsArray()
   comments?: any[];
 
-  // Explicitly add these so the service can read them
   @IsOptional()
   @IsString()
   assignee?: string;
@@ -22,4 +20,13 @@ export class UpdateTicketDto extends PartialType(CreateTicketDto) {
   @IsOptional()
   @IsString()
   category?: string;
+
+  @IsOptional()
+  @IsString()
+  subAssignment?: string;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  subAssignmentAt?: Date;
 }

@@ -109,6 +109,8 @@ export const TicketDetail = () => {
     if ('subAssignment' in payload) {
       const finalVal = payload.subAssignment === "custom" ? customSubAssignment : payload.subAssignment;
       payload.subAssignment = finalVal;
+      
+      // Calculate subAssignmentAt dynamically depending on state changes
       if (finalVal && !ticket.subAssignment) {
         payload.subAssignmentAt = new Date().toISOString();
       } else if (finalVal && ticket.subAssignment !== finalVal) {
