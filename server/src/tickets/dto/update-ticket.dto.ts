@@ -29,4 +29,9 @@ export class UpdateTicketDto extends PartialType(CreateTicketDto) {
   @Type(() => Date)
   @IsDate()
   subAssignmentAt?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  resolvedAt?: Date; // <--- Added resolvedAt to allow the update through DTO validation
 }
