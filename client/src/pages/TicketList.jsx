@@ -34,7 +34,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const diffMinutes = t.slaDeadline ? (deadline.getTime() - now.getTime()) / (1000 * 60) : Infinity;
 
       let slaStatus = "On Track";
-      if (t.status !== "Closed") {
+      if (t.status !== "Resolved") {
         if (diffMinutes < 0) slaStatus = "Breached";
         else if (diffMinutes < 30) slaStatus = "At Risk";
       }
@@ -122,13 +122,19 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                     {t.slaStatus}
                   </td>
                   <td className="p-4">
-                    <span className={`px-2.5 py-1 font-bold uppercase rounded-full text-xs ${
-                        t.status === "Closed" ? "bg-slate-100 text-slate-500" : 
-                        t.status === "Resolved" ? "bg-emerald-100 text-emerald-700" :
-                        "bg-blue-100 text-blue-600"
-                    }`}>
-                      {t.status || "Open"}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className={`px-2.5 py-1 font-bold uppercase rounded-full text-xs w-max ${
+                          t.status === "Resolved" ? "bg-emerald-100 text-emerald-700" :
+                          "bg-blue-100 text-blue-600"
+                      }`}>
+                        {t.status || "Open"}
+                      </span>
+                      {t.status === "Resolved" && t.resolvedAt && (
+                        <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                          {formatDate(t.resolvedAt)}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

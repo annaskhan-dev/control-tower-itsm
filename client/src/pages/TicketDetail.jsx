@@ -119,6 +119,15 @@ export const TicketDetail = () => {
       }
     }
 
+    // Logic for tracking when a ticket becomes "Resolved"
+    if ('status' in payload) {
+      if (payload.status === "Resolved" && ticket.status !== "Resolved") {
+        payload.resolvedAt = new Date().toISOString();
+      } else if (payload.status !== "Resolved") {
+        payload.resolvedAt = null;
+      }
+    }
+
     setIsUpdating(true);
     updateLocalTicket(ticket._id, payload);
     try {
@@ -148,7 +157,7 @@ export const TicketDetail = () => {
 
   if (!ticket) return <div className="p-4 text-center text-slate-500 text-sm">Loading...</div>;
 
-  const isOverdue = ticket.slaDeadline && new Date(ticket.slaDeadline) < new Date() && ticket.status !== "Closed";
+  const isOverdue = ticket.slaDeadline && new Date(ticket.slaDeadline) < new Date() && ticket.status !== "Resolved";
 
   return (
     <div className="h-full bg-slate-50 overflow-y-auto p-6">
@@ -261,7 +270,7 @@ export const TicketDetail = () => {
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Status</label>
                 <select disabled={!canEditStatus} value={ticket.status || ""} onChange={(e) => handleUpdate({ status: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed">
-                  {["Open", "In Progress", "Resolved", "Closed"].map((o) => <option key={o} value={o}>{o}</option>)}
+                  {["Open", "In Progress", "Resolved"].map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
 
@@ -294,6 +303,15 @@ export const TicketDetail = () => {
                 </label>
                 <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600">
                   {ticket.subAssignmentAt ? new Date(ticket.subAssignmentAt).toLocaleString() : "Not Sub-assigned Yet"}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block flex items-center gap-1">
+                  <Calendar size={10} /> Resolved Time
+                </label>
+                <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600">
+                  {ticket.resolvedAt ? new Date(ticket.resolvedAt).toLocaleString() : "Not Resolved Yet"}
                 </div>
               </div>
             </div>
