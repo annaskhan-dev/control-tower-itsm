@@ -214,15 +214,18 @@ export const TicketDetail = () => {
               />
             </div>
 
-            {/* Sub Assignment Panel */}
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+            {/* Sub Assignment Panel with restriction indicator */}
+            <div 
+              className={`bg-white border border-slate-200 rounded-xl shadow-sm p-5 ${isRestricted ? 'cursor-not-allowed' : ''}`}
+              title={isRestricted ? "You do not have permission to modify this section" : ""}
+            >
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <UserPlus size={16} className="text-blue-600" /> Sub Assignment
                 </h3>
                 <button
                   onClick={() => handleUpdate({ subAssignment })}
-                  disabled={isUpdating}
+                  disabled={isUpdating || isRestricted}
                   className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
                 >
                   {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
@@ -232,6 +235,7 @@ export const TicketDetail = () => {
               <div className="space-y-3">
                 <select
                   value={subAssignment}
+                  disabled={isRestricted}
                   onChange={(e) => {
                     const val = e.target.value;
                     setSubAssignment(val);
@@ -239,7 +243,7 @@ export const TicketDetail = () => {
                       setCustomSubAssignment("");
                     }
                   }}
-                  className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                   <option value="">Select Company User</option>
                   {companyUsers.map((u) => (
@@ -254,11 +258,12 @@ export const TicketDetail = () => {
                   <input
                     type="text"
                     value={customSubAssignment}
+                    disabled={isRestricted}
                     onChange={(e) => {
                       setCustomSubAssignment(e.target.value);
                     }}
                     placeholder="Enter custom sub assignment text..."
-                    className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                   />
                 )}
               </div>
@@ -287,9 +292,16 @@ export const TicketDetail = () => {
                 <input disabled value={ticket.priority || "Medium"} className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-500 cursor-not-allowed" />
               </div>
 
+              {/* Category with restriction hover & disabled states */}
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Category</label>
-                <select disabled={!canEditCategory} value={ticket.category || ""} onChange={(e) => handleUpdate({ category: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed">
+                <select 
+                  disabled={!canEditCategory || isRestricted} 
+                  value={ticket.category || ""} 
+                  onChange={(e) => handleUpdate({ category: e.target.value })} 
+                  title={isRestricted ? "You do not have permission to modify this category" : ""}
+                  className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                >
                   <option value="">Select Category</option>
                   {categoryOptions.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
