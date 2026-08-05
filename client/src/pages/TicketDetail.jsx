@@ -24,6 +24,7 @@ export const TicketDetail = () => {
 
   const [description, setDescription] = useState("");
   const [subAssignment, setSubAssignment] = useState("");
+  const [customSubAssignment, setCustomSubAssignment] = useState("");
   const [companyUsers, setCompanyUsers] = useState([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -72,9 +73,17 @@ export const TicketDetail = () => {
   useEffect(() => {
     if (ticket) {
       setDescription(ticket.description || "");
-      setSubAssignment(ticket.subAssignment || "");
+      const val = ticket.subAssignment || "";
+      const isExistingUser = companyUsers.some(u => (u.name || u.email) === val);
+      if (val && !isExistingUser) {
+        setSubAssignment("custom");
+        setCustomSubAssignment(val);
+      } else {
+        setSubAssignment(val);
+        setCustomSubAssignment("");
+      }
     }
-  }, [ticket]);
+  }, [ticket, companyUsers]);
 
   const calculateDeadline = (category, priority) => {
     const rule = slaConfigs.find(
@@ -98,9 +107,11 @@ export const TicketDetail = () => {
     payload.slaDeadline = calculateDeadline(newCategory, newPriority);
 
     if ('subAssignment' in payload) {
-      if (payload.subAssignment && !ticket.subAssignment) {
+      const finalVal = payload.subAssignment === "custom" ? customSubAssignment : payload.subAssignment;
+      payload.subAssignment = finalVal;
+      if (finalVal && !ticket.subAssignment) {
         payload.subAssignmentAt = new Date().toISOString();
-      } else if (!payload.subAssignment) {
+      } else if (!finalVal) {
         payload.subAssignmentAt = null;
       }
     }
@@ -201,10 +212,16 @@ export const TicketDetail = () => {
                   Assign
                 </button>
               </div>
-              <select
-                value={subAssignment}
-                onChange={(e) => setSubAssignment(e.target.value)}
-                className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+              <div className="space-y-3">
+                <select
+                  value={subAssignment}
+                  onChange={(e) => {
+                    setSubAssignment(e.target.value);
+                    if (e.target.value !== "custom") {
+                      setCustomSubAssignment("");
+                    }
+                  }}
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="">Select Company User</option>
                 {companyUsers.map((u) => (
@@ -212,7 +229,19 @@ export const TicketDetail = () => {
                     {u.name} ({u.role || "User"})
                   </option>
                 ))}
+                <option value="custom">Other (Type Custom Text)...</option>
               </select>
+
+              {subAssignment === "custom" && (
+                <input
+                  type="text"
+                  value={customSubAssignment}
+                  onChange={(e) => setCustomSubAssignment(e.target.value)}
+                  placeholder="Enter custom sub assignment text..."
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              )}
+            </div>
             </div>
           </div>
 
