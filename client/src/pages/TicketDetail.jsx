@@ -119,11 +119,10 @@ export const TicketDetail = () => {
       }
     }
 
-    // Logic for tracking when a ticket becomes "Resolved"
     if ('status' in payload) {
       if (payload.status === "Resolved" && ticket.status !== "Resolved") {
         payload.resolvedAt = new Date().toISOString();
-      } else if (payload.status !== "Resolved") {
+      } else if (payload.status && payload.status !== "Resolved") {
         payload.resolvedAt = null;
       }
     }
