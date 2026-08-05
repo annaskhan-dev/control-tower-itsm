@@ -97,6 +97,8 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                 <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Category</th>
                 <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Assignee</th>
                 <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Assigned At</th>
+                <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Sub Assignment</th>
+                <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Sub Assigned At</th>
                 <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">SLA</th>
                 <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Status</th>
               </tr>
@@ -114,6 +116,8 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                   <td className="p-4 text-slate-500">{t.category || "—"}</td>
                   <td className="p-4 text-slate-500">{t.assignee || "Unassigned"}</td>
                   <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(t.assignedAt)}</td>
+                  <td className="p-4 text-slate-500">{t.subAssignment || "—"}</td>
+                  <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(t.subAssignmentAt)}</td>
                   <td className={`p-4 font-bold ${t.slaStatus === "Breached" ? "text-rose-600" : t.slaStatus === "At Risk" ? "text-amber-600" : "text-emerald-600"}`}>
                     {t.slaStatus}
                   </td>
