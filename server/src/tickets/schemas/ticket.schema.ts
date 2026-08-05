@@ -36,6 +36,9 @@ export class Ticket extends Document {
   @Prop()
   subAssignmentAt!: Date;
 
+  @Prop()
+  resolvedAt!: Date; // <--- Added resolvedAt timestamp field
+
   @Prop({ default: 'fleet-coordination' })
   category!: string;
 

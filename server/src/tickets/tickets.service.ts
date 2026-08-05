@@ -56,6 +56,7 @@ export class TicketsService {
         slaDeadline: deadline,
         assignedAt: isAssigned ? new Date() : null,
         subAssignmentAt: isSubAssigned ? new Date() : null,
+        resolvedAt: null,
         companyId: companyId,
       };
 
@@ -112,8 +113,17 @@ export class TicketsService {
       updateData.subAssignmentAt = isActuallySubAssigned ? new Date() : null;
     }
 
+    // Automatically handle resolvedAt timestamp when status changes
+    if (updateData.status !== undefined && updateData.status !== existingTicket.status) {
+      if (updateData.status === 'Resolved') {
+        updateData.resolvedAt = new Date();
+      } else {
+        updateData.resolvedAt = null;
+      }
+    }
+
     const updatedTicket = await this.ticketModel
-      .findOneAndUpdate({ ...baseQuery, companyId }, updateData, { new: true })
+      .findOneAndUpdate({ ...baseQuery, companyId }, updateData, { new: true, runValidators: true })
       .exec();
 
     if (!updatedTicket) {

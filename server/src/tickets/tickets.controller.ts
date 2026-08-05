@@ -78,7 +78,7 @@ export class TicketsController {
   }
 
   @Get('stats')
-  @Roles('Operator', 'Manager', 'Super Admin', 'Agent')
+  @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async getStats(@Req() req: AuthenticatedRequest) {
     return await this.ticketsService.getStats(req.user.companyId);
   }
@@ -92,7 +92,7 @@ export class TicketsController {
   }
 
   @Patch(':id')
-  @Roles('Manager', 'Super Admin')
+  @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async update(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
