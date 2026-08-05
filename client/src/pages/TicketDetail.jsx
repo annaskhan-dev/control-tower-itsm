@@ -111,6 +111,8 @@ export const TicketDetail = () => {
       payload.subAssignment = finalVal;
       if (finalVal && !ticket.subAssignment) {
         payload.subAssignmentAt = new Date().toISOString();
+      } else if (finalVal && ticket.subAssignment !== finalVal) {
+        payload.subAssignmentAt = new Date().toISOString();
       } else if (!finalVal) {
         payload.subAssignmentAt = null;
       }
@@ -216,32 +218,37 @@ export const TicketDetail = () => {
                 <select
                   value={subAssignment}
                   onChange={(e) => {
-                    setSubAssignment(e.target.value);
-                    if (e.target.value !== "custom") {
+                    const val = e.target.value;
+                    setSubAssignment(val);
+                    if (val !== "custom") {
                       setCustomSubAssignment("");
                     }
                   }}
                   className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="">Select Company User</option>
-                {companyUsers.map((u) => (
-                  <option key={u._id || u.id} value={u.name || u.email}>
-                    {u.name} ({u.role || "User"})
-                  </option>
-                ))}
-                <option value="custom">Other (Type Custom Text)...</option>
-              </select>
+                >
+                  <option value="">Select Company User</option>
+                  {companyUsers.map((u) => (
+                    <option key={u._id || u.id} value={u.name || u.email}>
+                      {u.name} ({u.role || "User"})
+                    </option>
+                  ))}
+                  <option value="custom">Other (Type Custom Text)...</option>
+                </select>
 
-              {subAssignment === "custom" && (
-                <input
-                  type="text"
-                  value={customSubAssignment}
-                  onChange={(e) => setCustomSubAssignment(e.target.value)}
-                  placeholder="Enter custom sub assignment text..."
-                  className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              )}
-            </div>
+                {subAssignment === "custom" && (
+                  <input
+                    type="text"
+                    value={customSubAssignment}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomSubAssignment(val);
+                      setSubAssignment(val);
+                    }}
+                    placeholder="Enter custom sub assignment text..."
+                    className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                )}
+              </div>
             </div>
           </div>
 
@@ -288,7 +295,7 @@ export const TicketDetail = () => {
                 </label>
                 <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600">
                   {ticket.subAssignmentAt ? new Date(ticket.subAssignmentAt).toLocaleString() : "Not Sub-assigned Yet"}
-              </div>
+                </div>
               </div>
             </div>
           </div>
