@@ -63,6 +63,9 @@ export const TicketDetail = () => {
   const canEditStatus = canEditField(user?.role, "status");
   const canEditCategory = canEditField(user?.role, "category");
 
+  // Check if current user is restricted (i.e. not Manager or Super Admin)
+  const isRestricted = !['Manager', 'Super Admin'].includes(user?.role);
+
   const ticket = useMemo(() => {
     if (!tickets) return null;
     return tickets.find(
@@ -177,7 +180,10 @@ export const TicketDetail = () => {
           
           {/* Left Column: Description Panel & Sub Assignment */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+            <div 
+              className={`bg-white border border-slate-200 rounded-xl shadow-sm p-5 ${isRestricted ? 'cursor-not-allowed' : ''}`}
+              title={isRestricted ? "You do not have permission to modify this section" : ""}
+            >
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-sm">Description</h3>
                 <div className="flex gap-2">
@@ -261,7 +267,10 @@ export const TicketDetail = () => {
 
           {/* Right Column: Properties */}
           <div className="space-y-4">
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 space-y-4">
+            <div 
+              className={`bg-white border border-slate-200 rounded-xl shadow-sm p-5 space-y-4 ${isRestricted ? 'cursor-not-allowed' : ''}`}
+              title={isRestricted ? "You do not have permission to modify these properties" : ""}
+            >
               <h3 className="text-xs font-bold flex items-center gap-2 text-slate-700">
                 <ShieldAlert size={14} className="text-blue-600" /> Properties
               </h3>
