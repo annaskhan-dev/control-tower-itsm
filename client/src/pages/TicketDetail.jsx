@@ -12,7 +12,8 @@ import {
   ShieldAlert,
   Calendar,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  UserPlus
 } from "lucide-react";
 
 export const TicketDetail = () => {
@@ -22,6 +23,8 @@ export const TicketDetail = () => {
   const { user } = useAuth();
 
   const [description, setDescription] = useState("");
+  const [subAssignment, setSubAssignment] = useState("");
+  const [companyUsers, setCompanyUsers] = useState([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [slaConfigs, setSlaConfigs] = useState([]);
@@ -32,6 +35,18 @@ export const TicketDetail = () => {
       setSlaConfigs(data || []);
     };
     loadSla();
+  }, []);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await axiosInstance.get("/users");
+        setCompanyUsers(res.data || []);
+      } catch (err) {
+        console.error("Failed to fetch company users", err);
+      }
+    };
+    fetchUsers();
   }, []);
 
   const categoryOptions = useMemo(() => {
@@ -55,7 +70,10 @@ export const TicketDetail = () => {
   }, [tickets, id]);
 
   useEffect(() => {
-    if (ticket) setDescription(ticket.description || "");
+    if (ticket) {
+      setDescription(ticket.description || "");
+      setSubAssignment(ticket.subAssignment || "");
+    }
   }, [ticket]);
 
   const calculateDeadline = (category, priority) => {
@@ -78,6 +96,14 @@ export const TicketDetail = () => {
     const newCategory = payload.category || ticket.category;
     const newPriority = payload.priority || ticket.priority;
     payload.slaDeadline = calculateDeadline(newCategory, newPriority);
+
+    if ('subAssignment' in payload) {
+      if (payload.subAssignment && !ticket.subAssignment) {
+        payload.subAssignmentAt = new Date().toISOString();
+      } else if (!payload.subAssignment) {
+        payload.subAssignmentAt = null;
+      }
+    }
 
     setIsUpdating(true);
     updateLocalTicket(ticket._id, payload);
@@ -127,8 +153,8 @@ export const TicketDetail = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Left Column: Description Panel */}
-          <div className="lg:col-span-2 space-y-4">
+          {/* Left Column: Description Panel & Sub Assignment */}
+          <div className="lg:col-span-2 space-y-6">
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-sm">Description</h3>
@@ -154,10 +180,39 @@ export const TicketDetail = () => {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={!canEditDesc}
-                rows={8} // Shortened box height
+                rows={8}
                 className="w-full p-4 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-slate-50 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 placeholder="No description provided..."
               />
+            </div>
+
+            {/* Sub Assignment Panel */}
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <UserPlus size={16} className="text-blue-600" /> Sub Assignment
+                </h3>
+                <button
+                  onClick={() => handleUpdate({ subAssignment })}
+                  disabled={isUpdating}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+                >
+                  {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Assign
+                </button>
+              </div>
+              <select
+                value={subAssignment}
+                onChange={(e) => setSubAssignment(e.target.value)}
+                className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="">Select Company User</option>
+                {companyUsers.map((u) => (
+                  <option key={u._id || u.id} value={u.name || u.email}>
+                    {u.name} ({u.role || "User"})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -196,6 +251,15 @@ export const TicketDetail = () => {
                   {isOverdue && <AlertCircle size={12} />}
                   {ticket.slaDeadline ? new Date(ticket.slaDeadline).toLocaleString() : "No Deadline Set"}
                 </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block flex items-center gap-1">
+                  <Calendar size={10} /> Sub Assignment Time
+                </label>
+                <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600">
+                  {ticket.subAssignmentAt ? new Date(ticket.subAssignmentAt).toLocaleString() : "Not Sub-assigned Yet"}
+              </div>
               </div>
             </div>
           </div>
