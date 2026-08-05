@@ -76,10 +76,10 @@ export const UserManagement = () => {
     if (!isAdmin) return;
     const newStatus = targetUser.status === "Active" ? "Inactive" : "Active";
     try {
-      await api.patch(`/users/${targetUser.id}`, { status: newStatus });
+      await api.patch(`/users/${targetUser._id}`, { status: newStatus });
       setUsers(
         users.map((u) =>
-          u.id === targetUser.id ? { ...u, status: newStatus } : u,
+          u._id === targetUser._id ? { ...u, status: newStatus } : u,
         ),
       );
     } catch (error) {
@@ -96,7 +96,7 @@ export const UserManagement = () => {
     ) {
       try {
         await api.delete(`/users/${id}`);
-        setUsers(users.filter((u) => u.id !== id));
+        setUsers(users.filter((u) => u._id !== id));
       } catch (error) {
         alert(
           "Failed to delete user: " +
@@ -115,8 +115,8 @@ export const UserManagement = () => {
       }
 
       if (editingUser) {
-        const { data } = await api.patch(`/users/${editingUser.id}`, payload);
-        setUsers(users.map((u) => (u.id === editingUser.id ? data : u)));
+        const { data } = await api.patch(`/users/${editingUser._id}`, payload);
+        setUsers(users.map((u) => (u._id === editingUser._id ? data : u)));
       } else {
         const { data } = await api.post("/users", payload);
         setUsers([...users, data]);
@@ -178,7 +178,7 @@ export const UserManagement = () => {
                 {users.length > 0 ? (
                   users.map((u) => (
                     <tr
-                      key={u.id}
+                      key={u._id}
                       className="hover:bg-slate-50 transition-colors text-sm"
                     >
                       <td className="p-4 font-semibold text-slate-900 flex items-center gap-3">
@@ -224,7 +224,7 @@ export const UserManagement = () => {
                             )}
                           </button>
                           <button
-                            onClick={() => handleDelete(u.id)}
+                            onClick={() => handleDelete(u._id)}
                             className="p-2 hover:bg-slate-100 rounded-lg text-rose-500 transition"
                             title="Delete User"
                           >
