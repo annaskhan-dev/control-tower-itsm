@@ -127,8 +127,7 @@ const normalizeTicket = (t, now) => {
 };
 
 /**
- * Isolated Pie Chart Component wrapped in React.memo to completely bypass 
- * full component-tree re-render lag during parent layout shifts or state changes.
+ * Isolated Pie Chart Component using a smooth, controlled animation speed (`animationDuration`).
  */
 const OptimizedPieCard = memo(({ title, data }) => (
   <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
@@ -142,7 +141,9 @@ const OptimizedPieCard = memo(({ title, data }) => (
             outerRadius="70%" 
             paddingAngle={4} 
             dataKey="value"
-            isAnimationActive={false}
+            isAnimationActive={true}
+            animationDuration={1200}
+            animationEasing="ease-out"
           >
             {data.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
           </Pie>
@@ -351,7 +352,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Isolated & Memoized Round/Pie Charts for Maximum Rendering Speed */}
+        {/* Optimized Round/Pie Charts with a smooth, elegant entry animation speed */}
         <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
