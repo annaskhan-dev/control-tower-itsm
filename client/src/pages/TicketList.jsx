@@ -194,7 +194,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                     <th className="p-4">Category</th>
                     <th className="p-4">Assignee</th>
                     <th className="p-4">Assignment Time</th>
-                    <th className="p-4">SLA Elapsed</th>
+                    <th className="p-4">SLA Active Time</th>
                     <th className="p-4">Sub-Assignment</th>
                     <th className="p-4">Sub-Assignee Time</th>
                     <th className="p-4">SLA Health</th>
