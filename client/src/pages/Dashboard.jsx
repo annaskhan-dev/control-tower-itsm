@@ -17,7 +17,7 @@ const normalizeTicket = (t, now) => {
   }
 
   // Sub-assignee parsing
-  let rawSubAssignee = t.subAssignee || t.sub_assignee || t.subAssignedTo || t.sub_assigned_to || null;
+  let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || t.sub_assigned_to || t.subAssignee || null;
   if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
   }
@@ -27,15 +27,16 @@ const normalizeTicket = (t, now) => {
   if (typeof sla === "string") {
     const lowerSla = sla.toLowerCase();
     if (lowerSla.includes("breach")) sla = "Breached";
-    else if (lowerSla.includes("due") || lowerSla.includes("warn")) sla = "Due Soon";
+    else if (lowerSla.includes("due") || lowerSla.includes("warn") || lowerSla.includes("risk")) sla = "At Risk";
     else sla = "On Track";
   }
   
   if (t.slaDeadline) {
     const deadline = new Date(t.slaDeadline);
     if (!isNaN(deadline.getTime())) {
-      if (deadline < now) sla = "Breached";
-      else if (deadline < new Date(now.getTime() + 2 * 60 * 60 * 1000)) sla = "Due Soon";
+      const diffMinutes = (deadline.getTime() - now.getTime()) / (1000 * 60);
+      if (diffMinutes < 0) sla = "Breached";
+      else if (diffMinutes < 30) sla = "At Risk";
     }
   }
 
@@ -45,67 +46,73 @@ const normalizeTicket = (t, now) => {
   else if (rawPriorityStr.includes("high") || rawPriorityStr.includes("p2")) priority = "High";
   else if (rawPriorityStr.includes("med") || rawPriorityStr.includes("p3")) priority = "Medium";
 
-  const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "Request").toString();
+  const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
   
-  const status = (t.status || t.ticketStatus || t.state || "new").toString().toLowerCase().replace(/_/g, " ");
+  const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
   const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
-  const isAssigned = typeof rawAssignee === "string" && rawAssignee.toLowerCase() !== "unassigned";
+  const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
+  const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
+  
+  const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
+  const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned";
 
   // Timestamps
-  const createdAtTime = new Date(t.createdAt || t.created_at || t.creationDate || now).getTime();
-  const assignedAtTime = t.assignedAt || t.assigned_at || t.assignmentTime ? new Date(t.assignedAt || t.assigned_at || t.assignmentTime).getTime() : null;
-  const subAssignedAtTime = t.subAssignedAt || t.sub_assigned_at || t.subAssignmentTime ? new Date(t.subAssignedAt || t.sub_assigned_at || t.subAssignmentTime).getTime() : null;
-  const resolvedAtTime = isResolved ? (t.resolvedAt || t.resolved_at || t.closedAt || t.updatedAt ? new Date(t.resolvedAt || t.resolved_at || t.closedAt || t.updatedAt).getTime() : now.getTime()) : null;
+  const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
+  const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime;
+  const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
 
-  // Timelapses in ms
-  let assignmentTimeMs = null;
-  if (assignedAtTime) {
-    assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
-  } else if (isAssigned) {
-    assignmentTimeMs = Math.max(0, now.getTime() - createdAtTime);
+  const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at;
+  const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
+
+  const resolvedAtRaw = t.resolvedAt || t.resolved_at || t.closedAt;
+  const resolvedAtTime = isResolved ? (resolvedAtRaw ? new Date(resolvedAtRaw).getTime() : now.getTime()) : null;
+  
+  const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
+
+  // Timelapses in ms matching list view
+  let primaryAssignmentMs = 0;
+  if (isAssigned) {
+    const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
+    primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
   }
 
-  const slaStartTime = assignedAtTime || createdAtTime;
-  const slaEndTime = isResolved ? resolvedAtTime : now.getTime();
-  const slaTimeMs = Math.max(0, slaEndTime - slaStartTime);
-  const subAssignmentTimeMs = subAssignedAtTime ? Math.max(0, slaEndTime - subAssignedAtTime) : null;
+  const slaTimeMs = Math.max(0, currentOrResolveTime - assignedAtTime);
+
+  let subAssignmentTimeMs = 0;
+  if (isSubAssigned && subAssignedAtTime) {
+    subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subAssignedAtTime);
+  }
+
   const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
-  // Smart formatting mirroring your target ticket list component exactly
-  const formatDurationSmart = (ms) => {
-    if (ms === null || ms === undefined || isNaN(ms)) return null;
-    
-    if (ms < 60000) {
-      return "< 1m";
-    }
-
+  const formatDuration = (ms) => {
+    if (ms === null || ms === undefined || isNaN(ms)) return "—";
+    if (ms < 60000) return "Just now";
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hours === 0) {
-      return `${mins}m`;
-    }
+    if (hours === 0 && mins === 0) return "Just now";
     return `${hours}h ${mins}m`;
   };
 
   return {
     ...t,
-    id: t.id || t._id || t.ticketId || t.code || "N/A",
+    id: t.ticketId || t.id || t._id || t.code || "N/A",
+    ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
-    assignee: typeof rawAssignee === "string" ? rawAssignee : "Unassigned",
-    subAssignee: rawSubAssignee,
-    subAssigneeTimestamp: t.subAssignedAt || t.sub_assigned_at || t.subAssignmentTime || null,
-    status,
+    assigneeName,
+    subAssignmentName,
+    subAssignmentAt: subAssignedAtRaw,
+    status: t.status || "Open",
     createdAt: t.createdAt || t.created_at || new Date().toISOString(),
     priority,
     category: rawCategoryStr,
-    sla,
+    slaStatus: sla,
     isResolved,
-    isSubAssigned: Boolean(subAssignedAtTime || rawSubAssignee),
-    assignmentTimeFormatted: formatDurationSmart(assignmentTimeMs),
-    slaTimeFormatted: formatDurationSmart(slaTimeMs),
-    subAssignmentTimeFormatted: subAssignmentTimeMs !== null ? formatDurationSmart(subAssignmentTimeMs) : null,
-    finalResolutionTimeFormatted: isResolved ? formatDurationSmart(finalResolutionTimeMs) : null,
+    isSubAssigned,
+    assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
+    slaTimeFormatted: formatDuration(slaTimeMs),
+    subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
+    finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
   };
 };
 
@@ -153,6 +160,14 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
+  const formatDate = (dateString) => {
+    if (!dateString) return "—";
+    const d = new Date(dateString);
+    return isNaN(d.getTime()) 
+      ? "Invalid" 
+      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
   const handleExportExcel = () => {
     const currentDate = new Date();
     const oneMonthAgo = new Date();
@@ -177,13 +192,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     const csvRows = recentTickets.map((t) => {
       const formattedDate = t.createdAt ? new Date(t.createdAt).toLocaleString() : "";
       return [
-        `"${(t.id || "").toString().replace(/"/g, '""')}"`,
+        `"${(t.ticketId || "").toString().replace(/"/g, '""')}"`,
         `"${(t.title || "").replace(/"/g, '""')}"`,
         `"${(t.category || "").replace(/"/g, '""')}"`,
         `"${(t.priority || "").replace(/"/g, '""')}"`,
-        `"${(t.assignee || "").replace(/"/g, '""')}"`,
-        `"${(t.subAssignee || "").replace(/"/g, '""')}"`,
-        `"${(t.sla || "").replace(/"/g, '""')}"`,
+        `"${(t.assigneeName || "").replace(/"/g, '""')}"`,
+        `"${(t.subAssignmentName || "").replace(/"/g, '""')}"`,
+        `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
         `"${(t.status || "").replace(/"/g, '""')}"`,
         `"${t.assignmentTimeFormatted || "Unassigned"}"`,
         `"${t.slaTimeFormatted || "N/A"}"`,
@@ -208,8 +223,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const stats = useMemo(() => ({
     total: normalizedTickets.length,
     open: normalizedTickets.filter((t) => !t.isResolved).length,
-    unassigned: normalizedTickets.filter((t) => t.assignee.toLowerCase() === "unassigned").length,
-    slaRisk: normalizedTickets.filter((t) => ["Breached", "Due Soon"].includes(t.sla)).length,
+    unassigned: normalizedTickets.filter((t) => t.assigneeName.toLowerCase() === "unassigned").length,
+    slaRisk: normalizedTickets.filter((t) => ["Breached", "At Risk"].includes(t.slaStatus)).length,
   }), [normalizedTickets]);
 
   const chartData = useMemo(() => {
@@ -239,9 +254,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         { name: "Problem", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("problem") || t.category.toLowerCase().includes("fleet")).length, color: "#f59e0b" },
       ].filter((d) => d.value > 0),
       sla: [
-        { name: "On Track", value: normalizedTickets.filter((t) => t.sla === "On Track").length, color: "#10b981" },
-        { name: "Due Soon", value: normalizedTickets.filter((t) => t.sla === "Due Soon").length, color: "#f59e0b" },
-        { name: "Breached", value: normalizedTickets.filter((t) => t.sla === "Breached").length, color: "#ef4444" },
+        { name: "On Track", value: normalizedTickets.filter((t) => t.slaStatus === "On Track").length, color: "#10b981" },
+        { name: "At Risk", value: normalizedTickets.filter((t) => t.slaStatus === "At Risk").length, color: "#f59e0b" },
+        { name: "Breached", value: normalizedTickets.filter((t) => t.slaStatus === "Breached").length, color: "#ef4444" },
       ].filter((d) => d.value > 0),
       trend: trend,
     };
@@ -259,7 +274,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
         <button
           onClick={handleExportExcel}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm flex items-center gap-2"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer"
         >
           <Download size={16} /> Export to Excel
         </button>
@@ -350,9 +365,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section styled 100% identically to the Ticket List component */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-        {/* Table Header Section */}
+      {/* Ticket List Table Section matched 100% with TicketList.jsx */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/40">
           <div>
             <div className="flex items-center gap-2">
@@ -368,94 +382,87 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </Link>
         </div>
 
-        {/* Table Container */}
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-left border-collapse table-auto min-w-[1100px]">
-            <thead>
-              <tr className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 bg-slate-50/80">
-                <th className="py-3.5 px-4 w-44">CATEGORY</th>
-                <th className="py-3.5 px-4 w-32">ASSIGNEE</th>
-                <th className="py-3.5 px-4 w-32">ASSIGNMENT TIME</th>
-                <th className="py-3.5 px-4 w-32">SLA ACTIVE TIME</th>
-                <th className="py-3.5 px-4 w-36">SUB-ASSIGNMENT</th>
-                <th className="py-3.5 px-4 w-36">SUB-ASSIGNEE TIME</th>
-                <th className="py-3.5 px-4 w-32">SLA HEALTH</th>
+          <table className="w-full text-left text-sm text-slate-600 border-collapse min-w-[1100px]">
+            <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
+              <tr>
+                <th className="p-4">ID</th>
+                <th className="p-4">Entry</th>
+                <th className="p-4">Title</th>
+                <th className="p-4">Category</th>
+                <th className="p-4">Assignee</th>
+                <th className="p-4">Assignment Time</th>
+                <th className="p-4">SLA Active Time</th>
+                <th className="p-4">Sub-Assignment</th>
+                <th className="p-4">Sub-Assignee Time</th>
+                <th className="p-4">SLA Health</th>
+                <th className="p-4">Status & Resolution</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
-              {normalizedTickets.map((t, index) => (
-                <tr key={t.id || index} className="hover:bg-slate-50/60 transition-colors group">
-                  {/* Category */}
-                  <td className="py-4 px-4 font-semibold text-slate-800 whitespace-nowrap">
-                    {t.category}
-                  </td>
-
-                  {/* Assignee */}
-                  <td className="py-4 px-4 font-semibold text-slate-700 whitespace-nowrap">
-                    {t.assignee}
-                  </td>
-
-                  {/* Assignment Time */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    {t.assignmentTimeFormatted ? (
-                      <span className="font-mono text-slate-700 bg-slate-100/90 px-2.5 py-1 rounded-md border border-slate-200/80 text-[11px] inline-block shadow-2xs">
-                        {t.assignmentTimeFormatted}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 italic text-[11px]">Unassigned</span>
-                    )}
-                  </td>
-
-                  {/* SLA Active Time */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    <span className="font-mono text-blue-600 bg-blue-50/80 px-2.5 py-1 rounded-md border border-blue-100 text-[11px] font-semibold inline-block shadow-2xs">
-                      {t.slaTimeFormatted || "< 1m"}
-                    </span>
-                  </td>
-
-                  {/* Sub-Assignment */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    {t.subAssignee ? (
-                      <div>
-                        <span className="font-semibold text-slate-800">{t.subAssignee}</span>
-                        <div className="text-[10px] text-slate-400 font-normal">
-                          {t.subAssigneeTimestamp ? new Date(t.subAssigneeTimestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : "Sub-Assigned"}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
-
-                  {/* Sub-Assignee Time */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    {t.subAssignee && t.subAssignmentTimeFormatted ? (
-                      <span className="font-mono text-purple-700 bg-purple-50/80 px-2.5 py-1 rounded-md border border-purple-100 text-[11px] font-semibold inline-block shadow-2xs">
-                        {t.subAssignmentTimeFormatted}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 italic font-normal text-[11px]">Not Sub-Assigned</span>
-                    )}
-                  </td>
-
-                  {/* SLA Health */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 rounded-full font-semibold text-[11px] inline-flex items-center gap-1.5 shadow-2xs ${
-                      t.sla === "Breached" ? "bg-rose-50 text-rose-700 border border-rose-200" :
-                      t.sla === "Due Soon" ? "bg-amber-50 text-amber-700 border border-amber-200" :
-                      "bg-emerald-50 text-emerald-700 border border-emerald-200"
+            <tbody className="divide-y divide-slate-100">
+              {normalizedTickets.map((t) => (
+                <tr 
+                  key={t._id || t.id} 
+                  onClick={() => navigate(`/tickets/${t.ticketId}`)} 
+                  className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
+                >
+                  <td className="p-4 font-bold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">{t.ticketId}</td>
+                  <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
+                  <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
+                  <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
+                  <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs">{t.assigneeName}</td>
+                  <td className="p-4 whitespace-nowrap">
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                      t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
                     }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${
-                        t.sla === "Breached" ? "bg-rose-500" : t.sla === "Due Soon" ? "bg-amber-500" : "bg-emerald-500"
-                      }`}></span>
-                      {t.sla}
+                      {t.assignmentTimeFormatted}
                     </span>
+                  </td>
+                  <td className="p-4 whitespace-nowrap">
+                    <span className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg text-xs font-semibold">
+                      {t.slaTimeFormatted}
+                    </span>
+                  </td>
+                  <td className="p-4 text-xs whitespace-nowrap">
+                    <div className="font-semibold text-slate-700">{t.subAssignmentName || "—"}</div>
+                    {t.subAssignmentAt && (
+                      <div className="text-[10px] text-slate-400 mt-0.5">{formatDate(t.subAssignmentAt)}</div>
+                    )}
+                  </td>
+                  <td className="p-4 whitespace-nowrap">
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                      t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? "bg-purple-50 text-purple-700 border border-purple-100" : "bg-slate-50 text-slate-400 italic"
+                    }`}>
+                      {t.subAssignmentTimeFormatted}
+                    </span>
+                  </td>
+                  <td className="p-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                      t.slaStatus === "Breached" ? "bg-rose-100 text-rose-700 border border-rose-200" : 
+                      t.slaStatus === "At Risk" ? "bg-amber-100 text-amber-700 border border-amber-200" : 
+                      "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                    }`}>
+                      {t.slaStatus}
+                    </span>
+                  </td>
+                  <td className="p-4 whitespace-nowrap">
+                    <div className="flex flex-col gap-1 items-start">
+                      <span className={`px-3 py-1 font-bold uppercase rounded-full text-[10px] tracking-wider shadow-2xs ${
+                        t.status.toLowerCase() === "resolved" || t.status.toLowerCase() === "closed" ? "bg-emerald-600 text-white" :
+                        "bg-blue-600 text-white"
+                      }`}>
+                        {t.status || "Open"}
+                      </span>
+                      <span className={`text-[11px] font-medium ${t.isResolved ? "text-emerald-700 font-bold" : "text-slate-400 italic"}`}>
+                        Total: {t.finalResolutionTimeFormatted}
+                      </span>
+                    </div>
                   </td>
                 </tr>
               ))}
               {normalizedTickets.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="py-12 text-center text-slate-400 italic bg-slate-50/20">
+                  <td colSpan="11" className="p-16 text-center text-sm text-slate-400 italic">
                     No active tickets available to display within the current matrix parameters.
                   </td>
                 </tr>
