@@ -127,27 +127,50 @@ const normalizeTicket = (t, now) => {
 };
 
 /**
- * Isolated Pie Chart Component with smooth and elegant loading animation.
+ * Custom Styled Tooltip Component for Charts
+ */
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900/95 backdrop-blur-xs text-white text-xs px-3 py-2 rounded-xl shadow-xl border border-slate-700/60">
+        {label && <p className="font-bold text-slate-300 mb-1">{label}</p>}
+        {payload.map((entry, index) => (
+          <div key={`tooltip-${index}`} className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
+            <span className="text-slate-300 capitalize">{entry.name || entry.dataKey}:</span>
+            <span className="font-bold text-white">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+/**
+ * Isolated Pie Chart Component with smooth entrance animations and polished aesthetic.
  */
 const OptimizedPieCard = memo(({ title, data }) => (
-  <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
-    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">{title}</h4>
-    <div className="h-40 w-full mt-2">
+  <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between h-60">
+    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{title}</h4>
+    <div className="h-44 w-full mt-1">
       <ResponsiveContainer width="100%" height="100%" debounce={50}>
         <PieChart>
           <Pie 
             data={data} 
-            innerRadius="45%" 
-            outerRadius="70%" 
-            paddingAngle={4} 
+            innerRadius="50%" 
+            outerRadius="75%" 
+            paddingAngle={6} 
             dataKey="value"
             isAnimationActive={true}
-            animationDuration={800}
-            animationEasing="ease-in-out"
+            animationDuration={900}
+            animationEasing="cubic-bezier(0.34, 1.56, 0.64, 1)"
           >
-            {data.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
+            {data.map((entry, idx) => (
+              <Cell key={`cell-${idx}`} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
+            ))}
           </Pie>
-          <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
+          <Tooltip content={<CustomTooltip />} />
         </PieChart>
       </ResponsiveContainer>
     </div>
@@ -322,7 +345,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         ].map((item) => (
           <div 
             key={item.label} 
-            className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-sm"
+            className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-all duration-300"
           >
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
@@ -337,49 +360,52 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
-          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Priority Distribution</h4>
-          <div className="h-40 w-full mt-2">
+        {/* Priority Distribution Chart */}
+        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between h-60">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Priority Distribution</h4>
+          <div className="h-44 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%" debounce={50}>
               <BarChart data={chartData.priority} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
-                <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+                <Tooltip content={<CustomTooltip />} />
                 <Bar 
                   dataKey="count" 
                   fill="#3b82f6" 
-                  radius={[4, 4, 0, 0]} 
+                  radius={[6, 6, 0, 0]} 
                   isAnimationActive={true}
-                  animationDuration={800}
-                  animationEasing="ease-in-out"
+                  animationDuration={1000}
+                  animationEasing="cubic-bezier(0.34, 1.56, 0.64, 1)"
                 />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Optimized Pie Charts with smooth entrance animations */}
+        {/* Polished Pie Charts */}
         <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
-        <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
-          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">7-Day Velocity</h4>
-          <div className="h-40 w-full mt-2">
+        {/* 7-Day Velocity Trend Chart */}
+        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between h-60">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">7-Day Velocity</h4>
+          <div className="h-44 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%" debounce={50}>
               <LineChart data={chartData.trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
-                <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
+                <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+                <Tooltip content={<CustomTooltip />} />
                 <Line 
                   type="monotone" 
                   dataKey="tickets" 
                   stroke="#10b981" 
-                  strokeWidth={2.5} 
-                  dot={{ r: 3 }} 
+                  strokeWidth={3} 
+                  dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }} 
+                  activeDot={{ r: 6, fill: '#059669', strokeWidth: 2, stroke: '#ffffff' }}
                   isAnimationActive={true}
-                  animationDuration={1000}
+                  animationDuration={1200}
                   animationEasing="ease-in-out"
                 />
               </LineChart>
@@ -389,12 +415,12 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       </div>
 
       {/* Ticket List Table Section */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/40">
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Tickets List & Lifecycle Matrix</h3>
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
+              <span className="px-2.5 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
                 {normalizedTickets.length} Records
               </span>
             </div>
