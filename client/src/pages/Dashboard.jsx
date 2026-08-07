@@ -127,7 +127,7 @@ const normalizeTicket = (t, now) => {
 };
 
 /**
- * Isolated Pie Chart Component with an ultra-fast, snappy animation duration (`250ms`).
+ * Isolated Pie Chart Component with smooth and elegant loading animation.
  */
 const OptimizedPieCard = memo(({ title, data }) => (
   <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
@@ -142,8 +142,8 @@ const OptimizedPieCard = memo(({ title, data }) => (
             paddingAngle={4} 
             dataKey="value"
             isAnimationActive={true}
-            animationDuration={250}
-            animationEasing="ease-out"
+            animationDuration={800}
+            animationEasing="ease-in-out"
           >
             {data.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
           </Pie>
@@ -346,13 +346,20 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
                 <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
-                <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                <Bar 
+                  dataKey="count" 
+                  fill="#3b82f6" 
+                  radius={[4, 4, 0, 0]} 
+                  isAnimationActive={true}
+                  animationDuration={800}
+                  animationEasing="ease-in-out"
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Ultra-Fast Pie Charts with a snappy 250ms transition */}
+        {/* Optimized Pie Charts with smooth entrance animations */}
         <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
@@ -365,7 +372,16 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
                 <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
-                <Line type="monotone" dataKey="tickets" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive={false} />
+                <Line 
+                  type="monotone" 
+                  dataKey="tickets" 
+                  stroke="#10b981" 
+                  strokeWidth={2.5} 
+                  dot={{ r: 3 }} 
+                  isAnimationActive={true}
+                  animationDuration={1000}
+                  animationEasing="ease-in-out"
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -443,7 +459,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                     </span>
                   </td>
                   <td className="p-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                       t.slaStatus === "Breached" ? "bg-rose-100 text-rose-700 border border-rose-200" : 
                       t.slaStatus === "At Risk" ? "bg-amber-100 text-amber-700 border border-amber-200" : 
                       "bg-emerald-100 text-emerald-700 border border-emerald-200"
