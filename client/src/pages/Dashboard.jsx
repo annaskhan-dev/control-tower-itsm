@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import axiosInstance from '../api/axiosInstance';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -8,7 +8,7 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download } from "lucide-react";
 
 /**
- * Unified Normalization Engine: Ensures 100% telemetry formatting match for the Dashboard ticket list table.
+ * Unified Normalization Engine: Ensures 100% accurate SLA evaluation and telemetry formatting.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
@@ -22,21 +22,34 @@ const normalizeTicket = (t, now) => {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
   }
 
-  // Robust SLA evaluation matching the list view logic
+  const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
+  const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
+
+  // Robust SLA evaluation based on deadlines or explicit metadata
   let sla = t.slaStatus || t.sla_status || t.sla || "On Track";
-  if (typeof sla === "string") {
+  if (typeof sla === "string" && !t.slaDeadline) {
     const lowerSla = sla.toLowerCase();
     if (lowerSla.includes("breach")) sla = "Breached";
     else if (lowerSla.includes("due") || lowerSla.includes("warn") || lowerSla.includes("risk")) sla = "At Risk";
     else sla = "On Track";
   }
   
-  if (t.slaDeadline) {
-    const deadline = new Date(t.slaDeadline);
+  // Real-time SLA deadline validation against current timestamp or resolution time
+  const deadlineRaw = t.slaDeadline || t.sla_deadline || t.dueDate || t.due_date;
+  if (deadlineRaw) {
+    const deadline = new Date(deadlineRaw);
     if (!isNaN(deadline.getTime())) {
-      const diffMinutes = (deadline.getTime() - now.getTime()) / (1000 * 60);
-      if (diffMinutes < 0) sla = "Breached";
-      else if (diffMinutes < 30) sla = "At Risk";
+      const evaluationTime = isResolved ? new Date(t.resolvedAt || t.resolved_at || t.closedAt || now).getTime() : now.getTime();
+      const diffMinutes = (deadline.getTime() - evaluationTime) / (1000 * 60);
+      
+      if (diffMinutes < 0) {
+        sla = "Breached";
+      } else if (diffMinutes <= 30 && !isResolved) {
+        // Warning window: 30 minutes or less until deadline breach
+        sla = "At Risk";
+      } else if (!isResolved) {
+        sla = "On Track";
+      }
     }
   }
 
@@ -48,8 +61,6 @@ const normalizeTicket = (t, now) => {
 
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
   
-  const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
-  const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
   const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
   const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
   
@@ -69,7 +80,7 @@ const normalizeTicket = (t, now) => {
   
   const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-  // Timelapses in ms matching list view
+  // Timelapses in ms
   let primaryAssignmentMs = 0;
   if (isAssigned) {
     const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
@@ -94,15 +105,10 @@ const normalizeTicket = (t, now) => {
     return `${hours}h ${mins}m`;
   };
 
-  const internalId = t._id || t.id || t.ticketId || t.code || "N/A";
-  const publicTicketId = t.ticketId || t.id || t._id || t.code || "N/A";
-
   return {
     ...t,
-    id: internalId,
-    ticketId: publicTicketId,
-    // Provide both parameters in state so the detail view can instantly utilize internal or public ID without re-fetching list data if unnecessary
-    navigationTarget: internalId !== "N/A" ? internalId : publicTicketId,
+    id: t._id || t.id || t.ticketId || t.code || "N/A",
+    ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     assigneeName,
     subAssignmentName,
@@ -122,7 +128,6 @@ const normalizeTicket = (t, now) => {
 };
 
 export const Dashboard = ({ tickets: propTickets = [] }) => {
-  const navigate = useNavigate();
   const [tickets, setTickets] = useState(propTickets);
   const [loading, setLoading] = useState(propTickets.length === 0);
   const [now, setNow] = useState(new Date());
@@ -288,21 +293,20 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       {/* Top Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Tickets", val: stats.total, icon: Ticket, color: "blue", route: "/tickets?queue=all" },
-          { label: "Open Work", val: stats.open, icon: Clock, color: "indigo", route: "/tickets?queue=all" },
-          { label: "Unassigned", val: stats.unassigned, icon: UserX, color: "amber", route: "/tickets?queue=unassigned" },
-          { label: "SLA Risk", val: stats.slaRisk, icon: AlertTriangle, color: "rose", route: "/tickets?queue=sla-risk" },
+          { label: "Total Tickets", val: stats.total, icon: Ticket, color: "blue" },
+          { label: "Open Work", val: stats.open, icon: Clock, color: "indigo" },
+          { label: "Unassigned", val: stats.unassigned, icon: UserX, color: "amber" },
+          { label: "SLA Risk", val: stats.slaRisk, icon: AlertTriangle, color: "rose" },
         ].map((item) => (
           <div 
             key={item.label} 
-            onClick={() => navigate(item.route)} 
-            className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-sm cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+            className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-sm"
           >
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
               <h3 className={`text-2xl font-bold ${item.color === 'rose' ? 'text-rose-600' : 'text-slate-900'} mt-1`}>{item.val}</h3>
             </div>
-            <div className={`p-3 bg-slate-50 text-slate-600 rounded-xl`}>
+            <div className="p-3 bg-slate-50 text-slate-600 rounded-xl">
               <item.icon size={22} />
             </div>
           </div>
@@ -370,7 +374,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section */}
+      {/* Ticket List Table Section (Non-clickable rows) */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/40">
           <div>
@@ -408,10 +412,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               {normalizedTickets.map((t) => (
                 <tr 
                   key={t.id} 
-                  onClick={() => navigate(`/tickets/${t.navigationTarget}`, { state: { ticket: t } })} 
-                  className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
+                  className="hover:bg-slate-50/60 transition-colors"
                 >
-                  <td className="p-4 font-bold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">{t.ticketId}</td>
+                  <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{t.ticketId}</td>
                   <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
                   <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
                   <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
