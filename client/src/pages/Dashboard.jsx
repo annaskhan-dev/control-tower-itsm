@@ -94,10 +94,15 @@ const normalizeTicket = (t, now) => {
     return `${hours}h ${mins}m`;
   };
 
+  const internalId = t._id || t.id || t.ticketId || t.code || "N/A";
+  const publicTicketId = t.ticketId || t.id || t._id || t.code || "N/A";
+
   return {
     ...t,
-    id: t.ticketId || t.id || t._id || t.code || "N/A",
-    ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
+    id: internalId,
+    ticketId: publicTicketId,
+    // Provide both parameters in state so the detail view can instantly utilize internal or public ID without re-fetching list data if unnecessary
+    navigationTarget: internalId !== "N/A" ? internalId : publicTicketId,
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     assigneeName,
     subAssignmentName,
@@ -365,7 +370,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section matched 100% with TicketList.jsx */}
+      {/* Ticket List Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/40">
           <div>
@@ -402,8 +407,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             <tbody className="divide-y divide-slate-100">
               {normalizedTickets.map((t) => (
                 <tr 
-                  key={t._id || t.id} 
-                  onClick={() => navigate(`/tickets/${t.ticketId}`)} 
+                  key={t.id} 
+                  onClick={() => navigate(`/tickets/${t.navigationTarget}`, { state: { ticket: t } })} 
                   className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
                 >
                   <td className="p-4 font-bold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">{t.ticketId}</td>
