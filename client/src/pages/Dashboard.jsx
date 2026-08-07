@@ -336,8 +336,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-sm">
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
           <div>
-            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Ticket Lifecycle & Timeline Matrix</h4>
-            <p className="text-xs text-slate-400 mt-0.5">Tracking initial assignment delay, ongoing SLA duration, sub-assignment execution, and final resolution time.</p>
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Tickets List & Lifecycle Matrix</h4>
+            <p className="text-xs text-slate-400 mt-0.5">Comprehensive real-time view of current ticket records matching your operational queue.</p>
           </div>
           <Link to="/tickets" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
             View All Work <ArrowRight size={14} />
@@ -349,6 +349,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               <tr className="text-xs font-bold text-slate-400 uppercase border-b border-slate-100">
                 <th className="py-3 px-3">Ticket ID</th>
                 <th className="py-3 px-3">Title / Assignee</th>
+                <th className="py-3 px-3">Priority</th>
+                <th className="py-3 px-3">SLA Status</th>
                 <th className="py-3 px-3">Assignment Time</th>
                 <th className="py-3 px-3">SLA / Ongoing Time</th>
                 <th className="py-3 px-3">Sub-Assignment Time</th>
@@ -357,7 +359,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
-              {normalizedTickets.slice(0, 5).map((t, index) => (
+              {normalizedTickets.map((t, index) => (
                 <tr key={t.id || index} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3 px-3 font-bold text-blue-600">
                     <div>{t.id.toString().substring(0, 10)}</div>
@@ -366,6 +368,25 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                   <td className="py-3 px-3">
                     <div className="font-semibold text-slate-800">{t.title}</div>
                     <div className="text-[11px] text-slate-500">Assignee: {t.assignee}</div>
+                  </td>
+                  <td className="py-3 px-3">
+                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] ${
+                      t.priority === "Critical" ? "bg-rose-100 text-rose-800" :
+                      t.priority === "High" ? "bg-orange-100 text-orange-800" :
+                      t.priority === "Medium" ? "bg-amber-100 text-amber-800" :
+                      "bg-slate-100 text-slate-700"
+                    }`}>
+                      {t.priority}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3">
+                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] ${
+                      t.sla === "Breached" ? "bg-rose-100 text-rose-800" :
+                      t.sla === "Due Soon" ? "bg-amber-100 text-amber-800" :
+                      "bg-emerald-100 text-emerald-800"
+                    }`}>
+                      {t.sla}
+                    </span>
                   </td>
                   <td className="py-3 px-3">
                     <span className={`px-2 py-1 rounded-md font-semibold text-[11px] ${
@@ -404,7 +425,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               ))}
               {normalizedTickets.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="py-8 text-center text-slate-400 italic">No tickets available to display.</td>
+                  <td colSpan="9" className="py-8 text-center text-slate-400 italic">No tickets available to display.</td>
                 </tr>
               )}
             </tbody>
