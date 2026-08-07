@@ -129,10 +129,10 @@ const normalizeTicket = (t, now) => {
 /**
  * Custom Styled Tooltip Component for Charts
  */
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = memo(({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-900/95 backdrop-blur-xs text-white text-xs px-3 py-2 rounded-xl shadow-xl border border-slate-700/60">
+      <div className="bg-slate-900/95 backdrop-blur-xs text-white text-xs px-3 py-2 rounded-xl shadow-xl border border-slate-700/65">
         {label && <p className="font-bold text-slate-300 mb-1">{label}</p>}
         {payload.map((entry, index) => (
           <div key={`tooltip-${index}`} className="flex items-center gap-2">
@@ -145,16 +145,18 @@ const CustomTooltip = ({ active, payload, label }) => {
     );
   }
   return null;
-};
+});
+
+CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * Isolated Pie Chart Component with smooth entrance animations and polished aesthetic.
+ * Isolated Pie Chart Component with animations disabled for buttery-smooth performance.
  */
 const OptimizedPieCard = memo(({ title, data }) => (
-  <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between h-60">
+  <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-60">
     <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{title}</h4>
     <div className="h-44 w-full mt-1">
-      <ResponsiveContainer width="100%" height="100%" debounce={50}>
+      <ResponsiveContainer width="100%" height="100%" debounce={100}>
         <PieChart>
           <Pie 
             data={data} 
@@ -162,9 +164,7 @@ const OptimizedPieCard = memo(({ title, data }) => (
             outerRadius="75%" 
             paddingAngle={6} 
             dataKey="value"
-            isAnimationActive={true}
-            animationDuration={900}
-            animationEasing="cubic-bezier(0.34, 1.56, 0.64, 1)"
+            isAnimationActive={false}
           >
             {data.map((entry, idx) => (
               <Cell key={`cell-${idx}`} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
@@ -176,6 +176,8 @@ const OptimizedPieCard = memo(({ title, data }) => (
     </div>
   </div>
 ));
+
+OptimizedPieCard.displayName = "OptimizedPieCard";
 
 export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [tickets, setTickets] = useState(propTickets);
@@ -329,7 +331,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
         <button
           onClick={handleExportExcel}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-xs flex items-center gap-2 cursor-pointer"
         >
           <Download size={16} /> Export to Excel
         </button>
@@ -345,7 +347,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         ].map((item) => (
           <div 
             key={item.label} 
-            className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-all duration-300"
+            className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-shadow duration-200"
           >
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
@@ -361,10 +363,10 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Priority Distribution Chart */}
-        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between h-60">
+        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-60">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Priority Distribution</h4>
           <div className="h-44 w-full mt-1">
-            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+            <ResponsiveContainer width="100%" height="100%" debounce={100}>
               <BarChart data={chartData.priority} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
@@ -374,9 +376,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                   dataKey="count" 
                   fill="#3b82f6" 
                   radius={[6, 6, 0, 0]} 
-                  isAnimationActive={true}
-                  animationDuration={1000}
-                  animationEasing="cubic-bezier(0.34, 1.56, 0.64, 1)"
+                  isAnimationActive={false}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -388,10 +388,10 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
         {/* 7-Day Velocity Trend Chart */}
-        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between h-60">
+        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-60">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">7-Day Velocity</h4>
           <div className="h-44 w-full mt-1">
-            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+            <ResponsiveContainer width="100%" height="100%" debounce={100}>
               <LineChart data={chartData.trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
@@ -404,9 +404,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                   strokeWidth={3} 
                   dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }} 
                   activeDot={{ r: 6, fill: '#059669', strokeWidth: 2, stroke: '#ffffff' }}
-                  isAnimationActive={true}
-                  animationDuration={1200}
-                  animationEasing="ease-in-out"
+                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
