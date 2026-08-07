@@ -34,10 +34,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const formatDuration = (ms) => {
     if (ms === null || ms === undefined || isNaN(ms)) return "—";
-    if (ms < 0) return "< 1m";
+    if (ms < 60000) return "Just now"; // Clean professional text for under a minute
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours === 0 && mins === 0) return "< 1m";
+    if (hours === 0 && mins === 0) return "Just now";
     return `${hours}h ${mins}m`;
   };
 
@@ -86,7 +86,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       
       const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-      // 1. Primary Assignment Time (Active duration owned exclusively by primary assignee before hand-off or resolution)
+      // 1. Primary Assignment Time
       let primaryAssignmentMs = 0;
       if (isAssigned) {
         const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
@@ -96,7 +96,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       // 2. SLA / Total Ongoing Time Calculation
       const slaTimeMs = Math.max(0, currentOrResolveTime - assignedAtTime);
 
-      // 3. Sub-Assignment Execution Time (Active duration owned exclusively by sub-assignee since hand-off)
+      // 3. Sub-Assignment Execution Time
       let subAssignmentTimeMs = 0;
       if (isSubAssigned && subAssignedAtTime) {
         subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subAssignedAtTime);
