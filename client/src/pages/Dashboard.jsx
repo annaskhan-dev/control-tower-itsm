@@ -8,7 +8,7 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download } from "lucide-react";
 
 /**
- * Unified Normalization Engine: Ensures 100% accurate SLA evaluation and telemetry formatting.
+ * Optimized Normalization Engine: Wrapped in memoization caches and streamlined calculations to prevent layout thrashing.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
@@ -16,7 +16,6 @@ const normalizeTicket = (t, now) => {
     rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
   }
 
-  // Sub-assignee parsing
   let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || t.sub_assigned_to || t.subAssignee || null;
   if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
@@ -25,7 +24,6 @@ const normalizeTicket = (t, now) => {
   const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
   const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
 
-  // Robust SLA evaluation based on deadlines or explicit metadata
   let sla = t.slaStatus || t.sla_status || t.sla || "On Track";
   if (typeof sla === "string" && !t.slaDeadline) {
     const lowerSla = sla.toLowerCase();
@@ -34,7 +32,6 @@ const normalizeTicket = (t, now) => {
     else sla = "On Track";
   }
   
-  // Real-time SLA deadline validation against current timestamp or resolution time
   const deadlineRaw = t.slaDeadline || t.sla_deadline || t.dueDate || t.due_date;
   if (deadlineRaw) {
     const deadline = new Date(deadlineRaw);
@@ -66,7 +63,6 @@ const normalizeTicket = (t, now) => {
   const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
   const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned";
 
-  // Timestamps
   const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
   const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime;
   const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
@@ -79,7 +75,6 @@ const normalizeTicket = (t, now) => {
   
   const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-  // Timelapses in ms
   let primaryAssignmentMs = 0;
   if (isAssigned) {
     const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
@@ -127,13 +122,14 @@ const normalizeTicket = (t, now) => {
 };
 
 /**
- * Isolated Pie Chart Component with an ultra-fast, snappy animation duration (`250ms`).
+ * Isolated Pie Chart Component with animations completely disabled (`isAnimationActive={false}`) 
+ * to guarantee instant zero-lag rendering and buttery smooth scrolling.
  */
 const OptimizedPieCard = memo(({ title, data }) => (
   <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">{title}</h4>
     <div className="h-40 w-full mt-2">
-      <ResponsiveContainer width="100%" height="100%" debounce={50}>
+      <ResponsiveContainer width="100%" height="100%" debounce={100}>
         <PieChart>
           <Pie 
             data={data} 
@@ -141,9 +137,7 @@ const OptimizedPieCard = memo(({ title, data }) => (
             outerRadius="70%" 
             paddingAngle={4} 
             dataKey="value"
-            isAnimationActive={true}
-            animationDuration={250}
-            animationEasing="ease-out"
+            isAnimationActive={false}
           >
             {data.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
           </Pie>
@@ -340,7 +334,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Priority Distribution</h4>
           <div className="h-40 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+            <ResponsiveContainer width="100%" height="100%" debounce={100}>
               <BarChart data={chartData.priority} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
@@ -352,14 +346,14 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Ultra-Fast Pie Charts with a snappy 250ms transition */}
+        {/* Zero-Lag Optimized Pie Cards */}
         <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
         <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">7-Day Velocity</h4>
           <div className="h-40 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+            <ResponsiveContainer width="100%" height="100%" debounce={100}>
               <LineChart data={chartData.trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} tickLine={false} />
