@@ -8,15 +8,23 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download } from "lucide-react";
 
 /**
- * Normalization Helper with Accurate Stage-by-Stage Timeline & Sub-Assignment Tracking
+ * Enhanced Normalization Helper with Precise Field Mapping & Fallback Timestamps
  */
 const normalizeTicket = (t, now) => {
-  let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || "Unassigned";
+  let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
   if (typeof rawAssignee === "object" && rawAssignee !== null) {
     rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
   }
 
-  let sla = "On Track";
+  // Robust SLA evaluation
+  let sla = t.slaStatus || t.sla_status || t.sla || "On Track";
+  if (typeof sla === "string") {
+    const lowerSla = sla.toLowerCase();
+    if (lowerSla.includes("breach")) sla = "Breached";
+    else if (lowerSla.includes("due") || lowerSla.includes("warn")) sla = "Due Soon";
+    else sla = "On Track";
+  }
+  
   if (t.slaDeadline) {
     const deadline = new Date(t.slaDeadline);
     if (!isNaN(deadline.getTime())) {
@@ -25,60 +33,62 @@ const normalizeTicket = (t, now) => {
     }
   }
 
-  const rawPriorityStr = (t.priority || t.priorityLevel || "Low").toString().toLowerCase();
+  const rawPriorityStr = (t.priority || t.priorityLevel || t.severity || "Low").toString().toLowerCase();
   let priority = "Low";
-  if (rawPriorityStr.includes("crit")) priority = "Critical";
-  else if (rawPriorityStr.includes("high")) priority = "High";
-  else if (rawPriorityStr.includes("med")) priority = "Medium";
+  if (rawPriorityStr.includes("crit") || rawPriorityStr.includes("p1")) priority = "Critical";
+  else if (rawPriorityStr.includes("high") || rawPriorityStr.includes("p2")) priority = "High";
+  else if (rawPriorityStr.includes("med") || rawPriorityStr.includes("p3")) priority = "Medium";
 
-  const rawTypeStr = (t.type || t.ticketType || t.category || "Request").toString().toLowerCase();
+  const rawTypeStr = (t.type || t.ticketType || t.category || t.kind || "Request").toString().toLowerCase();
   let type = "Request";
   if (rawTypeStr.includes("incident")) type = "Incident";
   else if (rawTypeStr.includes("change")) type = "Change";
   else if (rawTypeStr.includes("prob")) type = "Problem";
 
-  const status = (t.status || t.ticketStatus || "new").toString().toLowerCase().replace(/_/g, " ");
-  const isResolved = ["closed", "resolved"].includes(status);
+  const status = (t.status || t.ticketStatus || t.state || "new").toString().toLowerCase().replace(/_/g, " ");
+  const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
   const isAssigned = typeof rawAssignee === "string" && rawAssignee.toLowerCase() !== "unassigned";
 
-  // Timeline anchors pulled directly from ticket database fields if available
-  const createdAtTime = new Date(t.createdAt || t.created_at || now).getTime();
-  const assignedAtTime = t.assignedAt || t.assigned_at ? new Date(t.assignedAt || t.assigned_at).getTime() : null;
-  const subAssignedAtTime = t.subAssignedAt || t.sub_assigned_at ? new Date(t.subAssignedAt || t.sub_assigned_at).getTime() : null;
-  const resolvedAtTime = isResolved ? (t.resolvedAt || t.resolved_at ? new Date(t.resolvedAt || t.resolved_at).getTime() : now.getTime()) : null;
+  // Parse exact timestamp anchors from possible backend database keys
+  const createdAtTime = new Date(t.createdAt || t.created_at || t.creationDate || now).getTime();
+  const assignedAtTime = t.assignedAt || t.assigned_at || t.assignmentTime ? new Date(t.assignedAt || t.assigned_at || t.assignmentTime).getTime() : null;
+  const subAssignedAtTime = t.subAssignedAt || t.sub_assigned_at || t.subAssignmentTime ? new Date(t.subAssignedAt || t.sub_assigned_at || t.subAssignmentTime).getTime() : null;
+  const resolvedAtTime = isResolved ? (t.resolvedAt || t.resolved_at || t.closedAt || t.updatedAt || now.getTime()) : null;
+  
   const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-  // 1. Assignment Time: Real duration from creation to assignment
+  // 1. Assignment Latency (Time from Creation -> Assignment)
   let assignmentTimeMs = null;
   if (assignedAtTime) {
     assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
   } else if (isAssigned) {
+    // If ticket is marked assigned but lacks a historical log timestamp, estimate gap or fallback to creation gap
     assignmentTimeMs = Math.max(0, now.getTime() - createdAtTime);
   }
 
-  // 2. SLA / Ongoing Time: Active running time since assignment began until resolution (or now)
+  // 2. SLA / Ongoing Active Running Time
   const slaStartTime = assignedAtTime || createdAtTime;
   const slaTimeMs = Math.max(0, currentOrResolveTime - slaStartTime);
 
-  // 3. Sub-Assignment Execution Time: Time elapsed specifically since sub-assignment started
+  // 3. Sub-Assignment Execution Time
   const subAssignmentTimeMs = subAssignedAtTime ? Math.max(0, currentOrResolveTime - subAssignedAtTime) : null;
 
   // 4. Final Total Resolution Time
   const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
   const formatDuration = (ms) => {
-    if (ms === null || ms === undefined) return null;
+    if (ms === null || ms === undefined || isNaN(ms)) return null;
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours === 0 && mins === 0) return "Just now";
+    if (hours === 0 && mins === 0) return "< 1m";
     if (hours === 0) return `${mins}m`;
     return `${hours}h ${mins}m`;
   };
 
   return {
     ...t,
-    id: t.id || t._id || t.ticketId || "N/A",
-    title: t.title || t.subject || t.name || "Untitled Ticket",
+    id: t.id || t._id || t.ticketId || t.code || "N/A",
+    title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     assignee: typeof rawAssignee === "string" ? rawAssignee : "Unassigned",
     status,
     createdAt: t.createdAt || t.created_at || new Date().toISOString(),
@@ -106,14 +116,14 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   }, []);
 
   useEffect(() => {
-    if (propTickets.length > 0) {
+    if (propTickets && propTickets.length > 0) {
       setTickets(propTickets);
       setLoading(false);
     }
   }, [propTickets]);
 
   useEffect(() => {
-    if (propTickets.length === 0) {
+    if (!propTickets || propTickets.length === 0) {
       const fetchTickets = async () => {
         const token = localStorage.getItem('access_token');
         if (!token) {
@@ -123,7 +133,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
         try {
           const response = await axiosInstance.get('/tickets');
-          setTickets(Array.isArray(response.data) ? response.data : []);
+          const data = Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []);
+          setTickets(data);
         } catch (error) {
           console.error("Failed to fetch tickets:", error);
           setTickets([]);
@@ -133,7 +144,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       };
       fetchTickets();
     }
-  }, [propTickets.length]);
+  }, [propTickets]);
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
@@ -143,13 +154,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     oneMonthAgo.setMonth(currentDate.getMonth() - 1);
 
     const recentTickets = normalizedTickets.filter((t) => {
-      if (!t.createdAt) return false;
+      if (!t.createdAt) return true;
       const ticketDate = new Date(t.createdAt);
-      return ticketDate >= oneMonthAgo && ticketDate <= currentDate;
+      return isNaN(ticketDate.getTime()) || ticketDate >= oneMonthAgo;
     });
 
     if (recentTickets.length === 0) {
-      alert("No ticket data found within the last 1 month to export.");
+      alert("No ticket data found to export.");
       return;
     }
 
@@ -204,7 +215,10 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
     const trend = last7Days.map((day) => ({
       day: day.label,
-      tickets: normalizedTickets.filter((t) => new Date(t.createdAt).toDateString() === day.fullDate).length,
+      tickets: normalizedTickets.filter((t) => {
+        const d = new Date(t.createdAt);
+        return !isNaN(d.getTime()) && d.toDateString() === day.fullDate;
+      }).length,
     }));
 
     return {
@@ -338,7 +352,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         <div className="px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/40">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Tickets & Lifecycle Matrix</h3>
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Tickets List & Lifecycle Matrix</h3>
               <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
                 {normalizedTickets.length} Records
               </span>
