@@ -8,7 +8,7 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download } from "lucide-react";
 
 /**
- * Normalization Helper
+ * Normalization Helper with Timeline and Sub-Assignment Metrics Calculation
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || "Unassigned";
@@ -37,16 +37,51 @@ const normalizeTicket = (t, now) => {
   else if (rawTypeStr.includes("change")) type = "Change";
   else if (rawTypeStr.includes("prob")) type = "Problem";
 
+  const status = (t.status || t.ticketStatus || "new").toString().toLowerCase().replace(/_/g, " ");
+  const isResolved = ["closed", "resolved"].includes(status);
+
+  // Time calculations (Fallbacks if specific timestamps aren't directly provided by backend schema)
+  const createdAtTime = new Date(t.createdAt || t.created_at || now).getTime();
+  const assignedAtTime = t.assignedAt ? new Date(t.assignedAt).getTime() : createdAtTime;
+  const subAssignedAtTime = t.subAssignedAt ? new Date(t.subAssignedAt).getTime() : assignedAtTime;
+  const resolvedAtTime = isResolved ? (t.resolvedAt ? new Date(t.resolvedAt).getTime() : now.getTime()) : null;
+
+  // 1. Assignment Time: Time taken from creation until assignment
+  const assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
+  
+  // 2. SLA Elapsed / Running Time: Time from assignment/creation ongoing or until resolution/current time
+  const slaEndTime = isResolved ? resolvedAtTime : now.getTime();
+  const slaTimeMs = Math.max(0, slaEndTime - assignedAtTime);
+
+  // 3. Sub-Assignment Execution Time: Time from sub-assignment execution until resolution or current
+  const subAssignmentTimeMs = Math.max(0, slaEndTime - subAssignedAtTime);
+
+  // 4. Final Total Resolution Time (if resolved)
+  const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
+
+  const formatDuration = (ms) => {
+    if (ms === null || ms === undefined) return "In Progress";
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    if (hours === 0 && mins === 0) return "< 1m";
+    return `${hours}h ${mins}m`;
+  };
+
   return {
     ...t,
     id: t.id || t._id || t.ticketId || "N/A",
     title: t.title || t.subject || t.name || "Untitled Ticket",
     assignee: typeof rawAssignee === "string" ? rawAssignee : "Unassigned",
-    status: (t.status || t.ticketStatus || "new").toString().toLowerCase().replace(/_/g, " "),
+    status,
     createdAt: t.createdAt || t.created_at || new Date().toISOString(),
     priority,
     type,
     sla,
+    isResolved,
+    assignmentTimeFormatted: formatDuration(assignmentTimeMs),
+    slaTimeFormatted: formatDuration(slaTimeMs),
+    subAssignmentTimeFormatted: formatDuration(subAssignmentTimeMs),
+    finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
   };
 };
 
@@ -93,13 +128,11 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
-  // Function to filter last 1 month and export tickets to Excel (CSV format)
   const handleExportExcel = () => {
     const currentDate = new Date();
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(currentDate.getMonth() - 1);
 
-    // Filter tickets created within the last 1 month
     const recentTickets = normalizedTickets.filter((t) => {
       if (!t.createdAt) return false;
       const ticketDate = new Date(t.createdAt);
@@ -111,33 +144,36 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       return;
     }
 
-    // Define CSV headers
-    const headers = ["Ticket ID", "Title", "Type", "Priority", "Assignee", "SLA", "Status", "Created At"];
+    const headers = [
+      "Ticket ID", "Title", "Type", "Priority", "Assignee", "SLA Status", "Ticket Status", 
+      "Assignment Time", "SLA/Ongoing Time", "Sub-Assignment Time", "Final Resolution Time", "Created At"
+    ];
 
-    // Map ticket data to CSV rows
     const csvRows = recentTickets.map((t) => {
       const formattedDate = t.createdAt ? new Date(t.createdAt).toLocaleString() : "";
-      const ticketId = `"${(t.id || "").toString().replace(/"/g, '""')}"`;
-      const title = `"${(t.title || "").replace(/"/g, '""')}"`;
-      const type = `"${(t.type || "").replace(/"/g, '""')}"`;
-      const priority = `"${(t.priority || "").replace(/"/g, '""')}"`;
-      const assignee = `"${(t.assignee || "").replace(/"/g, '""')}"`;
-      const sla = `"${(t.sla || "").replace(/"/g, '""')}"`;
-      const status = `"${(t.status || "").replace(/"/g, '""')}"`;
-      const createdAt = `"${formattedDate}"`;
-
-      return [ticketId, title, type, priority, assignee, sla, status, createdAt].join(",");
+      return [
+        `"${(t.id || "").toString().replace(/"/g, '""')}"`,
+        `"${(t.title || "").replace(/"/g, '""')}"`,
+        `"${(t.type || "").replace(/"/g, '""')}"`,
+        `"${(t.priority || "").replace(/"/g, '""')}"`,
+        `"${(t.assignee || "").replace(/"/g, '""')}"`,
+        `"${(t.sla || "").replace(/"/g, '""')}"`,
+        `"${(t.status || "").replace(/"/g, '""')}"`,
+        `"${t.assignmentTimeFormatted}"`,
+        `"${t.slaTimeFormatted}"`,
+        `"${t.subAssignmentTimeFormatted}"`,
+        `"${t.finalResolutionTimeFormatted}"`,
+        `"${formattedDate}"`
+      ].join(",");
     });
 
-    // Combine headers and rows
     const csvContent = [headers.join(","), ...csvRows].join("\n");
 
-    // Create a downloadable blob and trigger file download
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `tickets_last_1_month_${currentDate.toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `tickets_timeline_report_${currentDate.toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -145,7 +181,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
   const stats = useMemo(() => ({
     total: normalizedTickets.length,
-    open: normalizedTickets.filter((t) => !["closed", "resolved"].includes(t.status)).length,
+    open: normalizedTickets.filter((t) => !t.isResolved).length,
     unassigned: normalizedTickets.filter((t) => t.assignee.toLowerCase() === "unassigned").length,
     slaRisk: normalizedTickets.filter((t) => ["Breached", "Due Soon"].includes(t.sla)).length,
   }), [normalizedTickets]);
@@ -192,7 +228,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Operational Dashboard</h2>
-          <p className="text-sm text-slate-500 mt-1">Real-time ticketing analytics and SLA monitoring</p>
+          <p className="text-sm text-slate-500 mt-1">Real-time ticketing lifecycle, assignment timelines, and SLA monitoring</p>
         </div>
         <button
           onClick={handleExportExcel}
@@ -287,10 +323,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Recent Tickets Table */}
+      {/* Lifecycle & Timeline Breakdown Table */}
       <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-sm">
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Recent Tickets</h4>
+          <div>
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Ticket Lifecycle & Timeline Matrix</h4>
+            <p className="text-xs text-slate-400 mt-0.5">Tracking assignment duration, ongoing SLA timings, sub-assignment execution, and final resolution time.</p>
+          </div>
           <Link to="/tickets" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
             View All Work <ArrowRight size={14} />
           </Link>
@@ -300,34 +339,61 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             <thead>
               <tr className="text-xs font-bold text-slate-400 uppercase border-b border-slate-100">
                 <th className="py-3 px-3">Ticket ID</th>
-                <th className="py-3 px-3">Title</th>
-                <th className="py-3 px-3">Type</th>
-                <th className="py-3 px-3">Priority</th>
-                <th className="py-3 px-3">Assignee</th>
-                <th className="py-3 px-3">SLA</th>
-                <th className="py-3 px-3 text-right">Status</th>
+                <th className="py-3 px-3">Title / Assignee</th>
+                <th className="py-3 px-3">Assignment Time</th>
+                <th className="py-3 px-3">SLA / Ongoing Time</th>
+                <th className="py-3 px-3">Sub-Assignment Time</th>
+                <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3 text-right">Final Resolution Time</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
               {normalizedTickets.slice(0, 5).map((t, index) => (
                 <tr key={t.id || index} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-3 font-bold text-blue-600">{t.id.toString().substring(0, 10)}</td>
-                  <td className="py-3 px-3 font-semibold text-slate-800">{t.title}</td>
-                  <td className="py-3 px-3 text-slate-500">{t.type}</td>
+                  <td className="py-3 px-3 font-bold text-blue-600">
+                    <div>{t.id.toString().substring(0, 10)}</div>
+                    <span className="text-[10px] font-normal text-slate-400 uppercase">{t.type}</span>
+                  </td>
                   <td className="py-3 px-3">
-                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${t.priority === "Critical" ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
-                      {t.priority}
+                    <div className="font-semibold text-slate-800">{t.title}</div>
+                    <div className="text-[11px] text-slate-500">Assignee: {t.assignee}</div>
+                  </td>
+                  <td className="py-3 px-3">
+                    <span className="px-2 py-1 bg-slate-100 rounded-md text-slate-700 font-semibold text-[11px]">
+                      {t.assignmentTimeFormatted}
                     </span>
                   </td>
-                  <td className="py-3 px-3">{t.assignee}</td>
                   <td className="py-3 px-3">
-                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${t.sla === "Breached" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>
-                      {t.sla}
+                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md font-semibold text-[11px]">
+                      {t.slaTimeFormatted}
                     </span>
                   </td>
-                  <td className="py-3 px-3 text-right uppercase font-bold text-slate-500 text-[11px]">{t.status}</td>
+                  <td className="py-3 px-3">
+                    <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded-md font-semibold text-[11px]">
+                      {t.subAssignmentTimeFormatted}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3">
+                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase ${
+                      t.isResolved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                    }`}>
+                      {t.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-right">
+                    <span className={`px-2.5 py-1 rounded-md font-bold text-[11px] ${
+                      t.isResolved ? "bg-emerald-600 text-white shadow-xs" : "bg-slate-100 text-slate-500 italic"
+                    }`}>
+                      {t.finalResolutionTimeFormatted}
+                    </span>
+                  </td>
                 </tr>
               ))}
+              {normalizedTickets.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="py-8 text-center text-slate-400 italic">No tickets available to display.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
