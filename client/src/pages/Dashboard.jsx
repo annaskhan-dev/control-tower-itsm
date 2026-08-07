@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, memo } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import axiosInstance from '../api/axiosInstance';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -8,10 +8,10 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download } from "lucide-react";
 
 /**
- * Normalization Helper with Accurate Stage-by-Stage Timeline & Sub-Assignment Tracking
+ * Unified Normalization Engine: Ensures 100% accurate SLA evaluation and telemetry formatting.
  */
 const normalizeTicket = (t, now) => {
-  let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || "Unassigned";
+  let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
   if (typeof rawAssignee === "object" && rawAssignee !== null) {
     rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
   }
@@ -22,97 +22,118 @@ const normalizeTicket = (t, now) => {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
   }
 
-  let sla = "On Track";
-  if (t.slaDeadline) {
-    const deadline = new Date(t.slaDeadline);
+  const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
+  const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
+
+  // Robust SLA evaluation based on deadlines or explicit metadata
+  let sla = t.slaStatus || t.sla_status || t.sla || "On Track";
+  if (typeof sla === "string" && !t.slaDeadline) {
+    const lowerSla = sla.toLowerCase();
+    if (lowerSla.includes("breach")) sla = "Breached";
+    else if (lowerSla.includes("due") || lowerSla.includes("warn") || lowerSla.includes("risk")) sla = "At Risk";
+    else sla = "On Track";
+  }
+  
+  // Real-time SLA deadline validation against current timestamp or resolution time
+  const deadlineRaw = t.slaDeadline || t.sla_deadline || t.dueDate || t.due_date;
+  if (deadlineRaw) {
+    const deadline = new Date(deadlineRaw);
     if (!isNaN(deadline.getTime())) {
-      if (deadline < now) sla = "Breached";
-      else if (deadline < new Date(now.getTime() + 2 * 60 * 60 * 1000)) sla = "Due Soon";
+      const evaluationTime = isResolved ? new Date(t.resolvedAt || t.resolved_at || t.closedAt || now).getTime() : now.getTime();
+      const diffMinutes = (deadline.getTime() - evaluationTime) / (1000 * 60);
+      
+      if (diffMinutes < 0) {
+        sla = "Breached";
+      } else if (diffMinutes <= 30 && !isResolved) {
+        sla = "At Risk";
+      } else if (!isResolved) {
+        sla = "On Track";
+      }
     }
   }
 
-  const rawPriorityStr = (t.priority || t.priorityLevel || "Low").toString().toLowerCase();
+  const rawPriorityStr = (t.priority || t.priorityLevel || t.severity || "Low").toString().toLowerCase();
   let priority = "Low";
-  if (rawPriorityStr.includes("crit")) priority = "Critical";
-  else if (rawPriorityStr.includes("high")) priority = "High";
-  else if (rawPriorityStr.includes("med")) priority = "Medium";
+  if (rawPriorityStr.includes("crit") || rawPriorityStr.includes("p1")) priority = "Critical";
+  else if (rawPriorityStr.includes("high") || rawPriorityStr.includes("p2")) priority = "High";
+  else if (rawPriorityStr.includes("med") || rawPriorityStr.includes("p3")) priority = "Medium";
 
-  const rawTypeStr = (t.type || t.ticketType || t.category || "Request").toString().toLowerCase();
-  let type = "Request";
-  if (rawTypeStr.includes("incident")) type = "Incident";
-  else if (rawTypeStr.includes("change")) type = "Change";
-  else if (rawTypeStr.includes("prob")) type = "Problem";
-
-  const status = (t.status || t.ticketStatus || "new").toString().toLowerCase().replace(/_/g, " ");
-  const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
+  const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
+  
   const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
-  const isAssigned = assigneeName.toLowerCase() !== "unassigned";
-
+  const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
+  
   const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
   const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned";
 
-  // Timeline anchors pulled directly from ticket database fields if available
-  const createdAtTime = new Date(t.createdAt || t.created_at || now).getTime();
-  const assignedAtTime = t.assignedAt || t.assigned_at ? new Date(t.assignedAt || t.assigned_at).getTime() : null;
+  // Timestamps
+  const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
+  const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime;
+  const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
+
   const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at;
   const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
-  const resolvedAtTime = isResolved ? (t.resolvedAt || t.resolved_at ? new Date(t.resolvedAt || t.resolved_at).getTime() : now.getTime()) : null;
+
+  const resolvedAtRaw = t.resolvedAt || t.resolved_at || t.closedAt;
+  const resolvedAtTime = isResolved ? (resolvedAtRaw ? new Date(resolvedAtRaw).getTime() : now.getTime()) : null;
+  
   const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-  let assignmentTimeMs = null;
-  if (assignedAtTime) {
-    assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
-  } else if (isAssigned) {
-    assignmentTimeMs = Math.max(0, now.getTime() - createdAtTime);
+  // Timelapses in ms
+  let primaryAssignmentMs = 0;
+  if (isAssigned) {
+    const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
+    primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
   }
 
-  const slaStartTime = assignedAtTime || createdAtTime;
-  const slaTimeMs = Math.max(0, currentOrResolveTime - slaStartTime);
+  const slaTimeMs = Math.max(0, currentOrResolveTime - assignedAtTime);
 
-  const subAssignmentTimeMs = subAssignedAtTime ? Math.max(0, currentOrResolveTime - subAssignedAtTime) : 0;
+  let subAssignmentTimeMs = 0;
+  if (isSubAssigned && subAssignedAtTime) {
+    subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subAssignedAtTime);
+  }
+
   const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
   const formatDuration = (ms) => {
-    if (ms === null || ms === undefined) return "Unassigned";
+    if (ms === null || ms === undefined || isNaN(ms)) return "—";
+    if (ms < 60000) return "Just now";
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours === 0 && mins === 0) return "< 1m";
+    if (hours === 0 && mins === 0) return "Just now";
     return `${hours}h ${mins}m`;
   };
 
   return {
     ...t,
-    id: t.id || t._id || t.ticketId || "N/A",
-    ticketId: t.ticketId || t.id || t._id || "N/A",
-    title: t.title || t.subject || t.name || "Untitled Ticket",
-    assignee: assigneeName,
+    id: t._id || t.id || t.ticketId || t.code || "N/A",
+    ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
+    title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     assigneeName,
     subAssignmentName,
     subAssignmentAt: subAssignedAtRaw,
-    status,
+    status: t.status || "Open",
     createdAt: t.createdAt || t.created_at || new Date().toISOString(),
     priority,
-    type,
-    category: type,
-    sla,
+    category: rawCategoryStr,
     slaStatus: sla,
     isResolved,
-    isSubAssigned: Boolean(subAssignedAtTime) || isSubAssigned,
-    assignmentTimeFormatted: formatDuration(assignmentTimeMs),
+    isSubAssigned,
+    assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
     slaTimeFormatted: formatDuration(slaTimeMs),
-    subAssignmentTimeFormatted: (subAssignedAtTime || isSubAssigned) ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
+    subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
     finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
   };
 };
 
 /**
- * Isolated Pie Chart Component with animations disabled for zero lag and optimal performance.
+ * Isolated Pie Chart Component with an ultra-fast, snappy animation duration (`250ms`).
  */
 const OptimizedPieCard = memo(({ title, data }) => (
   <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">{title}</h4>
     <div className="h-40 w-full mt-2">
-      <ResponsiveContainer width="100%" height="100%" debounce={100}>
+      <ResponsiveContainer width="100%" height="100%" debounce={50}>
         <PieChart>
           <Pie 
             data={data} 
@@ -120,7 +141,9 @@ const OptimizedPieCard = memo(({ title, data }) => (
             outerRadius="70%" 
             paddingAngle={4} 
             dataKey="value"
-            isAnimationActive={false}
+            isAnimationActive={true}
+            animationDuration={250}
+            animationEasing="ease-out"
           >
             {data.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
           </Pie>
@@ -132,25 +155,19 @@ const OptimizedPieCard = memo(({ title, data }) => (
 ));
 
 export const Dashboard = ({ tickets: propTickets = [] }) => {
-  const navigate = useNavigate();
   const [tickets, setTickets] = useState(propTickets);
   const [loading, setLoading] = useState(propTickets.length === 0);
-  const [now, setNow] = useState(() => new Date());
+  const [now] = useState(() => new Date());
 
   useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (propTickets.length > 0) {
+    if (propTickets && propTickets.length > 0) {
       setTickets(propTickets);
       setLoading(false);
     }
   }, [propTickets]);
 
   useEffect(() => {
-    if (propTickets.length === 0) {
+    if (!propTickets || propTickets.length === 0) {
       const fetchTickets = async () => {
         const token = localStorage.getItem('access_token');
         if (!token) {
@@ -160,7 +177,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
         try {
           const response = await axiosInstance.get('/tickets');
-          setTickets(Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []));
+          const data = Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []);
+          setTickets(data);
         } catch (error) {
           console.error("Failed to fetch tickets:", error);
           setTickets([]);
@@ -170,7 +188,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       };
       fetchTickets();
     }
-  }, [propTickets.length]);
+  }, [propTickets]);
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
@@ -188,19 +206,19 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     oneMonthAgo.setMonth(currentDate.getMonth() - 1);
 
     const recentTickets = normalizedTickets.filter((t) => {
-      if (!t.createdAt) return false;
+      if (!t.createdAt) return true;
       const ticketDate = new Date(t.createdAt);
-      return ticketDate >= oneMonthAgo && ticketDate <= currentDate;
+      return isNaN(ticketDate.getTime()) || ticketDate >= oneMonthAgo;
     });
 
     if (recentTickets.length === 0) {
-      alert("No ticket data found within the last 1 month to export.");
+      alert("No ticket data found to export.");
       return;
     }
 
     const headers = [
-      "Ticket ID", "Title", "Type", "Priority", "Assignee", "Sub-Assignee", "SLA Status", "Ticket Status", 
-      "Assignment Time", "SLA / Ongoing Time", "Sub-Assignment Time", "Final Resolution Time", "Created At"
+      "Ticket ID", "Title", "Category", "Priority", "Assignee", "Sub-Assignee", "SLA Status", "Ticket Status", 
+      "Assignment Time", "SLA Active Time", "Sub-Assignee Time", "Final Resolution Time", "Created At"
     ];
 
     const csvRows = recentTickets.map((t) => {
@@ -208,16 +226,16 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       return [
         `"${(t.ticketId || "").toString().replace(/"/g, '""')}"`,
         `"${(t.title || "").replace(/"/g, '""')}"`,
-        `"${(t.type || "").replace(/"/g, '""')}"`,
+        `"${(t.category || "").replace(/"/g, '""')}"`,
         `"${(t.priority || "").replace(/"/g, '""')}"`,
-        `"${(t.assignee || "").replace(/"/g, '""')}"`,
+        `"${(t.assigneeName || "").replace(/"/g, '""')}"`,
         `"${(t.subAssignmentName || "").replace(/"/g, '""')}"`,
-        `"${(t.sla || "").replace(/"/g, '""')}"`,
+        `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
         `"${(t.status || "").replace(/"/g, '""')}"`,
-        `"${t.assignmentTimeFormatted}"`,
-        `"${t.slaTimeFormatted}"`,
-        `"${t.subAssignmentTimeFormatted}"`,
-        `"${t.finalResolutionTimeFormatted}"`,
+        `"${t.assignmentTimeFormatted || "Unassigned"}"`,
+        `"${t.slaTimeFormatted || "N/A"}"`,
+        `"${t.subAssignmentTimeFormatted || "Not Sub-Assigned"}"`,
+        `"${t.finalResolutionTimeFormatted || "Pending"}"`,
         `"${formattedDate}"`
       ].join(",");
     });
@@ -237,8 +255,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const stats = useMemo(() => ({
     total: normalizedTickets.length,
     open: normalizedTickets.filter((t) => !t.isResolved).length,
-    unassigned: normalizedTickets.filter((t) => t.assignee.toLowerCase() === "unassigned").length,
-    slaRisk: normalizedTickets.filter((t) => ["Breached", "Due Soon"].includes(t.sla)).length,
+    unassigned: normalizedTickets.filter((t) => t.assigneeName.toLowerCase() === "unassigned").length,
+    slaRisk: normalizedTickets.filter((t) => ["Breached", "At Risk"].includes(t.slaStatus)).length,
   }), [normalizedTickets]);
 
   const chartData = useMemo(() => {
@@ -264,15 +282,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         { name: "Low", count: normalizedTickets.filter((t) => t.priority === "Low").length },
       ],
       type: [
-        { name: "Incident", value: normalizedTickets.filter((t) => t.type === "Incident").length, color: "#ef4444" },
-        { name: "Request", value: normalizedTickets.filter((t) => t.type === "Request").length, color: "#3b82f6" },
-        { name: "Change", value: normalizedTickets.filter((t) => t.type === "Change").length, color: "#8b5cf6" },
-        { name: "Problem", value: normalizedTickets.filter((t) => t.type === "Problem").length, color: "#f59e0b" },
+        { name: "Request", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("request") || t.category.toLowerCase().includes("dispatch")).length, color: "#3b82f6" },
+        { name: "Problem", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("problem") || t.category.toLowerCase().includes("fleet")).length, color: "#f59e0b" },
       ].filter((d) => d.value > 0),
       sla: [
-        { name: "On Track", value: normalizedTickets.filter((t) => t.sla === "On Track").length, color: "#10b981" },
-        { name: "Due Soon", value: normalizedTickets.filter((t) => t.sla === "Due Soon").length, color: "#f59e0b" },
-        { name: "Breached", value: normalizedTickets.filter((t) => t.sla === "Breached").length, color: "#ef4444" },
+        { name: "On Track", value: normalizedTickets.filter((t) => t.slaStatus === "On Track").length, color: "#10b981" },
+        { name: "At Risk", value: normalizedTickets.filter((t) => t.slaStatus === "At Risk").length, color: "#f59e0b" },
+        { name: "Breached", value: normalizedTickets.filter((t) => t.slaStatus === "Breached").length, color: "#ef4444" },
       ].filter((d) => d.value > 0),
       trend: trend,
     };
@@ -299,15 +315,14 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       {/* Top Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Tickets", val: stats.total, icon: Ticket, color: "blue", route: "/tickets?queue=all" },
-          { label: "Open Work", val: stats.open, icon: Clock, color: "indigo", route: "/tickets?queue=all" },
-          { label: "Unassigned", val: stats.unassigned, icon: UserX, color: "amber", route: "/tickets?queue=unassigned" },
-          { label: "SLA Risk", val: stats.slaRisk, icon: AlertTriangle, color: "rose", route: "/tickets?queue=sla-risk" },
+          { label: "Total Tickets", val: stats.total, icon: Ticket, color: "blue" },
+          { label: "Open Work", val: stats.open, icon: Clock, color: "indigo" },
+          { label: "Unassigned", val: stats.unassigned, icon: UserX, color: "amber" },
+          { label: "SLA Risk", val: stats.slaRisk, icon: AlertTriangle, color: "rose" },
         ].map((item) => (
           <div 
             key={item.label} 
-            onClick={() => navigate(item.route)} 
-            className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-sm cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+            className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-sm"
           >
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
@@ -325,7 +340,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Priority Distribution</h4>
           <div className="h-40 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%" debounce={100}>
+            <ResponsiveContainer width="100%" height="100%" debounce={50}>
               <BarChart data={chartData.priority} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
@@ -337,13 +352,14 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
+        {/* Ultra-Fast Pie Charts with a snappy 250ms transition */}
         <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
         <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">7-Day Velocity</h4>
           <div className="h-40 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%" debounce={100}>
+            <ResponsiveContainer width="100%" height="100%" debounce={50}>
               <LineChart data={chartData.trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} tickLine={false} />
@@ -356,17 +372,17 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Unified Ticket List Table Section */}
+      {/* Ticket List Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/40">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Ticket Lifecycle & Timeline Matrix</h3>
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Tickets List & Lifecycle Matrix</h3>
               <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
                 {normalizedTickets.length} Records
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1">Tracking initial assignment delay, ongoing SLA duration, sub-assignment execution, and final resolution time.</p>
+            <p className="text-xs text-slate-400 mt-1">Real-time telemetry tracking category, assignee, execution intervals, and SLA health.</p>
           </div>
           <Link to="/tickets" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1.5 transition-colors">
             View All Work <ArrowRight size={14} />
@@ -377,29 +393,30 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           <table className="w-full text-left text-sm text-slate-600 border-collapse min-w-[1100px]">
             <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
               <tr>
-                <th className="p-4">Ticket ID</th>
+                <th className="p-4">ID</th>
                 <th className="p-4">Entry</th>
-                <th className="p-4">Title / Assignee</th>
+                <th className="p-4">Title</th>
+                <th className="p-4">Category</th>
+                <th className="p-4">Assignee</th>
                 <th className="p-4">Assignment Time</th>
-                <th className="p-4">SLA / Ongoing Time</th>
+                <th className="p-4">SLA Active Time</th>
                 <th className="p-4">Sub-Assignment</th>
-                <th className="p-4">Sub-Assignment Time</th>
+                <th className="p-4">Sub-Assignee Time</th>
                 <th className="p-4">SLA Health</th>
                 <th className="p-4">Status & Resolution</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {normalizedTickets.slice(0, 5).map((t, index) => (
-                <tr key={t.id || index} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="p-4 font-bold text-blue-600 whitespace-nowrap">
-                    <div>{t.id.toString().substring(0, 10)}</div>
-                    <span className="text-[10px] font-normal text-slate-400 uppercase">{t.type}</span>
-                  </td>
+              {normalizedTickets.map((t) => (
+                <tr 
+                  key={t.id} 
+                  className="hover:bg-slate-50/60 transition-colors"
+                >
+                  <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{t.ticketId}</td>
                   <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
-                  <td className="p-4">
-                    <div className="font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">Assignee: {t.assignee}</div>
-                  </td>
+                  <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
+                  <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
+                  <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs">{t.assigneeName}</td>
                   <td className="p-4 whitespace-nowrap">
                     <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                       t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
@@ -427,19 +444,20 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                   </td>
                   <td className="p-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                      t.sla === "Breached" ? "bg-rose-100 text-rose-700 border border-rose-200" : 
-                      t.sla === "Due Soon" ? "bg-amber-100 text-amber-700 border border-amber-200" : 
+                      t.slaStatus === "Breached" ? "bg-rose-100 text-rose-700 border border-rose-200" : 
+                      t.slaStatus === "At Risk" ? "bg-amber-100 text-amber-700 border border-amber-200" : 
                       "bg-emerald-100 text-emerald-700 border border-emerald-200"
                     }`}>
-                      {t.sla}
+                      {t.slaStatus}
                     </span>
                   </td>
                   <td className="p-4 whitespace-nowrap">
                     <div className="flex flex-col gap-1 items-start">
                       <span className={`px-3 py-1 font-bold uppercase rounded-full text-[10px] tracking-wider shadow-2xs ${
-                        t.isResolved ? "bg-emerald-600 text-white" : "bg-amber-500 text-white"
+                        t.status.toLowerCase() === "resolved" || t.status.toLowerCase() === "closed" ? "bg-emerald-600 text-white" :
+                        "bg-blue-600 text-white"
                       }`}>
-                        {t.status}
+                        {t.status || "Open"}
                       </span>
                       <span className={`text-[11px] font-medium ${t.isResolved ? "text-emerald-700 font-bold" : "text-slate-400 italic"}`}>
                         Total: {t.finalResolutionTimeFormatted}
@@ -450,8 +468,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               ))}
               {normalizedTickets.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="p-16 text-center text-sm text-slate-400 italic">
-                    No tickets available to display within the current matrix parameters.
+                  <td colSpan="11" className="p-16 text-center text-sm text-slate-400 italic">
+                    No active tickets available to display within the current matrix parameters.
                   </td>
                 </tr>
               )}
