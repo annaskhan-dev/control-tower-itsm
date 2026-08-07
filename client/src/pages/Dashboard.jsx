@@ -48,12 +48,11 @@ const normalizeTicket = (t, now) => {
   const resolvedAtTime = isResolved ? (t.resolvedAt || t.resolved_at ? new Date(t.resolvedAt || t.resolved_at).getTime() : now.getTime()) : null;
   const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-  // 1. Assignment Time: Real duration from creation to assignment (Shows "Unassigned" if missing DB timestamp and not yet assigned)
+  // 1. Assignment Time: Real duration from creation to assignment
   let assignmentTimeMs = null;
   if (assignedAtTime) {
     assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
   } else if (isAssigned) {
-    // Fallback if ticket is assigned but no exact assignment timestamp logged in DB
     assignmentTimeMs = Math.max(0, now.getTime() - createdAtTime);
   }
 
@@ -344,33 +343,33 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </Link>
         </div>
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse table-auto min-w-[1000px]">
             <thead>
-              <tr className="text-xs font-bold text-slate-400 uppercase border-b border-slate-100">
-                <th className="py-3 px-3">Ticket ID</th>
-                <th className="py-3 px-3">Title / Assignee</th>
-                <th className="py-3 px-3">Priority</th>
-                <th className="py-3 px-3">SLA Status</th>
-                <th className="py-3 px-3">Assignment Time</th>
-                <th className="py-3 px-3">SLA / Ongoing Time</th>
-                <th className="py-3 px-3">Sub-Assignment Time</th>
-                <th className="py-3 px-3">Status</th>
-                <th className="py-3 px-3 text-right">Final Resolution Time</th>
+              <tr className="text-xs font-bold text-slate-400 uppercase border-b border-slate-100 bg-slate-50/50">
+                <th className="py-3 px-3 w-28">Ticket ID</th>
+                <th className="py-3 px-3 min-w-[200px]">Title / Assignee</th>
+                <th className="py-3 px-3 w-24">Priority</th>
+                <th className="py-3 px-3 w-28">SLA Status</th>
+                <th className="py-3 px-3 w-32">Assignment Time</th>
+                <th className="py-3 px-3 w-32">SLA / Ongoing</th>
+                <th className="py-3 px-3 w-32">Sub-Assignment</th>
+                <th className="py-3 px-3 w-24">Status</th>
+                <th className="py-3 px-3 w-32 text-right">Final Resolution</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
               {normalizedTickets.map((t, index) => (
                 <tr key={t.id || index} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3 px-3 font-bold text-blue-600">
-                    <div>{t.id.toString().substring(0, 10)}</div>
+                    <div className="truncate">{t.id.toString().substring(0, 10)}</div>
                     <span className="text-[10px] font-normal text-slate-400 uppercase">{t.type}</span>
                   </td>
                   <td className="py-3 px-3">
-                    <div className="font-semibold text-slate-800">{t.title}</div>
+                    <div className="font-semibold text-slate-800 line-clamp-1">{t.title}</div>
                     <div className="text-[11px] text-slate-500">Assignee: {t.assignee}</div>
                   </td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] ${
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] inline-block ${
                       t.priority === "Critical" ? "bg-rose-100 text-rose-800" :
                       t.priority === "High" ? "bg-orange-100 text-orange-800" :
                       t.priority === "Medium" ? "bg-amber-100 text-amber-800" :
@@ -379,8 +378,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                       {t.priority}
                     </span>
                   </td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] ${
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] inline-block ${
                       t.sla === "Breached" ? "bg-rose-100 text-rose-800" :
                       t.sla === "Due Soon" ? "bg-amber-100 text-amber-800" :
                       "bg-emerald-100 text-emerald-800"
@@ -388,34 +387,34 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                       {t.sla}
                     </span>
                   </td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] ${
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] inline-block ${
                       t.assignmentTimeFormatted === "Unassigned" ? "bg-slate-100 text-slate-400 italic" : "bg-slate-100 text-slate-700"
                     }`}>
                       {t.assignmentTimeFormatted}
                     </span>
                   </td>
-                  <td className="py-3 px-3">
-                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md font-semibold text-[11px]">
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md font-semibold text-[11px] inline-block">
                       {t.slaTimeFormatted}
                     </span>
                   </td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] ${
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] inline-block ${
                       t.isSubAssigned ? "bg-purple-50 text-purple-700" : "bg-slate-100 text-slate-400 italic"
                     }`}>
                       {t.subAssignmentTimeFormatted}
                     </span>
                   </td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase ${
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase inline-block ${
                       t.isResolved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                     }`}>
                       {t.status}
                     </span>
                   </td>
-                  <td className="py-3 px-3 text-right">
-                    <span className={`px-2.5 py-1 rounded-md font-bold text-[11px] ${
+                  <td className="py-3 px-3 text-right whitespace-nowrap">
+                    <span className={`px-2.5 py-1 rounded-md font-bold text-[11px] inline-block ${
                       t.isResolved ? "bg-emerald-600 text-white shadow-xs" : "bg-slate-100 text-slate-500 italic"
                     }`}>
                       {t.finalResolutionTimeFormatted}
