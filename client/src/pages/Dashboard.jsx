@@ -127,7 +127,7 @@ const normalizeTicket = (t, now) => {
 };
 
 /**
- * Isolated Pie Chart Component using a smooth, controlled animation speed (`animationDuration`).
+ * Isolated Pie Chart Component with a snappy, optimized animation duration (`500ms`).
  */
 const OptimizedPieCard = memo(({ title, data }) => (
   <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
@@ -142,7 +142,7 @@ const OptimizedPieCard = memo(({ title, data }) => (
             paddingAngle={4} 
             dataKey="value"
             isAnimationActive={true}
-            animationDuration={1200}
+            animationDuration={500}
             animationEasing="ease-out"
           >
             {data.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
@@ -352,7 +352,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Optimized Round/Pie Charts with a smooth, elegant entry animation speed */}
+        {/* Snappy Pie Charts with a faster 500ms transition */}
         <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
