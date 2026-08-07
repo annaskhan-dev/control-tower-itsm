@@ -41,18 +41,21 @@ const normalizeTicket = (t, now) => {
   const isResolved = ["closed", "resolved"].includes(status);
   const isAssigned = typeof rawAssignee === "string" && rawAssignee.toLowerCase() !== "unassigned";
 
-  // Timeline anchors
+  // Timeline anchors pulled directly from ticket database fields if available
   const createdAtTime = new Date(t.createdAt || t.created_at || now).getTime();
-  // Time when initial assignment happened (fallback to created if missing)
-  const assignedAtTime = t.assignedAt ? new Date(t.assignedAt).getTime() : (isAssigned ? createdAtTime : null);
-  // Time when sub-assignment happened (fallback to assignedAt if missing but sub-assigned, or null if not yet sub-assigned)
-  const subAssignedAtTime = t.subAssignedAt ? new Date(t.subAssignedAt).getTime() : null;
-  // Resolution time
-  const resolvedAtTime = isResolved ? (t.resolvedAt ? new Date(t.resolvedAt).getTime() : now.getTime()) : null;
+  const assignedAtTime = t.assignedAt || t.assigned_at ? new Date(t.assignedAt || t.assigned_at).getTime() : null;
+  const subAssignedAtTime = t.subAssignedAt || t.sub_assigned_at ? new Date(t.subAssignedAt || t.sub_assigned_at).getTime() : null;
+  const resolvedAtTime = isResolved ? (t.resolvedAt || t.resolved_at ? new Date(t.resolvedAt || t.resolved_at).getTime() : now.getTime()) : null;
   const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-  // 1. Assignment Time: Duration from Ticket Creation until Initial Assignment
-  const assignmentTimeMs = assignedAtTime ? Math.max(0, assignedAtTime - createdAtTime) : Math.max(0, now.getTime() - createdAtTime);
+  // 1. Assignment Time: Real duration from creation to assignment (Shows "Unassigned" if missing DB timestamp and not yet assigned)
+  let assignmentTimeMs = null;
+  if (assignedAtTime) {
+    assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
+  } else if (isAssigned) {
+    // Fallback if ticket is assigned but no exact assignment timestamp logged in DB
+    assignmentTimeMs = Math.max(0, now.getTime() - createdAtTime);
+  }
 
   // 2. SLA / Ongoing Time: Active running time since assignment began until resolution (or now)
   const slaStartTime = assignedAtTime || createdAtTime;
@@ -65,7 +68,7 @@ const normalizeTicket = (t, now) => {
   const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
   const formatDuration = (ms) => {
-    if (ms === null || ms === undefined) return "In Progress";
+    if (ms === null || ms === undefined) return "Unassigned";
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
     if (hours === 0 && mins === 0) return "< 1m";
@@ -365,7 +368,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                     <div className="text-[11px] text-slate-500">Assignee: {t.assignee}</div>
                   </td>
                   <td className="py-3 px-3">
-                    <span className="px-2 py-1 bg-slate-100 rounded-md text-slate-700 font-semibold text-[11px]">
+                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] ${
+                      t.assignmentTimeFormatted === "Unassigned" ? "bg-slate-100 text-slate-400 italic" : "bg-slate-100 text-slate-700"
+                    }`}>
                       {t.assignmentTimeFormatted}
                     </span>
                   </td>
