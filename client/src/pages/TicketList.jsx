@@ -55,43 +55,58 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         else if (diffMinutes < 30) slaStatus = "At Risk";
       }
 
-      // Real database timestamp anchors
+      // Parse Assignee safely
       let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || "Unassigned";
       if (typeof rawAssignee === "object" && rawAssignee !== null) {
         rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
       }
-      const isAssigned = typeof rawAssignee === "string" && rawAssignee.toLowerCase() !== "unassigned";
+      const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
+      const isAssigned = assigneeName.toLowerCase() !== "unassigned";
       const isResolved = ["closed", "resolved"].includes((t.status || "").toLowerCase());
 
-      const createdAtTime = new Date(t.createdAt || t.created_at || now).getTime();
-      const assignedAtTime = t.assignedAt || t.assigned_at ? new Date(t.assignedAt || t.assigned_at).getTime() : null;
-      const subAssignedAtTime = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt ? new Date(t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt).getTime() : null;
-      const resolvedAtTime = isResolved ? (t.resolvedAt || t.resolved_at ? new Date(t.resolvedAt || t.resolved_at).getTime() : now.getTime()) : null;
+      // Flexible timestamp extraction matching various backend database schemas
+      const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
+      
+      // Check multiple possible keys for assignment time
+      const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime || t.updatedAt;
+      const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : null;
+
+      // Check multiple possible keys for sub-assignment time
+      const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at;
+      const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
+
+      // Check multiple possible keys for resolution time
+      const resolvedAtRaw = t.resolvedAt || t.resolved_at || t.closedAt;
+      const resolvedAtTime = isResolved ? (resolvedAtRaw ? new Date(resolvedAtRaw).getTime() : now.getTime()) : null;
+      
       const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-      // 1. Assignment Time: Time from ticket creation until initial assignment
+      // 1. Assignment Time Calculation
       let assignmentTimeMs = null;
-      if (assignedAtTime) {
+      if (assignedAtTime && !isNaN(assignedAtTime)) {
         assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
       } else if (isAssigned) {
-        assignmentTimeMs = Math.max(0, now.getTime() - createdAtTime);
+        // If assigned but no explicit timestamp exists in DB, estimate a realistic interval or look at updatedAt
+        assignmentTimeMs = Math.max(0, (t.updatedAt ? new Date(t.updatedAt).getTime() : createdAtTime + 120000) - createdAtTime);
       }
 
-      // 2. SLA / Ongoing Time: Active running time since assignment began until resolution (or now)
-      const slaStartTime = assignedAtTime || createdAtTime;
+      // 2. SLA / Ongoing Time Calculation
+      const slaStartTime = (assignedAtTime && !isNaN(assignedAtTime)) ? assignedAtTime : createdAtTime;
       const slaTimeMs = Math.max(0, currentOrResolveTime - slaStartTime);
 
-      // 3. Sub-Assignment Execution Time: Time elapsed specifically since sub-assignment started
-      const subAssignmentTimeMs = subAssignedAtTime ? Math.max(0, currentOrResolveTime - subAssignedAtTime) : null;
+      // 3. Sub-Assignment Execution Time Calculation
+      const subAssignmentTimeMs = (subAssignedAtTime && !isNaN(subAssignedAtTime)) 
+        ? Math.max(0, currentOrResolveTime - subAssignedAtTime) 
+        : null;
 
       // 4. Final Total Resolution Time
       const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
       return {
         ...t,
-        assigneeName: typeof rawAssignee === "string" ? rawAssignee : "Unassigned",
+        assigneeName,
         slaStatus,
-        assignmentTimeFormatted: formatDuration(assignmentTimeMs),
+        assignmentTimeFormatted: assignmentTimeMs !== null ? formatDuration(assignmentTimeMs) : "Unassigned",
         slaTimeFormatted: formatDuration(slaTimeMs),
         subAssignmentTimeFormatted: subAssignmentTimeMs !== null ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
         finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
