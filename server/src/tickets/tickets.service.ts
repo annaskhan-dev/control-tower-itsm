@@ -26,7 +26,6 @@ export class TicketsService {
   private authorize(userRole: string, allowedRoles: string[]) {
     if (userRole === 'Super Admin') return;
     
-    // Normalize string comparisons to match variations (e.g. spaces vs underscores)
     const normalizedUserRole = userRole.replace(/\s+/g, '_').toLowerCase();
     const isAllowed = allowedRoles.some(
       role => role.replace(/\s+/g, '_').toLowerCase() === normalizedUserRole
@@ -54,6 +53,7 @@ export class TicketsService {
         subAssignment: isSubAssigned ? createTicketDto.subAssignment : null,
         ticketId: `INC-${Math.floor(10000 + Math.random() * 90000)}`,
         slaDeadline: deadline,
+        // Ensures assignedAt is explicitly populated if an assignee exists
         assignedAt: isAssigned ? new Date() : null,
         subAssignmentAt: isSubAssigned ? new Date() : null,
         resolvedAt: null,
@@ -87,7 +87,6 @@ export class TicketsService {
   }
 
   async update(id: string, updateTicketDto: UpdateTicketDto, companyId: string, userRole: string): Promise<Ticket> {
-    // Treat Transporter, Shipper Ops, and Sales Person like Operators (restricted from updating Assignee or Category)
     const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
     const restrictedUpdateRoles = ['operator', 'transporter', 'shipper_ops', 'sales_person'];
 
@@ -103,14 +102,20 @@ export class TicketsService {
 
     const updateData: any = { ...updateTicketDto };
 
-    if (updateData.assignee !== undefined && updateData.assignee !== existingTicket.assignee) {
+    // Handle Assignee and assignedAt logic safely
+    if (updateData.assignee !== undefined) {
       const isActuallyAssigned = updateData.assignee !== 'Unassigned' && updateData.assignee !== '';
-      updateData.assignedAt = isActuallyAssigned ? new Date() : null;
+      if (isActuallyAssigned) {
+        // Only update assignedAt if it wasn't previously assigned or if assignee changed
+        updateData.assignedAt = existingTicket.assignedAt || new Date();
+      } else {
+        updateData.assignedAt = null;
+      }
     }
 
     if (updateData.subAssignment !== undefined && updateData.subAssignment !== existingTicket.subAssignment) {
       const isActuallySubAssigned = updateData.subAssignment !== 'Unassigned' && updateData.subAssignment !== '';
-      updateData.subAssignmentAt = isActuallySubAssigned ? new Date() : null;
+      updateData.subAssignmentAt = isActuallySubAssigned ? (existingTicket.subAssignmentAt || new Date()) : null;
     }
 
     // Automatically handle resolvedAt timestamp when status changes

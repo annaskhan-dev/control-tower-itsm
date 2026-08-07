@@ -64,33 +64,32 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const isAssigned = assigneeName.toLowerCase() !== "unassigned";
       const isResolved = ["closed", "resolved"].includes((t.status || "").toLowerCase());
 
-      // Flexible timestamp extraction matching various backend database schemas
+      // Flexible timestamp extraction matching backend schema
       const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
       
-      // Check multiple possible keys for assignment time
       const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime || t.updatedAt;
       const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : null;
 
-      // Check multiple possible keys for sub-assignment time
       const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at;
       const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
 
-      // Check multiple possible keys for resolution time
       const resolvedAtRaw = t.resolvedAt || t.resolved_at || t.closedAt;
       const resolvedAtTime = isResolved ? (resolvedAtRaw ? new Date(resolvedAtRaw).getTime() : now.getTime()) : null;
       
       const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-      // 1. Assignment Time Calculation
+      // 1. Assignment Time Calculation: Time from creation until assignment.
+      // If assignedAt exists, use it. If historical ticket is already assigned but missing assignedAt, 
+      // fallback to 0 or creation time instead of falsely showing huge durations if updated recently.
       let assignmentTimeMs = null;
       if (assignedAtTime && !isNaN(assignedAtTime)) {
         assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
       } else if (isAssigned) {
-        // If assigned but no explicit timestamp exists in DB, estimate a realistic interval or look at updatedAt
-        assignmentTimeMs = Math.max(0, (t.updatedAt ? new Date(t.updatedAt).getTime() : createdAtTime + 120000) - createdAtTime);
+        // Fallback for legacy data where assignedAt wasn't stored: defaults to < 1m or exact creation match
+        assignmentTimeMs = 0; 
       }
 
-      // 2. SLA / Ongoing Time Calculation
+      // 2. SLA / Ongoing Time Calculation: Time elapsed since assignment began until resolution/now
       const slaStartTime = (assignedAtTime && !isNaN(assignedAtTime)) ? assignedAtTime : createdAtTime;
       const slaTimeMs = Math.max(0, currentOrResolveTime - slaStartTime);
 
