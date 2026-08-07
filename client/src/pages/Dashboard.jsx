@@ -8,7 +8,7 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download } from "lucide-react";
 
 /**
- * Normalization Helper with Timeline and Sub-Assignment Metrics Calculation
+ * Normalization Helper with Accurate Stage-by-Stage Timeline & Sub-Assignment Tracking
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || "Unassigned";
@@ -39,24 +39,29 @@ const normalizeTicket = (t, now) => {
 
   const status = (t.status || t.ticketStatus || "new").toString().toLowerCase().replace(/_/g, " ");
   const isResolved = ["closed", "resolved"].includes(status);
+  const isAssigned = typeof rawAssignee === "string" && rawAssignee.toLowerCase() !== "unassigned";
 
-  // Time calculations (Fallbacks if specific timestamps aren't directly provided by backend schema)
+  // Timeline anchors
   const createdAtTime = new Date(t.createdAt || t.created_at || now).getTime();
-  const assignedAtTime = t.assignedAt ? new Date(t.assignedAt).getTime() : createdAtTime;
-  const subAssignedAtTime = t.subAssignedAt ? new Date(t.subAssignedAt).getTime() : assignedAtTime;
+  // Time when initial assignment happened (fallback to created if missing)
+  const assignedAtTime = t.assignedAt ? new Date(t.assignedAt).getTime() : (isAssigned ? createdAtTime : null);
+  // Time when sub-assignment happened (fallback to assignedAt if missing but sub-assigned, or null if not yet sub-assigned)
+  const subAssignedAtTime = t.subAssignedAt ? new Date(t.subAssignedAt).getTime() : null;
+  // Resolution time
   const resolvedAtTime = isResolved ? (t.resolvedAt ? new Date(t.resolvedAt).getTime() : now.getTime()) : null;
+  const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-  // 1. Assignment Time: Time taken from creation until assignment
-  const assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
-  
-  // 2. SLA Elapsed / Running Time: Time from assignment/creation ongoing or until resolution/current time
-  const slaEndTime = isResolved ? resolvedAtTime : now.getTime();
-  const slaTimeMs = Math.max(0, slaEndTime - assignedAtTime);
+  // 1. Assignment Time: Duration from Ticket Creation until Initial Assignment
+  const assignmentTimeMs = assignedAtTime ? Math.max(0, assignedAtTime - createdAtTime) : Math.max(0, now.getTime() - createdAtTime);
 
-  // 3. Sub-Assignment Execution Time: Time from sub-assignment execution until resolution or current
-  const subAssignmentTimeMs = Math.max(0, slaEndTime - subAssignedAtTime);
+  // 2. SLA / Ongoing Time: Active running time since assignment began until resolution (or now)
+  const slaStartTime = assignedAtTime || createdAtTime;
+  const slaTimeMs = Math.max(0, currentOrResolveTime - slaStartTime);
 
-  // 4. Final Total Resolution Time (if resolved)
+  // 3. Sub-Assignment Execution Time: Time elapsed specifically since sub-assignment started
+  const subAssignmentTimeMs = subAssignedAtTime ? Math.max(0, currentOrResolveTime - subAssignedAtTime) : 0;
+
+  // 4. Final Total Resolution Time
   const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
   const formatDuration = (ms) => {
@@ -78,9 +83,10 @@ const normalizeTicket = (t, now) => {
     type,
     sla,
     isResolved,
+    isSubAssigned: Boolean(subAssignedAtTime),
     assignmentTimeFormatted: formatDuration(assignmentTimeMs),
     slaTimeFormatted: formatDuration(slaTimeMs),
-    subAssignmentTimeFormatted: formatDuration(subAssignmentTimeMs),
+    subAssignmentTimeFormatted: subAssignedAtTime ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
     finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
   };
 };
@@ -146,7 +152,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
     const headers = [
       "Ticket ID", "Title", "Type", "Priority", "Assignee", "SLA Status", "Ticket Status", 
-      "Assignment Time", "SLA/Ongoing Time", "Sub-Assignment Time", "Final Resolution Time", "Created At"
+      "Assignment Time", "SLA / Ongoing Time", "Sub-Assignment Time", "Final Resolution Time", "Created At"
     ];
 
     const csvRows = recentTickets.map((t) => {
@@ -328,7 +334,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
           <div>
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Ticket Lifecycle & Timeline Matrix</h4>
-            <p className="text-xs text-slate-400 mt-0.5">Tracking assignment duration, ongoing SLA timings, sub-assignment execution, and final resolution time.</p>
+            <p className="text-xs text-slate-400 mt-0.5">Tracking initial assignment delay, ongoing SLA duration, sub-assignment execution, and final resolution time.</p>
           </div>
           <Link to="/tickets" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
             View All Work <ArrowRight size={14} />
@@ -369,7 +375,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                     </span>
                   </td>
                   <td className="py-3 px-3">
-                    <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded-md font-semibold text-[11px]">
+                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] ${
+                      t.isSubAssigned ? "bg-purple-50 text-purple-700" : "bg-slate-100 text-slate-400 italic"
+                    }`}>
                       {t.subAssignmentTimeFormatted}
                     </span>
                   </td>
