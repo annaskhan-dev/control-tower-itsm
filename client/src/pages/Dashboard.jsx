@@ -130,12 +130,9 @@ const normalizeTicket = (t, now) => {
 export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [tickets, setTickets] = useState(propTickets);
   const [loading, setLoading] = useState(propTickets.length === 0);
-  const [now, setNow] = useState(new Date());
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(interval);
-  }, []);
+  
+  // Fixed static timestamp on mount to prevent constant full-dashboard re-renders every 60 seconds
+  const [now] = useState(() => new Date());
 
   useEffect(() => {
     if (propTickets && propTickets.length > 0) {
