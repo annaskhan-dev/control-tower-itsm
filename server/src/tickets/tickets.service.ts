@@ -53,7 +53,6 @@ export class TicketsService {
         subAssignment: isSubAssigned ? createTicketDto.subAssignment : null,
         ticketId: `INC-${Math.floor(10000 + Math.random() * 90000)}`,
         slaDeadline: deadline,
-        // Ensures assignedAt is explicitly populated if an assignee exists
         assignedAt: isAssigned ? new Date() : null,
         subAssignmentAt: isSubAssigned ? new Date() : null,
         resolvedAt: null,
@@ -106,16 +105,25 @@ export class TicketsService {
     if (updateData.assignee !== undefined) {
       const isActuallyAssigned = updateData.assignee !== 'Unassigned' && updateData.assignee !== '';
       if (isActuallyAssigned) {
-        // Only update assignedAt if it wasn't previously assigned or if assignee changed
         updateData.assignedAt = existingTicket.assignedAt || new Date();
       } else {
         updateData.assignedAt = null;
       }
     }
 
-    if (updateData.subAssignment !== undefined && updateData.subAssignment !== existingTicket.subAssignment) {
-      const isActuallySubAssigned = updateData.subAssignment !== 'Unassigned' && updateData.subAssignment !== '';
-      updateData.subAssignmentAt = isActuallySubAssigned ? (existingTicket.subAssignmentAt || new Date()) : null;
+    // Handle Sub-Assignment and subAssignmentAt logic robustly (fixes legacy records missing timestamps)
+    if (updateData.subAssignment !== undefined) {
+      const isActuallySubAssigned = updateData.subAssignment !== 'Unassigned' && updateData.subAssignment !== '' && updateData.subAssignment !== null;
+      
+      if (isActuallySubAssigned) {
+        const isNewSubAssignment = updateData.subAssignment !== existingTicket.subAssignment;
+        if (isNewSubAssignment || !existingTicket.subAssignmentAt) {
+          updateData.subAssignmentAt = new Date();
+        }
+      } else {
+        updateData.subAssignment = null;
+        updateData.subAssignmentAt = null;
+      }
     }
 
     // Automatically handle resolvedAt timestamp when status changes
@@ -172,12 +180,35 @@ export class TicketsService {
     if (search) {
       query.title = { $regex: search, $options: 'i' };
     }
-    return this.ticketModel.find(query).sort({ createdAt: -1 }).exec();
+    
+    const tickets = await this.ticketModel.find(query).sort({ createdAt: -1 }).exec();
+
+    // Auto-patch legacy documents on the fly during retrieval to prevent null time anchors
+    return tickets.map((t: any) => {
+      const ticketObj = t.toObject ? t.toObject() : t;
+      const hasSubAssignment = ticketObj.subAssignment && ticketObj.subAssignment !== 'Unassigned' && ticketObj.subAssignment !== '';
+      
+      if (hasSubAssignment && !ticketObj.subAssignmentAt) {
+        ticketObj.subAssignmentAt = ticketObj.updatedAt || ticketObj.createdAt;
+      }
+      return ticketObj;
+    });
   }
 
   async findOne(id: string, companyId: string): Promise<Ticket | null> {
     const baseQuery = id.startsWith('INC-') ? { ticketId: id } : { _id: id };
-    return this.ticketModel.findOne({ ...baseQuery, companyId }).exec();
+    const ticket = await this.ticketModel.findOne({ ...baseQuery, companyId }).exec();
+    
+    if (!ticket) return null;
+
+    const ticketObj: any = ticket.toObject ? ticket.toObject() : ticket;
+    const hasSubAssignment = ticketObj.subAssignment && ticketObj.subAssignment !== 'Unassigned' && ticketObj.subAssignment !== '';
+    
+    if (hasSubAssignment && !ticketObj.subAssignmentAt) {
+      ticketObj.subAssignmentAt = ticketObj.updatedAt || ticketObj.createdAt;
+    }
+    
+    return ticketObj;
   }
 
   async getStats(companyId: string) {

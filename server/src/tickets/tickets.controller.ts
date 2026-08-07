@@ -71,16 +71,16 @@ export class TicketsController {
     return await this.ticketsService.create(createTicketDto, req.user.companyId, req.user.role);
   }
 
-  @Get()
-  @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
-  async findAll(@Req() req: AuthenticatedRequest, @Query('search') search: string, @Query('queue') queue: string) {
-    return this.ticketsService.findAll(search, queue, req.user.companyId);
-  }
-
   @Get('stats')
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async getStats(@Req() req: AuthenticatedRequest) {
     return await this.ticketsService.getStats(req.user.companyId);
+  }
+
+  @Get()
+  @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
+  async findAll(@Req() req: AuthenticatedRequest, @Query('search') search: string, @Query('queue') queue: string) {
+    return this.ticketsService.findAll(search, queue, req.user.companyId);
   }
 
   @Get(':id')
