@@ -7,6 +7,13 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
+  const [now, setNow] = useState(new Date());
+
+  // Update current time every minute for active duration calculations
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
   
   const { tickets, fetchTickets, isLoading } = useTickets();
   const { isAdmin, isManager } = useAuth();
@@ -25,11 +32,20 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
+  const formatDuration = (ms) => {
+    if (ms === null || ms === undefined || isNaN(ms)) return "—";
+    if (ms < 0) return "< 1m";
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    if (hours === 0 && mins === 0) return "< 1m";
+    return `${hours}h ${mins}m`;
+  };
+
   const ticketData = useMemo(() => {
     if (!tickets) return [];
-    const now = new Date();
     
     return tickets.map((t) => {
+      // SLA calculations
       const deadline = new Date(t.slaDeadline || now);
       const diffMinutes = t.slaDeadline ? (deadline.getTime() - now.getTime()) / (1000 * 60) : Infinity;
 
@@ -39,9 +55,49 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         else if (diffMinutes < 30) slaStatus = "At Risk";
       }
 
-      return { ...t, slaStatus };
+      // Real database timestamp anchors
+      let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || "Unassigned";
+      if (typeof rawAssignee === "object" && rawAssignee !== null) {
+        rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
+      }
+      const isAssigned = typeof rawAssignee === "string" && rawAssignee.toLowerCase() !== "unassigned";
+      const isResolved = ["closed", "resolved"].includes((t.status || "").toLowerCase());
+
+      const createdAtTime = new Date(t.createdAt || t.created_at || now).getTime();
+      const assignedAtTime = t.assignedAt || t.assigned_at ? new Date(t.assignedAt || t.assigned_at).getTime() : null;
+      const subAssignedAtTime = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt ? new Date(t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt).getTime() : null;
+      const resolvedAtTime = isResolved ? (t.resolvedAt || t.resolved_at ? new Date(t.resolvedAt || t.resolved_at).getTime() : now.getTime()) : null;
+      const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
+
+      // 1. Assignment Time: Time from ticket creation until initial assignment
+      let assignmentTimeMs = null;
+      if (assignedAtTime) {
+        assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
+      } else if (isAssigned) {
+        assignmentTimeMs = Math.max(0, now.getTime() - createdAtTime);
+      }
+
+      // 2. SLA / Ongoing Time: Active running time since assignment began until resolution (or now)
+      const slaStartTime = assignedAtTime || createdAtTime;
+      const slaTimeMs = Math.max(0, currentOrResolveTime - slaStartTime);
+
+      // 3. Sub-Assignment Execution Time: Time elapsed specifically since sub-assignment started
+      const subAssignmentTimeMs = subAssignedAtTime ? Math.max(0, currentOrResolveTime - subAssignedAtTime) : null;
+
+      // 4. Final Total Resolution Time
+      const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
+
+      return {
+        ...t,
+        assigneeName: typeof rawAssignee === "string" ? rawAssignee : "Unassigned",
+        slaStatus,
+        assignmentTimeFormatted: formatDuration(assignmentTimeMs),
+        slaTimeFormatted: formatDuration(slaTimeMs),
+        subAssignmentTimeFormatted: subAssignmentTimeMs !== null ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
+        finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
+      };
     });
-  }, [tickets]);
+  }, [tickets, now]);
 
   const filteredTickets = useMemo(() => {
     return ticketData.filter((t) => {
@@ -96,11 +152,12 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                 <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Title</th>
                 <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Category</th>
                 <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Assignee</th>
-                <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Assigned At</th>
+                <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Assignment Time</th>
+                <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">SLA / Ongoing Time</th>
                 <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Sub Assignment</th>
-                <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Sub Assigned At</th>
+                <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Sub-Assignment Time</th>
                 <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">SLA</th>
-                <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Status</th>
+                <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Status & Resolution Time</th>
               </tr>
             </thead>
             <tbody>
@@ -112,28 +169,46 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                 >
                   <td className="p-4 font-bold text-blue-600">{t.ticketId}</td>
                   <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
-                  <td className="p-4 font-medium text-slate-900 truncate max-w-[240px]">{t.title}</td>
+                  <td className="p-4 font-medium text-slate-900 truncate max-w-[200px]">{t.title}</td>
                   <td className="p-4 text-slate-500">{t.category || "—"}</td>
-                  <td className="p-4 text-slate-500">{t.assignee || "Unassigned"}</td>
-                  <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(t.assignedAt)}</td>
-                  <td className="p-4 text-slate-500">{t.subAssignment || "—"}</td>
-                  <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(t.subAssignmentAt)}</td>
-                  <td className={`p-4 font-bold ${t.slaStatus === "Breached" ? "text-rose-600" : t.slaStatus === "At Risk" ? "text-amber-600" : "text-emerald-600"}`}>
+                  <td className="p-4 text-slate-500">{t.assigneeName}</td>
+                  <td className="p-4 whitespace-nowrap">
+                    <span className="px-2 py-1 bg-slate-100 rounded text-slate-700 text-xs font-medium">
+                      {t.assignmentTimeFormatted}
+                    </span>
+                  </td>
+                  <td className="p-4 whitespace-nowrap">
+                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                      {t.slaTimeFormatted}
+                    </span>
+                  </td>
+                  <td className="p-4 text-slate-500">
+                    <div>{t.subAssignment || "—"}</div>
+                    {t.subAssignmentAt && (
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap">{formatDate(t.subAssignmentAt)}</span>
+                    )}
+                  </td>
+                  <td className="p-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? "bg-purple-50 text-purple-700" : "bg-slate-100 text-slate-400 italic"
+                    }`}>
+                      {t.subAssignmentTimeFormatted}
+                    </span>
+                  </td>
+                  <td className={`p-4 font-bold whitespace-nowrap ${t.slaStatus === "Breached" ? "text-rose-600" : t.slaStatus === "At Risk" ? "text-amber-600" : "text-emerald-600"}`}>
                     {t.slaStatus}
                   </td>
-                  <td className="p-4">
+                  <td className="p-4 whitespace-nowrap">
                     <div className="flex flex-col gap-1">
                       <span className={`px-2.5 py-1 font-bold uppercase rounded-full text-xs w-max ${
-                          t.status === "Resolved" ? "bg-emerald-100 text-emerald-700" :
-                          "bg-blue-100 text-blue-600"
+                        t.status === "Resolved" ? "bg-emerald-100 text-emerald-700" :
+                        "bg-blue-100 text-blue-600"
                       }`}>
                         {t.status || "Open"}
                       </span>
-                      {t.status === "Resolved" && t.resolvedAt && (
-                        <span className="text-[10px] text-slate-400 whitespace-nowrap">
-                          {formatDate(t.resolvedAt)}
-                        </span>
-                      )}
+                      <span className={`text-[10px] font-semibold ${t.status === "Resolved" ? "text-emerald-600 font-bold" : "text-slate-400 italic"}`}>
+                        Total: {t.finalResolutionTimeFormatted}
+                      </span>
                     </div>
                   </td>
                 </tr>
