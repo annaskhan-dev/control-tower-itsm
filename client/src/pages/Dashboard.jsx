@@ -8,7 +8,7 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download } from "lucide-react";
 
 /**
- * Enhanced Normalization Helper with Precise Field Mapping & Fallback Timestamps
+ * Unified Normalization Engine: Ensures 100% parity between your main Ticket List and the Dashboard view.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
@@ -16,7 +16,13 @@ const normalizeTicket = (t, now) => {
     rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
   }
 
-  // Robust SLA evaluation
+  // Sub-assignee parsing to match ticket list view
+  let rawSubAssignee = t.subAssignee || t.sub_assignee || t.subAssignedTo || t.sub_assigned_to || null;
+  if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
+    rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
+  }
+
+  // Robust SLA evaluation matching the list view logic
   let sla = t.slaStatus || t.sla_status || t.sla || "On Track";
   if (typeof sla === "string") {
     const lowerSla = sla.toLowerCase();
@@ -49,11 +55,13 @@ const normalizeTicket = (t, now) => {
   const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
   const isAssigned = typeof rawAssignee === "string" && rawAssignee.toLowerCase() !== "unassigned";
 
-  // Parse exact timestamp anchors from possible backend database keys
+  // Parse exact timestamp anchors consistently with the ticket list view
   const createdAtTime = new Date(t.createdAt || t.created_at || t.creationDate || now).getTime();
   const assignedAtTime = t.assignedAt || t.assigned_at || t.assignmentTime ? new Date(t.assignedAt || t.assigned_at || t.assignmentTime).getTime() : null;
   const subAssignedAtTime = t.subAssignedAt || t.sub_assigned_at || t.subAssignmentTime ? new Date(t.subAssignedAt || t.sub_assigned_at || t.subAssignmentTime).getTime() : null;
-  const resolvedAtTime = isResolved ? (t.resolvedAt || t.resolved_at || t.closedAt || t.updatedAt || now.getTime()) : null;
+  
+  // FIXED: If resolved, accurately fetch resolution time or fallback to update/current time without forcing active inflation
+  const resolvedAtTime = isResolved ? (t.resolvedAt || t.resolved_at || t.closedAt || t.updatedAt ? new Date(t.resolvedAt || t.resolved_at || t.closedAt || t.updatedAt).getTime() : now.getTime()) : null;
   
   const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
@@ -62,18 +70,18 @@ const normalizeTicket = (t, now) => {
   if (assignedAtTime) {
     assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
   } else if (isAssigned) {
-    // If ticket is marked assigned but lacks a historical log timestamp, estimate gap or fallback to creation gap
     assignmentTimeMs = Math.max(0, now.getTime() - createdAtTime);
   }
 
-  // 2. SLA / Ongoing Active Running Time
+  // 2. SLA / Ongoing Active Running Time (If resolved, lock to resolution duration. If open, run against current time)
   const slaStartTime = assignedAtTime || createdAtTime;
-  const slaTimeMs = Math.max(0, currentOrResolveTime - slaStartTime);
+  const slaEndTime = isResolved ? resolvedAtTime : now.getTime();
+  const slaTimeMs = Math.max(0, slaEndTime - slaStartTime);
 
   // 3. Sub-Assignment Execution Time
-  const subAssignmentTimeMs = subAssignedAtTime ? Math.max(0, currentOrResolveTime - subAssignedAtTime) : null;
+  const subAssignmentTimeMs = subAssignedAtTime ? Math.max(0, slaEndTime - subAssignedAtTime) : null;
 
-  // 4. Final Total Resolution Time
+  // 4. Final Total Resolution Time (Creation -> Resolution)
   const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
   const formatDuration = (ms) => {
@@ -90,16 +98,17 @@ const normalizeTicket = (t, now) => {
     id: t.id || t._id || t.ticketId || t.code || "N/A",
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     assignee: typeof rawAssignee === "string" ? rawAssignee : "Unassigned",
+    subAssignee: rawSubAssignee,
     status,
     createdAt: t.createdAt || t.created_at || new Date().toISOString(),
     priority,
     type,
     sla,
     isResolved,
-    isSubAssigned: Boolean(subAssignedAtTime),
+    isSubAssigned: Boolean(subAssignedAtTime || rawSubAssignee),
     assignmentTimeFormatted: formatDuration(assignmentTimeMs),
     slaTimeFormatted: formatDuration(slaTimeMs),
-    subAssignmentTimeFormatted: subAssignedAtTime ? formatDuration(subAssignmentTimeMs) : null,
+    subAssignmentTimeFormatted: subAssignedAtTime ? formatDuration(subAssignmentTimeMs) : (rawSubAssignee ? "Active" : null),
     finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : null,
   };
 };
@@ -165,7 +174,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     }
 
     const headers = [
-      "Ticket ID", "Title", "Type", "Priority", "Assignee", "SLA Status", "Ticket Status", 
+      "Ticket ID", "Title", "Type", "Priority", "Assignee", "Sub-Assignee", "SLA Status", "Ticket Status", 
       "Assignment Time", "SLA / Ongoing Time", "Sub-Assignment Time", "Final Resolution Time", "Created At"
     ];
 
@@ -177,6 +186,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         `"${(t.type || "").replace(/"/g, '""')}"`,
         `"${(t.priority || "").replace(/"/g, '""')}"`,
         `"${(t.assignee || "").replace(/"/g, '""')}"`,
+        `"${(t.subAssignee || "").replace(/"/g, '""')}"`,
         `"${(t.sla || "").replace(/"/g, '""')}"`,
         `"${(t.status || "").replace(/"/g, '""')}"`,
         `"${t.assignmentTimeFormatted || "Unassigned"}"`,
@@ -346,7 +356,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Professional Lifecycle & Timeline Breakdown Table */}
+      {/* Professional Lifecycle & Timeline Breakdown Table - Perfectly aligned with your main list columns */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
         {/* Table Header Section */}
         <div className="px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/40">
@@ -364,55 +374,96 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </Link>
         </div>
 
-        {/* Professional Enterprise Table Layout */}
+        {/* Professional Enterprise Table Layout Matching Your Ticket List Structure */}
         <div className="w-full overflow-x-auto">
           <table className="w-full text-left border-collapse table-auto min-w-[1100px]">
             <thead>
               <tr className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 bg-slate-50/80">
                 <th className="py-3.5 px-4 w-32">Ticket ID</th>
-                <th className="py-3.5 px-4 min-w-[220px]">Title & Assignee</th>
-                <th className="py-3.5 px-4 w-28">Priority</th>
-                <th className="py-3.5 px-4 w-32">SLA Health</th>
-                <th className="py-3.5 px-4 w-32">Assignment Latency</th>
-                <th className="py-3.5 px-4 w-32">Active / SLA Duration</th>
+                <th className="py-3.5 px-4 w-36">Entry Date</th>
+                <th className="py-3.5 px-4 min-w-[180px]">Title</th>
+                <th className="py-3.5 px-4 w-36">Category</th>
+                <th className="py-3.5 px-4 w-28">Assignee</th>
+                <th className="py-3.5 px-4 w-28">Assignment Time</th>
+                <th className="py-3.5 px-4 w-28">SLA Active Time</th>
                 <th className="py-3.5 px-4 w-32">Sub-Assignment</th>
-                <th className="py-3.5 px-4 w-28">Status</th>
-                <th className="py-3.5 px-4 w-32 text-right">Resolution Time</th>
+                <th className="py-3.5 px-4 w-28">Sub-Assignee Time</th>
+                <th className="py-3.5 px-4 w-28">SLA Health</th>
+                <th className="py-3.5 px-4 w-32 text-right">Status & Resolution</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
               {normalizedTickets.map((t, index) => (
                 <tr key={t.id || index} className="hover:bg-slate-50/60 transition-colors group">
-                  {/* Ticket ID & Type */}
+                  {/* Ticket ID */}
                   <td className="py-4 px-4 font-bold">
                     <span className="text-blue-600 hover:underline cursor-pointer font-mono tracking-tight">
-                      {t.id.toString().substring(0, 10)}
+                      {t.id}
                     </span>
-                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">{t.type}</div>
                   </td>
 
-                  {/* Title & Assignee */}
+                  {/* Entry Date */}
+                  <td className="py-4 px-4 text-slate-500 whitespace-nowrap">
+                    {t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : "N/A"}
+                  </td>
+
+                  {/* Title */}
                   <td className="py-4 px-4">
                     <div className="font-semibold text-slate-800 line-clamp-1 group-hover:text-blue-600 transition-colors">{t.title}</div>
-                    <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                      Assignee: <span className="font-medium text-slate-600">{t.assignee}</span>
-                    </div>
                   </td>
 
-                  {/* Priority Badge */}
+                  {/* Category */}
+                  <td className="py-4 px-4 text-slate-600 whitespace-nowrap">
+                    {t.type || "Dispatch & Operations"}
+                  </td>
+
+                  {/* Assignee */}
+                  <td className="py-4 px-4 font-semibold text-slate-700 whitespace-nowrap">
+                    {t.assignee}
+                  </td>
+
+                  {/* Assignment Time */}
                   <td className="py-4 px-4 whitespace-nowrap">
-                    <span className={`px-2.5 py-1 rounded-md font-semibold text-[11px] inline-flex items-center gap-1 ${
-                      t.priority === "Critical" ? "bg-rose-50 text-rose-700 border border-rose-200/60" :
-                      t.priority === "High" ? "bg-orange-50 text-orange-700 border border-orange-200/60" :
-                      t.priority === "Medium" ? "bg-amber-50 text-amber-700 border border-amber-200/60" :
-                      "bg-slate-100 text-slate-600 border border-slate-200"
-                    }`}>
-                      {t.priority}
+                    {t.assignmentTimeFormatted ? (
+                      <span className="font-mono text-slate-700 bg-slate-100/80 px-2.5 py-1 rounded-md border border-slate-200/60 text-[11px] inline-block">
+                        {t.assignmentTimeFormatted}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic text-[11px]">Unassigned</span>
+                    )}
+                  </td>
+
+                  {/* SLA Active Time */}
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    <span className="font-mono text-blue-700 bg-blue-50/80 px-2.5 py-1 rounded-md border border-blue-100 text-[11px] font-semibold inline-block">
+                      {t.slaTimeFormatted || "0h 0m"}
                     </span>
                   </td>
 
-                  {/* SLA Status Badge */}
+                  {/* Sub-Assignment */}
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    {t.subAssignee ? (
+                      <div>
+                        <span className="font-semibold text-slate-800">{t.subAssignee}</span>
+                        <div className="text-[10px] text-slate-400">Sub-Assigned</div>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 italic">—</span>
+                    )}
+                  </td>
+
+                  {/* Sub-Assignee Time */}
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    {t.subAssignmentTimeFormatted ? (
+                      <span className="font-mono text-purple-700 bg-purple-50/80 px-2.5 py-1 rounded-md border border-purple-100 text-[11px] font-semibold inline-block">
+                        {t.subAssignmentTimeFormatted}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic text-[11px] bg-slate-50 px-2 py-1 rounded">Not Sub-Assigned</span>
+                    )}
+                  </td>
+
+                  {/* SLA Health */}
                   <td className="py-4 px-4 whitespace-nowrap">
                     <span className={`px-2.5 py-1 rounded-md font-semibold text-[11px] inline-flex items-center gap-1.5 ${
                       t.sla === "Breached" ? "bg-rose-50 text-rose-700 border border-rose-200/60" :
@@ -426,61 +477,22 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                     </span>
                   </td>
 
-                  {/* Assignment Latency */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    {t.assignmentTimeFormatted ? (
-                      <span className="font-mono text-slate-700 bg-slate-100/80 px-2 py-1 rounded border border-slate-200/60 text-[11px]">
-                        {t.assignmentTimeFormatted}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 italic text-[11px] bg-slate-50 px-2 py-1 rounded">Unassigned</span>
-                    )}
-                  </td>
-
-                  {/* Active / SLA Running Time */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    <span className="font-mono text-blue-700 bg-blue-50/80 px-2 py-1 rounded border border-blue-100 text-[11px] font-semibold">
-                      {t.slaTimeFormatted}
-                    </span>
-                  </td>
-
-                  {/* Sub-Assignment Time */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    {t.subAssignmentTimeFormatted ? (
-                      <span className="font-mono text-purple-700 bg-purple-50/80 px-2 py-1 rounded border border-purple-100 text-[11px] font-semibold">
-                        {t.subAssignmentTimeFormatted}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 italic text-[11px]">Not Sub-Assigned</span>
-                    )}
-                  </td>
-
-                  {/* Ticket Status */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    <span className={`px-2.5 py-1 rounded-md font-bold text-[10px] uppercase tracking-wider inline-block ${
-                      t.isResolved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                    }`}>
-                      {t.status}
-                    </span>
-                  </td>
-
-                  {/* Final Resolution Time */}
+                  {/* Status & Resolution */}
                   <td className="py-4 px-4 text-right whitespace-nowrap">
-                    {t.finalResolutionTimeFormatted ? (
-                      <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200/60 text-[11px] shadow-xs inline-block">
-                        {t.finalResolutionTimeFormatted}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 italic text-[11px] bg-slate-50 px-2.5 py-1 rounded border border-slate-100">
-                        Pending
-                      </span>
-                    )}
+                    <span className={`px-2.5 py-1 rounded-md font-bold text-[10px] uppercase tracking-wider inline-block ${
+                      t.isResolved ? "bg-emerald-600 text-white" : "bg-blue-600 text-white"
+                    }`}>
+                      {t.isResolved ? "Resolved" : "Open"}
+                    </span>
+                    <div className="text-[10px] font-mono text-slate-400 mt-1">
+                      {t.isResolved && t.finalResolutionTimeFormatted ? `Total: ${t.finalResolutionTimeFormatted}` : "Total: Pending"}
+                    </div>
                   </td>
                 </tr>
               ))}
               {normalizedTickets.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-slate-400 italic bg-slate-50/20">
+                  <td colSpan="11" className="py-12 text-center text-slate-400 italic bg-slate-50/20">
                     No active tickets available to display within the current matrix parameters.
                   </td>
                 </tr>
