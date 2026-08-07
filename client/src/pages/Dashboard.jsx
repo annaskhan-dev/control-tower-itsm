@@ -83,7 +83,8 @@ const normalizeTicket = (t, now) => {
   // Timelapses in ms
   let primaryAssignmentMs = 0;
   if (isAssigned) {
-    primaryAssignmentMs = Math.max(0, currentOrResolveTime - assignedAtTime);
+    const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
+    primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
   }
 
   const slaTimeMs = Math.max(0, currentOrResolveTime - assignedAtTime);
