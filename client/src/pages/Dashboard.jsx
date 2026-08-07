@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, memo } from "react";
 import { Link } from "react-router-dom";
 import axiosInstance from '../api/axiosInstance';
 import {
@@ -45,7 +45,6 @@ const normalizeTicket = (t, now) => {
       if (diffMinutes < 0) {
         sla = "Breached";
       } else if (diffMinutes <= 30 && !isResolved) {
-        // Warning window: 30 minutes or less until deadline breach
         sla = "At Risk";
       } else if (!isResolved) {
         sla = "On Track";
@@ -127,11 +126,36 @@ const normalizeTicket = (t, now) => {
   };
 };
 
+/**
+ * Isolated Pie Chart Component wrapped in React.memo to completely bypass 
+ * full component-tree re-render lag during parent layout shifts or state changes.
+ */
+const OptimizedPieCard = memo(({ title, data }) => (
+  <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
+    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">{title}</h4>
+    <div className="h-40 w-full mt-2">
+      <ResponsiveContainer width="100%" height="100%" debounce={50}>
+        <PieChart>
+          <Pie 
+            data={data} 
+            innerRadius="45%" 
+            outerRadius="70%" 
+            paddingAngle={4} 
+            dataKey="value"
+            isAnimationActive={false}
+          >
+            {data.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
+          </Pie>
+          <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+));
+
 export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [tickets, setTickets] = useState(propTickets);
   const [loading, setLoading] = useState(propTickets.length === 0);
-  
-  // Fixed static timestamp on mount to prevent constant full-dashboard re-renders every 60 seconds
   const [now] = useState(() => new Date());
 
   useEffect(() => {
@@ -315,63 +339,39 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Priority Distribution</h4>
           <div className="h-40 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" debounce={50}>
               <BarChart data={chartData.priority} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
                 <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
-                <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
-          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Ticket Type Split</h4>
-          <div className="h-40 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={chartData.type} innerRadius="45%" outerRadius="70%" paddingAngle={4} dataKey="value">
-                  {chartData.type.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
-                </Pie>
-                <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
-          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">SLA Health</h4>
-          <div className="h-40 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={chartData.sla} innerRadius="45%" outerRadius="70%" paddingAngle={4} dataKey="value">
-                  {chartData.sla.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
-                </Pie>
-                <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        {/* Isolated & Memoized Round/Pie Charts for Maximum Rendering Speed */}
+        <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
+        <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
         <div className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-sm flex flex-col justify-between h-56">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">7-Day Velocity</h4>
           <div className="h-40 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" debounce={50}>
               <LineChart data={chartData.trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
                 <Tooltip contentStyle={{ fontSize: "12px", borderRadius: "8px" }} />
-                <Line type="monotone" dataKey="tickets" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="tickets" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* Ticket List Table Section (Non-clickable rows) */}
+      {/* Ticket List Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/40">
           <div>
