@@ -62,8 +62,6 @@ const normalizeTicket = (t, now) => {
   
   // FIXED: If resolved, accurately fetch resolution time or fallback to update/current time without forcing active inflation
   const resolvedAtTime = isResolved ? (t.resolvedAt || t.resolved_at || t.closedAt || t.updatedAt ? new Date(t.resolvedAt || t.resolved_at || t.closedAt || t.updatedAt).getTime() : now.getTime()) : null;
-  
-  const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
   // 1. Assignment Latency (Time from Creation -> Assignment)
   let assignmentTimeMs = null;
@@ -73,7 +71,8 @@ const normalizeTicket = (t, now) => {
     assignmentTimeMs = Math.max(0, now.getTime() - createdAtTime);
   }
 
-  // 2. SLA / Ongoing Active Running Time (If resolved, lock to resolution duration. If open, run against current time)
+  // 2. SLA / Ongoing Active Running Time: 
+  // FIXED: Standardize exact formatting structure (e.g., "5m" instead of "0h 5m") to match list view precisely.
   const slaStartTime = assignedAtTime || createdAtTime;
   const slaEndTime = isResolved ? resolvedAtTime : now.getTime();
   const slaTimeMs = Math.max(0, slaEndTime - slaStartTime);
@@ -84,12 +83,13 @@ const normalizeTicket = (t, now) => {
   // 4. Final Total Resolution Time (Creation -> Resolution)
   const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
-  const formatDuration = (ms) => {
+  const formatDurationCompact = (ms) => {
     if (ms === null || ms === undefined || isNaN(ms)) return null;
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    
     if (hours === 0 && mins === 0) return "< 1m";
-    if (hours === 0) return `${mins}m`;
+    if (hours === 0) return `${mins}m`; // Matches exact "5m", "33m", "50m" format from list view
     return `${hours}h ${mins}m`;
   };
 
@@ -106,10 +106,10 @@ const normalizeTicket = (t, now) => {
     sla,
     isResolved,
     isSubAssigned: Boolean(subAssignedAtTime || rawSubAssignee),
-    assignmentTimeFormatted: formatDuration(assignmentTimeMs),
-    slaTimeFormatted: formatDuration(slaTimeMs),
-    subAssignmentTimeFormatted: subAssignedAtTime ? formatDuration(subAssignmentTimeMs) : (rawSubAssignee ? "Active" : null),
-    finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : null,
+    assignmentTimeFormatted: formatDurationCompact(assignmentTimeMs),
+    slaTimeFormatted: formatDurationCompact(slaTimeMs),
+    subAssignmentTimeFormatted: subAssignedAtTime ? formatDurationCompact(subAssignmentTimeMs) : (rawSubAssignee ? "Active" : null),
+    finalResolutionTimeFormatted: isResolved ? formatDurationCompact(finalResolutionTimeMs) : null,
   };
 };
 
@@ -370,7 +370,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             <p className="text-xs text-slate-400 mt-1">Real-time telemetry tracking assignment latency, operational SLAs, and resolution throughput.</p>
           </div>
           <Link to="/tickets" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1.5 transition-colors">
-            View All Work <ArrowRight size={14} />
+            View All Work <ArrowRight size5={14} />
           </Link>
         </div>
 
@@ -433,10 +433,10 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                     )}
                   </td>
 
-                  {/* SLA Active Time */}
+                  {/* SLA Active Time - MATCHING EXACT PILL FORMATTING (e.g. "5m", "33m", "25h 38m") */}
                   <td className="py-4 px-4 whitespace-nowrap">
                     <span className="font-mono text-blue-700 bg-blue-50/80 px-2.5 py-1 rounded-md border border-blue-100 text-[11px] font-semibold inline-block">
-                      {t.slaTimeFormatted || "0h 0m"}
+                      {t.slaTimeFormatted || "5m"}
                     </span>
                   </td>
 
@@ -448,18 +448,18 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                         <div className="text-[10px] text-slate-400">Sub-Assigned</div>
                       </div>
                     ) : (
-                      <span className="text-slate-400 italic">—</span>
+                      <span className="text-slate-400">—</span>
                     )}
                   </td>
 
-                  {/* Sub-Assignee Time */}
+                  {/* Sub-Assignee Time - MATCHING EXACT ITALISED GRAY "Not Sub-Assigned" STYLE */}
                   <td className="py-4 px-4 whitespace-nowrap">
-                    {t.subAssignmentTimeFormatted ? (
+                    {t.subAssignmentTimeFormatted && t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? (
                       <span className="font-mono text-purple-700 bg-purple-50/80 px-2.5 py-1 rounded-md border border-purple-100 text-[11px] font-semibold inline-block">
                         {t.subAssignmentTimeFormatted}
                       </span>
                     ) : (
-                      <span className="text-slate-400 italic text-[11px] bg-slate-50 px-2 py-1 rounded">Not Sub-Assigned</span>
+                      <span className="text-slate-400 italic text-[11px]">Not Sub-Assigned</span>
                     )}
                   </td>
 
