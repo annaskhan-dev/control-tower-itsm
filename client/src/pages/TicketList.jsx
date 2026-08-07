@@ -61,7 +61,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
       }
       const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
-      const isAssigned = assigneeName.toLowerCase() !== "unassigned";
+      const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
       
       // Check sub-assignment status
       let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || "";
@@ -69,14 +69,14 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || "";
       }
       const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
-      const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned";
+      const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned" && subAssignmentName !== null;
 
       const isResolved = ["closed", "resolved"].includes((t.status || "").toLowerCase());
 
       // Flexible timestamp extraction matching backend schema
       const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
       
-      const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime || t.updatedAt;
+      const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime;
       const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : null;
 
       const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at;
@@ -87,19 +87,18 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       
       const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-      // 1. Assignment Time Calculation
+      // 1. Assignment Time Calculation (Fixed: tracks duration since assignment occurred)
       let assignmentTimeMs = null;
-      if (assignedAtTime && !isNaN(assignedAtTime)) {
-        assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
-      } else if (isAssigned) {
-        assignmentTimeMs = 0; 
+      if (isAssigned) {
+        const assignStartTime = (assignedAtTime && !isNaN(assignedAtTime)) ? assignedAtTime : createdAtTime;
+        assignmentTimeMs = Math.max(0, currentOrResolveTime - assignStartTime);
       }
 
       // 2. SLA / Ongoing Time Calculation
       const slaStartTime = (assignedAtTime && !isNaN(assignedAtTime)) ? assignedAtTime : createdAtTime;
       const slaTimeMs = Math.max(0, currentOrResolveTime - slaStartTime);
 
-      // 3. Sub-Assignment Execution Time Calculation (Fixed to strictly verify sub-assignment existence)
+      // 3. Sub-Assignment Execution Time Calculation (Fixed: tracks duration since sub-assignment occurred)
       let subAssignmentTimeMs = null;
       if (isSubAssigned) {
         const subStartTime = (subAssignedAtTime && !isNaN(subAssignedAtTime)) ? subAssignedAtTime : createdAtTime;
@@ -114,7 +113,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         assigneeName,
         subAssignmentName,
         slaStatus,
-        assignmentTimeFormatted: assignmentTimeMs !== null ? formatDuration(assignmentTimeMs) : "Unassigned",
+        assignmentTimeFormatted: isAssigned ? formatDuration(assignmentTimeMs) : "Unassigned",
         slaTimeFormatted: formatDuration(slaTimeMs),
         subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
         finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
@@ -196,7 +195,9 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                   <td className="p-4 text-slate-500">{t.category || "—"}</td>
                   <td className="p-4 text-slate-500">{t.assigneeName}</td>
                   <td className="p-4 whitespace-nowrap">
-                    <span className="px-2 py-1 bg-slate-100 rounded text-slate-700 text-xs font-medium">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700" : "bg-slate-100 text-slate-400 italic"
+                    }`}>
                       {t.assignmentTimeFormatted}
                     </span>
                   </td>
@@ -206,7 +207,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                     </span>
                   </td>
                   <td className="p-4 text-slate-500">
-                    <div>{t.subAssignment || "—"}</div>
+                    <div>{t.subAssignmentName || "—"}</div>
                     {t.subAssignmentAt && (
                       <span className="text-[10px] text-slate-400 whitespace-nowrap">{formatDate(t.subAssignmentAt)}</span>
                     )}
