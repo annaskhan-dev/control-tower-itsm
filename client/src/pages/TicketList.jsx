@@ -62,6 +62,15 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       }
       const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
       const isAssigned = assigneeName.toLowerCase() !== "unassigned";
+      
+      // Check sub-assignment status
+      let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || "";
+      if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
+        rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || "";
+      }
+      const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
+      const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned";
+
       const isResolved = ["closed", "resolved"].includes((t.status || "").toLowerCase());
 
       // Flexible timestamp extraction matching backend schema
@@ -78,25 +87,24 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       
       const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-      // 1. Assignment Time Calculation: Time from creation until assignment.
-      // If assignedAt exists, use it. If historical ticket is already assigned but missing assignedAt, 
-      // fallback to 0 or creation time instead of falsely showing huge durations if updated recently.
+      // 1. Assignment Time Calculation
       let assignmentTimeMs = null;
       if (assignedAtTime && !isNaN(assignedAtTime)) {
         assignmentTimeMs = Math.max(0, assignedAtTime - createdAtTime);
       } else if (isAssigned) {
-        // Fallback for legacy data where assignedAt wasn't stored: defaults to < 1m or exact creation match
         assignmentTimeMs = 0; 
       }
 
-      // 2. SLA / Ongoing Time Calculation: Time elapsed since assignment began until resolution/now
+      // 2. SLA / Ongoing Time Calculation
       const slaStartTime = (assignedAtTime && !isNaN(assignedAtTime)) ? assignedAtTime : createdAtTime;
       const slaTimeMs = Math.max(0, currentOrResolveTime - slaStartTime);
 
-      // 3. Sub-Assignment Execution Time Calculation
-      const subAssignmentTimeMs = (subAssignedAtTime && !isNaN(subAssignedAtTime)) 
-        ? Math.max(0, currentOrResolveTime - subAssignedAtTime) 
-        : null;
+      // 3. Sub-Assignment Execution Time Calculation (Fixed to strictly verify sub-assignment existence)
+      let subAssignmentTimeMs = null;
+      if (isSubAssigned) {
+        const subStartTime = (subAssignedAtTime && !isNaN(subAssignedAtTime)) ? subAssignedAtTime : createdAtTime;
+        subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subStartTime);
+      }
 
       // 4. Final Total Resolution Time
       const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
@@ -104,10 +112,11 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       return {
         ...t,
         assigneeName,
+        subAssignmentName,
         slaStatus,
         assignmentTimeFormatted: assignmentTimeMs !== null ? formatDuration(assignmentTimeMs) : "Unassigned",
         slaTimeFormatted: formatDuration(slaTimeMs),
-        subAssignmentTimeFormatted: subAssignmentTimeMs !== null ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
+        subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
         finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
       };
     });
