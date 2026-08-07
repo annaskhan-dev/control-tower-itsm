@@ -61,16 +61,17 @@ const normalizeTicket = (t, now) => {
   const slaTimeMs = Math.max(0, currentOrResolveTime - slaStartTime);
 
   // 3. Sub-Assignment Execution Time: Time elapsed specifically since sub-assignment started
-  const subAssignmentTimeMs = subAssignedAtTime ? Math.max(0, currentOrResolveTime - subAssignedAtTime) : 0;
+  const subAssignmentTimeMs = subAssignedAtTime ? Math.max(0, currentOrResolveTime - subAssignedAtTime) : null;
 
   // 4. Final Total Resolution Time
   const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
   const formatDuration = (ms) => {
-    if (ms === null || ms === undefined) return "Unassigned";
+    if (ms === null || ms === undefined) return null;
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours === 0 && mins === 0) return "< 1m";
+    if (hours === 0 && mins === 0) return "Just now";
+    if (hours === 0) return `${mins}m`;
     return `${hours}h ${mins}m`;
   };
 
@@ -88,8 +89,8 @@ const normalizeTicket = (t, now) => {
     isSubAssigned: Boolean(subAssignedAtTime),
     assignmentTimeFormatted: formatDuration(assignmentTimeMs),
     slaTimeFormatted: formatDuration(slaTimeMs),
-    subAssignmentTimeFormatted: subAssignedAtTime ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
-    finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
+    subAssignmentTimeFormatted: subAssignedAtTime ? formatDuration(subAssignmentTimeMs) : null,
+    finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : null,
   };
 };
 
@@ -167,10 +168,10 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         `"${(t.assignee || "").replace(/"/g, '""')}"`,
         `"${(t.sla || "").replace(/"/g, '""')}"`,
         `"${(t.status || "").replace(/"/g, '""')}"`,
-        `"${t.assignmentTimeFormatted}"`,
-        `"${t.slaTimeFormatted}"`,
-        `"${t.subAssignmentTimeFormatted}"`,
-        `"${t.finalResolutionTimeFormatted}"`,
+        `"${t.assignmentTimeFormatted || "Unassigned"}"`,
+        `"${t.slaTimeFormatted || "N/A"}"`,
+        `"${t.subAssignmentTimeFormatted || "Not Sub-Assigned"}"`,
+        `"${t.finalResolutionTimeFormatted || "Pending"}"`,
         `"${formattedDate}"`
       ].join(",");
     });
@@ -331,100 +332,143 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Lifecycle & Timeline Breakdown Table */}
-      <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-sm">
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+      {/* Professional Lifecycle & Timeline Breakdown Table */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+        {/* Table Header Section */}
+        <div className="px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/40">
           <div>
-            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Tickets List & Lifecycle Matrix</h4>
-            <p className="text-xs text-slate-400 mt-0.5">Comprehensive real-time view of current ticket records matching your operational queue.</p>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Tickets & Lifecycle Matrix</h3>
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
+                {normalizedTickets.length} Records
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">Real-time telemetry tracking assignment latency, operational SLAs, and resolution throughput.</p>
           </div>
-          <Link to="/tickets" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+          <Link to="/tickets" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1.5 transition-colors">
             View All Work <ArrowRight size={14} />
           </Link>
         </div>
+
+        {/* Professional Enterprise Table Layout */}
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-left border-collapse table-auto min-w-[1000px]">
+          <table className="w-full text-left border-collapse table-auto min-w-[1100px]">
             <thead>
-              <tr className="text-xs font-bold text-slate-400 uppercase border-b border-slate-100 bg-slate-50/50">
-                <th className="py-3 px-3 w-28">Ticket ID</th>
-                <th className="py-3 px-3 min-w-[200px]">Title / Assignee</th>
-                <th className="py-3 px-3 w-24">Priority</th>
-                <th className="py-3 px-3 w-28">SLA Status</th>
-                <th className="py-3 px-3 w-32">Assignment Time</th>
-                <th className="py-3 px-3 w-32">SLA / Ongoing</th>
-                <th className="py-3 px-3 w-32">Sub-Assignment</th>
-                <th className="py-3 px-3 w-24">Status</th>
-                <th className="py-3 px-3 w-32 text-right">Final Resolution</th>
+              <tr className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 bg-slate-50/80">
+                <th className="py-3.5 px-4 w-32">Ticket ID</th>
+                <th className="py-3.5 px-4 min-w-[220px]">Title & Assignee</th>
+                <th className="py-3.5 px-4 w-28">Priority</th>
+                <th className="py-3.5 px-4 w-32">SLA Health</th>
+                <th className="py-3.5 px-4 w-32">Assignment Latency</th>
+                <th className="py-3.5 px-4 w-32">Active / SLA Duration</th>
+                <th className="py-3.5 px-4 w-32">Sub-Assignment</th>
+                <th className="py-3.5 px-4 w-28">Status</th>
+                <th className="py-3.5 px-4 w-32 text-right">Resolution Time</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
               {normalizedTickets.map((t, index) => (
-                <tr key={t.id || index} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-3 font-bold text-blue-600">
-                    <div className="truncate">{t.id.toString().substring(0, 10)}</div>
-                    <span className="text-[10px] font-normal text-slate-400 uppercase">{t.type}</span>
+                <tr key={t.id || index} className="hover:bg-slate-50/60 transition-colors group">
+                  {/* Ticket ID & Type */}
+                  <td className="py-4 px-4 font-bold">
+                    <span className="text-blue-600 hover:underline cursor-pointer font-mono tracking-tight">
+                      {t.id.toString().substring(0, 10)}
+                    </span>
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">{t.type}</div>
                   </td>
-                  <td className="py-3 px-3">
-                    <div className="font-semibold text-slate-800 line-clamp-1">{t.title}</div>
-                    <div className="text-[11px] text-slate-500">Assignee: {t.assignee}</div>
+
+                  {/* Title & Assignee */}
+                  <td className="py-4 px-4">
+                    <div className="font-semibold text-slate-800 line-clamp-1 group-hover:text-blue-600 transition-colors">{t.title}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                      Assignee: <span className="font-medium text-slate-600">{t.assignee}</span>
+                    </div>
                   </td>
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] inline-block ${
-                      t.priority === "Critical" ? "bg-rose-100 text-rose-800" :
-                      t.priority === "High" ? "bg-orange-100 text-orange-800" :
-                      t.priority === "Medium" ? "bg-amber-100 text-amber-800" :
-                      "bg-slate-100 text-slate-700"
+
+                  {/* Priority Badge */}
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    <span className={`px-2.5 py-1 rounded-md font-semibold text-[11px] inline-flex items-center gap-1 ${
+                      t.priority === "Critical" ? "bg-rose-50 text-rose-700 border border-rose-200/60" :
+                      t.priority === "High" ? "bg-orange-50 text-orange-700 border border-orange-200/60" :
+                      t.priority === "Medium" ? "bg-amber-50 text-amber-700 border border-amber-200/60" :
+                      "bg-slate-100 text-slate-600 border border-slate-200"
                     }`}>
                       {t.priority}
                     </span>
                   </td>
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] inline-block ${
-                      t.sla === "Breached" ? "bg-rose-100 text-rose-800" :
-                      t.sla === "Due Soon" ? "bg-amber-100 text-amber-800" :
-                      "bg-emerald-100 text-emerald-800"
+
+                  {/* SLA Status Badge */}
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    <span className={`px-2.5 py-1 rounded-md font-semibold text-[11px] inline-flex items-center gap-1.5 ${
+                      t.sla === "Breached" ? "bg-rose-50 text-rose-700 border border-rose-200/60" :
+                      t.sla === "Due Soon" ? "bg-amber-50 text-amber-700 border border-amber-200/60" :
+                      "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
                     }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        t.sla === "Breached" ? "bg-rose-500" : t.sla === "Due Soon" ? "bg-amber-500" : "bg-emerald-500"
+                      }`}></span>
                       {t.sla}
                     </span>
                   </td>
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] inline-block ${
-                      t.assignmentTimeFormatted === "Unassigned" ? "bg-slate-100 text-slate-400 italic" : "bg-slate-100 text-slate-700"
-                    }`}>
-                      {t.assignmentTimeFormatted}
-                    </span>
+
+                  {/* Assignment Latency */}
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    {t.assignmentTimeFormatted ? (
+                      <span className="font-mono text-slate-700 bg-slate-100/80 px-2 py-1 rounded border border-slate-200/60 text-[11px]">
+                        {t.assignmentTimeFormatted}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic text-[11px] bg-slate-50 px-2 py-1 rounded">Unassigned</span>
+                    )}
                   </td>
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md font-semibold text-[11px] inline-block">
+
+                  {/* Active / SLA Running Time */}
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    <span className="font-mono text-blue-700 bg-blue-50/80 px-2 py-1 rounded border border-blue-100 text-[11px] font-semibold">
                       {t.slaTimeFormatted}
                     </span>
                   </td>
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded-md font-semibold text-[11px] inline-block ${
-                      t.isSubAssigned ? "bg-purple-50 text-purple-700" : "bg-slate-100 text-slate-400 italic"
-                    }`}>
-                      {t.subAssignmentTimeFormatted}
-                    </span>
+
+                  {/* Sub-Assignment Time */}
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    {t.subAssignmentTimeFormatted ? (
+                      <span className="font-mono text-purple-700 bg-purple-50/80 px-2 py-1 rounded border border-purple-100 text-[11px] font-semibold">
+                        {t.subAssignmentTimeFormatted}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic text-[11px]">Not Sub-Assigned</span>
+                    )}
                   </td>
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase inline-block ${
+
+                  {/* Ticket Status */}
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    <span className={`px-2.5 py-1 rounded-md font-bold text-[10px] uppercase tracking-wider inline-block ${
                       t.isResolved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                     }`}>
                       {t.status}
                     </span>
                   </td>
-                  <td className="py-3 px-3 text-right whitespace-nowrap">
-                    <span className={`px-2.5 py-1 rounded-md font-bold text-[11px] inline-block ${
-                      t.isResolved ? "bg-emerald-600 text-white shadow-xs" : "bg-slate-100 text-slate-500 italic"
-                    }`}>
-                      {t.finalResolutionTimeFormatted}
-                    </span>
+
+                  {/* Final Resolution Time */}
+                  <td className="py-4 px-4 text-right whitespace-nowrap">
+                    {t.finalResolutionTimeFormatted ? (
+                      <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200/60 text-[11px] shadow-xs inline-block">
+                        {t.finalResolutionTimeFormatted}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic text-[11px] bg-slate-50 px-2.5 py-1 rounded border border-slate-100">
+                        Pending
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
               {normalizedTickets.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="py-8 text-center text-slate-400 italic">No tickets available to display.</td>
+                  <td colSpan="9" className="py-12 text-center text-slate-400 italic bg-slate-50/20">
+                    No active tickets available to display within the current matrix parameters.
+                  </td>
                 </tr>
               )}
             </tbody>
