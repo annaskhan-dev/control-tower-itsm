@@ -239,31 +239,62 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     });
 
     if (recentTickets.length === 0) {
-      alert("No ticket data found to export.");
+      alert("No ticket data found to export for the last month.");
       return;
     }
 
+    // Comprehensive headers covering every property and metric
     const headers = [
-      "Ticket ID", "Title", "Category", "Priority", "Assignee", "Sub-Assignee", "SLA Status", "Ticket Status", 
-      "Assignment Time", "SLA Active Time", "Sub-Assignee Time", "Final Resolution Time", "Created At"
+      "Ticket ID",
+      "Title",
+      "Description",
+      "Source",
+      "Category",
+      "Priority",
+      "Ticket Status",
+      "SLA Health",
+      "SLA Deadline",
+      "Assignee",
+      "Assigned At",
+      "Assignment Duration",
+      "SLA Active Duration",
+      "Sub-Assignee",
+      "Sub-Assigned At",
+      "Sub-Assignment Duration",
+      "Resolved At",
+      "Final Resolution Duration",
+      "Company ID",
+      "Created At"
     ];
 
     const csvRows = recentTickets.map((t) => {
-      const formattedDate = t.createdAt ? new Date(t.createdAt).toLocaleString() : "";
+      const createdAtFormatted = t.createdAt ? new Date(t.createdAt).toLocaleString() : "";
+      const assignedAtFormatted = t.assignedAt ? new Date(t.assignedAt).toLocaleString() : "";
+      const subAssignmentAtFormatted = t.subAssignmentAt ? new Date(t.subAssignmentAt).toLocaleString() : "";
+      const resolvedAtFormatted = t.resolvedAt ? new Date(t.resolvedAt).toLocaleString() : "";
+      const slaDeadlineFormatted = t.slaDeadline ? new Date(t.slaDeadline).toLocaleString() : "";
+
       return [
         `"${(t.ticketId || "").toString().replace(/"/g, '""')}"`,
         `"${(t.title || "").replace(/"/g, '""')}"`,
+        `"${(t.description || "").replace(/"/g, '""')}"`,
+        `"${(t.source || "").replace(/"/g, '""')}"`,
         `"${(t.category || "").replace(/"/g, '""')}"`,
         `"${(t.priority || "").replace(/"/g, '""')}"`,
-        `"${(t.assigneeName || "").replace(/"/g, '""')}"`,
-        `"${(t.subAssignmentName || "").replace(/"/g, '""')}"`,
-        `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
         `"${(t.status || "").replace(/"/g, '""')}"`,
+        `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
+        `"${slaDeadlineFormatted}"`,
+        `"${(t.assigneeName || "").replace(/"/g, '""')}"`,
+        `"${assignedAtFormatted}"`,
         `"${t.assignmentTimeFormatted || "Unassigned"}"`,
         `"${t.slaTimeFormatted || "N/A"}"`,
+        `"${(t.subAssignmentName || "").replace(/"/g, '""')}"`,
+        `"${subAssignmentAtFormatted}"`,
         `"${t.subAssignmentTimeFormatted || "Not Sub-Assigned"}"`,
+        `"${resolvedAtFormatted}"`,
         `"${t.finalResolutionTimeFormatted || "Pending"}"`,
-        `"${formattedDate}"`
+        `"${(t.companyId || "").toString().replace(/"/g, '""')}"`,
+        `"${createdAtFormatted}"`
       ].join(",");
     });
 
@@ -273,7 +304,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `tickets_timeline_report_${currentDate.toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `comprehensive_tickets_report_last_month_${currentDate.toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
