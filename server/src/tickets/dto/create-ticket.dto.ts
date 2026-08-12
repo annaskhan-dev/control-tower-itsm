@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsDate } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsDate, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateTicketDto {
@@ -34,8 +34,10 @@ export class CreateTicketDto {
   @IsOptional()
   assignee?: string;
 
+  // Validation: subAssignment can only be specified if assignee is present and not empty/unassigned
+  @ValidateIf((o) => o.assignee && o.assignee.trim() !== '' && o.assignee.toLowerCase() !== 'unassigned')
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   subAssignment?: string;
 
   @IsOptional()

@@ -80,6 +80,17 @@ export const TicketDetail = () => {
     );
   }, [tickets, id]);
 
+  // Compute if primary assignee is present
+  const isPrimaryAssigned = useMemo(() => {
+    if (!ticket) return false;
+    let rawAssignee = ticket.assignee || ticket.assignedTo || ticket.assigned_to || "Unassigned";
+    if (typeof rawAssignee === "object" && rawAssignee !== null) {
+      rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
+    }
+    const assigneeName = typeof rawAssignee === "string" ? rawAssignee.trim() : "Unassigned";
+    return assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
+  }, [ticket]);
+
   useEffect(() => {
     if (ticket) {
       setDescription(ticket.description || "");
@@ -296,8 +307,8 @@ export const TicketDetail = () => {
 
             {/* Sub Assignment Panel with restriction indicator */}
             <div 
-              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${isRestricted ? 'cursor-not-allowed' : ''}`}
-              title={isRestricted ? "You do not have permission to modify this section" : ""}
+              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${isRestricted || !isPrimaryAssigned ? 'cursor-not-allowed' : ''}`}
+              title={!isPrimaryAssigned ? "Please assign a primary assignee before selecting a sub-assignee" : (isRestricted ? "You do not have permission to modify this section" : "")}
             >
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
@@ -305,17 +316,25 @@ export const TicketDetail = () => {
                 </h3>
                 <button
                   onClick={() => handleUpdate({ subAssignment })}
-                  disabled={isUpdating || isRestricted}
+                  disabled={isUpdating || isRestricted || !isPrimaryAssigned}
                   className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer"
                 >
                   {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   Assign
                 </button>
               </div>
+
+              {!isPrimaryAssigned && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0" />
+                  <span>A primary assignee must be selected before a sub-assignee can be assigned.</span>
+                </div>
+              )}
+
               <div className="space-y-3">
                 <select
                   value={subAssignment}
-                  disabled={isRestricted}
+                  disabled={isRestricted || !isPrimaryAssigned}
                   onChange={(e) => {
                     const val = e.target.value;
                     setSubAssignment(val);
@@ -338,7 +357,7 @@ export const TicketDetail = () => {
                   <input
                     type="text"
                     value={customSubAssignment}
-                    disabled={isRestricted}
+                    disabled={isRestricted || !isPrimaryAssigned}
                     onChange={(e) => {
                       setCustomSubAssignment(e.target.value);
                     }}
