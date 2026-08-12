@@ -101,6 +101,9 @@ export class TicketsService {
 
     const updateData: any = { ...updateTicketDto };
 
+    // Prevent SLA Deadline from ever being altered or recalculated during regular updates/sub-assignments
+    delete updateData.slaDeadline;
+
     // Handle Assignee and assignedAt logic safely
     if (updateData.assignee !== undefined) {
       const isActuallyAssigned = updateData.assignee !== 'Unassigned' && updateData.assignee !== '';

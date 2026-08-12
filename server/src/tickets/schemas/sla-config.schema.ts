@@ -3,8 +3,9 @@ import { Document } from 'mongoose';
 
 export type SlaConfigDocument = SlaConfig & Document;
 
-@Schema({ timestamps: true }) // Added timestamps for better debugging
-export class SlaConfig extends Document {
+// Add a compound index to prevent duplicate category/priority entries per company
+@Schema({ timestamps: true, collection: 'slaconfigs' })
+export class SlaConfig {
   @Prop({ required: true })
   companyId!: string; // Mandatory for multi-tenancy
 
@@ -12,13 +13,16 @@ export class SlaConfig extends Document {
   category!: string;
 
   @Prop({ required: true })
+  priority!: string;
+
+  @Prop({ required: true })
   hours!: number;
 
-  @Prop({ default: 'category' }) // Allows us to distinguish if needed later
+  @Prop({ default: 'category' }) 
   type!: string;
-  // Add this line inside your SlaConfig class
-  @Prop({ required: true })
-  priority!: string;
 }
 
 export const SlaConfigSchema = SchemaFactory.createForClass(SlaConfig);
+
+// Enforce unique combinations of company, category, and priority at the database level
+SlaConfigSchema.index({ companyId: 1, category: 1, priority: 1 }, { unique: true });

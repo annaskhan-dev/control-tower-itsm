@@ -1,14 +1,15 @@
-import { IsString, IsNumber, IsNotEmpty } from 'class-validator';
+import { IsString, IsNumber, IsNotEmpty, IsPositive } from 'class-validator';
 
 export class CreateSlaCategoryDto {
   @IsString()
   @IsNotEmpty()
-  category!: string; // Updated from 'name'
+  category!: string;
 
   @IsString()
   @IsNotEmpty()
-  priority!: string; // Added priority
+  priority!: string;
 
   @IsNumber()
+  @IsPositive() // Ensures hours cannot be 0 or negative
   hours!: number;
 }
