@@ -45,14 +45,29 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     if (!tickets) return [];
     
     return tickets.map((t) => {
-      // SLA calculations
-      const deadline = new Date(t.slaDeadline || now);
-      const diffMinutes = t.slaDeadline ? (deadline.getTime() - now.getTime()) / (1000 * 60) : Infinity;
+      const isResolved = ["closed", "resolved", "completed", "done"].includes((t.status || "").toLowerCase());
+      const resolvedAtRaw = t.resolvedAt || t.resolved_at || t.closedAt;
+      const resolvedAtTime = isResolved ? (resolvedAtRaw ? new Date(resolvedAtRaw).getTime() : now.getTime()) : null;
+      const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-      let slaStatus = "On Track";
-      if (t.status !== "Resolved") {
-        if (diffMinutes < 0) slaStatus = "Breached";
-        else if (diffMinutes < 30) slaStatus = "At Risk";
+      // Robust SLA evaluation based on deadlines or explicit metadata matching Dashboard & Backend
+      let slaStatus = t.slaStatus || t.sla_status || t.sla || "On Track";
+      const deadlineRaw = t.slaDeadline || t.sla_deadline || t.dueDate || t.due_date;
+      
+      if (deadlineRaw) {
+        const deadline = new Date(deadlineRaw);
+        if (!isNaN(deadline.getTime())) {
+          const evaluationTime = currentOrResolveTime;
+          const diffMinutes = (deadline.getTime() - evaluationTime) / (1000 * 60);
+          
+          if (diffMinutes < 0) {
+            slaStatus = "Breached";
+          } else if (diffMinutes <= 30 && !isResolved) {
+            slaStatus = "At Risk";
+          } else if (!isResolved) {
+            slaStatus = "On Track";
+          }
+        }
       }
 
       // Parse Assignee safely
@@ -64,27 +79,20 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
       
       // Check sub-assignment status
-      let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || "";
+      let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || t.sub_assigned_to || "";
       if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
         rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || "";
       }
       const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
       const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned" && subAssignmentName !== null;
 
-      const isResolved = ["closed", "resolved"].includes((t.status || "").toLowerCase());
-
-      // Timestamps
+      // Timestamps matching backend fallback behaviors
       const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
       const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime;
       const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
 
-      const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at;
+      const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at || (isSubAssigned ? (t.updatedAt || t.createdAt) : null);
       const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
-
-      const resolvedAtRaw = t.resolvedAt || t.resolved_at || t.closedAt;
-      const resolvedAtTime = isResolved ? (resolvedAtRaw ? new Date(resolvedAtRaw).getTime() : now.getTime()) : null;
-      
-      const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
       // 1. Primary Assignment Time
       let primaryAssignmentMs = 0;
@@ -93,8 +101,8 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
       }
 
-      // 2. SLA / Total Ongoing Time Calculation
-      const slaTimeMs = Math.max(0, currentOrResolveTime - assignedAtTime);
+      // 2. SLA / Active Assignment Time (strictly anchored to assignedAt when assigned)
+      const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
       // 3. Sub-Assignment Execution Time
       let subAssignmentTimeMs = 0;
@@ -109,9 +117,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         ...t,
         assigneeName,
         subAssignmentName,
+        subAssignmentAt: subAssignedAtRaw,
         slaStatus,
         assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
-        slaTimeFormatted: formatDuration(slaTimeMs),
+        slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
         subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
         finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
       };
@@ -185,7 +194,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600 border-collapse">
+              <table className="w-full text-left text-sm text-slate-600 border-collapse min-w-[1100px]">
                 <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                   <tr>
                     <th className="p-4">ID</th>
@@ -204,7 +213,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                 <tbody className="divide-y divide-slate-100">
                   {filteredTickets.map((t) => (
                     <tr 
-                      key={t._id} 
+                      key={t._id || t.id} 
                       onClick={() => navigate(`/tickets/${t.ticketId}`)} 
                       className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
                     >
@@ -221,7 +230,9 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         </span>
                       </td>
                       <td className="p-4 whitespace-nowrap">
-                        <span className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg text-xs font-semibold">
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                          t.slaTimeFormatted !== "N/A" ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-slate-50 text-slate-400 italic"
+                        }`}>
                           {t.slaTimeFormatted}
                         </span>
                       </td>
@@ -250,12 +261,12 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                       <td className="p-4 whitespace-nowrap">
                         <div className="flex flex-col gap-1 items-start">
                           <span className={`px-3 py-1 font-bold uppercase rounded-full text-[10px] tracking-wider shadow-2xs ${
-                            t.status === "Resolved" ? "bg-emerald-600 text-white" :
+                            t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "bg-emerald-600 text-white" :
                             "bg-blue-600 text-white"
                           }`}>
                             {t.status || "Open"}
                           </span>
-                          <span className={`text-[11px] font-medium ${t.status === "Resolved" ? "text-emerald-700 font-bold" : "text-slate-400 italic"}`}>
+                          <span className={`text-[11px] font-medium ${t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "text-emerald-700 font-bold" : "text-slate-400 italic"}`}>
                             Total: {t.finalResolutionTimeFormatted}
                           </span>
                         </div>

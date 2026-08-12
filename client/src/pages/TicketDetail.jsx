@@ -29,6 +29,13 @@ export const TicketDetail = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [slaConfigs, setSlaConfigs] = useState([]);
+  const [now, setNow] = useState(new Date());
+
+  // Update current time every minute for live duration calculations matching TicketList
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const loadSla = async () => {
@@ -88,6 +95,75 @@ export const TicketDetail = () => {
     }
   }, [ticket, companyUsers]);
 
+  // Duration formatting helper synchronized with TicketList
+  const formatDuration = (ms) => {
+    if (ms === null || ms === undefined || isNaN(ms)) return "—";
+    if (ms < 60000) return "Just now";
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    if (hours === 0 && mins === 0) return "Just now";
+    return `${hours}h ${mins}m`;
+  };
+
+  // Computed timing metrics synchronized with backend & TicketList logic
+  const calculatedMetrics = useMemo(() => {
+    if (!ticket) return {};
+
+    const isResolved = ["closed", "resolved", "completed", "done"].includes((ticket.status || "").toLowerCase());
+    const resolvedAtRaw = ticket.resolvedAt || ticket.resolved_at || ticket.closedAt;
+    const resolvedAtTime = isResolved ? (resolvedAtRaw ? new Date(resolvedAtRaw).getTime() : now.getTime()) : null;
+    const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
+
+    // Parse Assignee safely
+    let rawAssignee = ticket.assignee || ticket.assignedTo || ticket.assigned_to || "Unassigned";
+    if (typeof rawAssignee === "object" && rawAssignee !== null) {
+      rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
+    }
+    const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
+    const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
+
+    // Parse Sub-Assignee safely
+    let rawSubAssignee = ticket.subAssignment || ticket.sub_assignment || ticket.subAssignedTo || ticket.sub_assigned_to || "";
+    if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
+      rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || "";
+    }
+    const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
+    const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned" && subAssignmentName !== null;
+
+    const createdAtTime = new Date(ticket.createdAt || ticket.created_at || ticket.timestamp || now).getTime();
+    const assignedAtRaw = ticket.assignedAt || ticket.assigned_at || ticket.assignmentTime;
+    const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
+
+    const subAssignedAtRaw = ticket.subAssignmentAt || ticket.sub_assigned_at || ticket.subAssignedAt || ticket.sub_assignment_at || (isSubAssigned ? (ticket.updatedAt || ticket.createdAt) : null);
+    const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
+
+    // Primary Assignment Time
+    let primaryAssignmentMs = 0;
+    if (isAssigned) {
+      const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
+      primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
+    }
+
+    // SLA Active Time (anchored strictly to assignedAt)
+    const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
+
+    // Sub-Assignment Execution Time
+    let subAssignmentTimeMs = 0;
+    if (isSubAssigned && subAssignedAtTime) {
+      subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subAssignedAtTime);
+    }
+
+    // Total Resolution Time
+    const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
+
+    return {
+      assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
+      slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
+      subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
+      finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
+    };
+  }, [ticket, now]);
+
   const calculateDeadline = (category, priority) => {
     const rule = slaConfigs.find(
       (c) => c.category === category && c.priority === (priority || "Medium")
@@ -123,9 +199,12 @@ export const TicketDetail = () => {
     }
 
     if ('status' in payload) {
-      if (payload.status === "Resolved" && ticket.status !== "Resolved") {
+      const isNewResolved = ["closed", "resolved", "completed", "done"].includes(payload.status.toLowerCase());
+      const isOldResolved = ["closed", "resolved", "completed", "done"].includes((ticket.status || "").toLowerCase());
+
+      if (isNewResolved && !isOldResolved) {
         payload.resolvedAt = new Date().toISOString();
-      } else if (payload.status && payload.status !== "Resolved") {
+      } else if (!isNewResolved) {
         payload.resolvedAt = null;
       }
     }
@@ -159,7 +238,8 @@ export const TicketDetail = () => {
 
   if (!ticket) return <div className="p-4 text-center text-slate-500 text-sm">Loading...</div>;
 
-  const isOverdue = ticket.slaDeadline && new Date(ticket.slaDeadline) < new Date() && ticket.status !== "Resolved";
+  const isResolvedState = ["closed", "resolved", "completed", "done"].includes((ticket.status || "").toLowerCase());
+  const isOverdue = ticket.slaDeadline && new Date(ticket.slaDeadline) < new Date() && !isResolvedState;
 
   return (
     <div className="h-full bg-slate-50 overflow-y-auto p-6">
@@ -169,7 +249,7 @@ export const TicketDetail = () => {
         <div className="flex items-center gap-4 mb-6">
           <button 
             onClick={() => navigate(-1)} 
-            className="p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-100 transition"
+            className="p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-100 transition cursor-pointer"
           >
             <ArrowLeft size={18} className="text-slate-600" />
           </button>
@@ -181,7 +261,7 @@ export const TicketDetail = () => {
           {/* Left Column: Description Panel & Sub Assignment */}
           <div className="lg:col-span-2 space-y-6">
             <div 
-              className={`bg-white border border-slate-200 rounded-xl shadow-sm p-5 ${isRestricted ? 'cursor-not-allowed' : ''}`}
+              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${isRestricted ? 'cursor-not-allowed' : ''}`}
               title={isRestricted ? "You do not have permission to modify this section" : ""}
             >
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
@@ -190,14 +270,14 @@ export const TicketDetail = () => {
                   <button
                     onClick={handleDelete}
                     disabled={isDeleting || !canDelete}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 disabled:opacity-50 transition"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 disabled:opacity-50 transition cursor-pointer"
                   >
                     <Trash2 size={14} /> Delete
                   </button>
                   <button
                     onClick={() => handleUpdate({ description })}
                     disabled={isUpdating || !canEditDesc}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer"
                   >
                     {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                     Save
@@ -216,7 +296,7 @@ export const TicketDetail = () => {
 
             {/* Sub Assignment Panel with restriction indicator */}
             <div 
-              className={`bg-white border border-slate-200 rounded-xl shadow-sm p-5 ${isRestricted ? 'cursor-not-allowed' : ''}`}
+              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${isRestricted ? 'cursor-not-allowed' : ''}`}
               title={isRestricted ? "You do not have permission to modify this section" : ""}
             >
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
@@ -226,7 +306,7 @@ export const TicketDetail = () => {
                 <button
                   onClick={() => handleUpdate({ subAssignment })}
                   disabled={isUpdating || isRestricted}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer"
                 >
                   {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   Assign
@@ -270,10 +350,10 @@ export const TicketDetail = () => {
             </div>
           </div>
 
-          {/* Right Column: Properties */}
+          {/* Right Column: Properties & Live Durations */}
           <div className="space-y-4">
             <div 
-              className={`bg-white border border-slate-200 rounded-xl shadow-sm p-5 space-y-4 ${isRestricted ? 'cursor-not-allowed' : ''}`}
+              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 space-y-4 ${isRestricted ? 'cursor-not-allowed' : ''}`}
               title={isRestricted ? "You do not have permission to modify these properties" : ""}
             >
               <h3 className="text-xs font-bold flex items-center gap-2 text-slate-700">
@@ -282,8 +362,8 @@ export const TicketDetail = () => {
 
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Status</label>
-                <select disabled={!canEditStatus} value={ticket.status || ""} onChange={(e) => handleUpdate({ status: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed">
-                  {["Open", "In Progress", "Resolved"].map((o) => <option key={o} value={o}>{o}</option>)}
+                <select disabled={!canEditStatus} value={ticket.status || "Open"} onChange={(e) => handleUpdate({ status: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed">
+                  {["Open", "In Progress", "Resolved", "Closed"].map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
 
@@ -317,9 +397,40 @@ export const TicketDetail = () => {
                 </div>
               </div>
 
+              {/* Synchronized Active Duration Trackers */}
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <div>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Primary Assignment Duration</span>
+                  <div className="text-xs font-semibold text-slate-700 mt-0.5 bg-slate-50 p-2 border border-slate-200 rounded-lg">
+                    {calculatedMetrics.assignmentTimeFormatted}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">SLA Active Time</span>
+                  <div className="text-xs font-semibold text-blue-700 mt-0.5 bg-blue-50/50 p-2 border border-blue-100 rounded-lg">
+                    {calculatedMetrics.slaTimeFormatted}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Sub-Assignment Active Time</span>
+                  <div className="text-xs font-semibold text-purple-700 mt-0.5 bg-purple-50/50 p-2 border border-purple-100 rounded-lg">
+                    {calculatedMetrics.subAssignmentTimeFormatted}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Total Resolution Duration</span>
+                  <div className="text-xs font-semibold text-emerald-700 mt-0.5 bg-emerald-50/50 p-2 border border-emerald-100 rounded-lg">
+                    {calculatedMetrics.finalResolutionTimeFormatted}
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-2 border-t border-slate-100">
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block flex items-center gap-1">
-                  <Calendar size={10} /> Sub Assignment Time
+                  <Calendar size={10} /> Sub Assignment Timestamp
                 </label>
                 <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600">
                   {ticket.subAssignmentAt ? new Date(ticket.subAssignmentAt).toLocaleString() : "Not Sub-assigned Yet"}
@@ -328,7 +439,7 @@ export const TicketDetail = () => {
 
               <div className="pt-2 border-t border-slate-100">
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block flex items-center gap-1">
-                  <Calendar size={10} /> Resolved Time
+                  <Calendar size={10} /> Resolved Timestamp
                 </label>
                 <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600">
                   {ticket.resolvedAt ? new Date(ticket.resolvedAt).toLocaleString() : "Not Resolved Yet"}

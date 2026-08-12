@@ -33,5 +33,5 @@ export class UpdateTicketDto extends PartialType(CreateTicketDto) {
   @IsOptional()
   @Type(() => Date)
   @IsDate()
-  resolvedAt?: Date; // <--- Added resolvedAt to allow the update through DTO validation
+  resolvedAt?: Date;
 }

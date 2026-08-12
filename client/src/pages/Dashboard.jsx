@@ -8,7 +8,8 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download } from "lucide-react";
 
 /**
- * Unified Normalization Engine: Ensures 100% accurate SLA evaluation and telemetry formatting.
+ * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
+ * 100% accurate primary assignment, SLA tracking, and sub-assignment telemetry.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
@@ -16,7 +17,7 @@ const normalizeTicket = (t, now) => {
     rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
   }
 
-  // Sub-assignee parsing
+  // Sub-assignee parsing matching backend rules
   let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || t.sub_assigned_to || t.subAssignee || null;
   if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
@@ -66,12 +67,12 @@ const normalizeTicket = (t, now) => {
   const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
   const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned";
 
-  // Timestamps
+  // Timestamps matching backend fallback behaviors
   const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
   const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime;
   const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
 
-  const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at;
+  const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at || (isSubAssigned ? (t.updatedAt || t.createdAt) : null);
   const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
 
   const resolvedAtRaw = t.resolvedAt || t.resolved_at || t.closedAt;
@@ -86,7 +87,8 @@ const normalizeTicket = (t, now) => {
     primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
   }
 
-  const slaTimeMs = Math.max(0, currentOrResolveTime - assignedAtTime);
+  // Synchronized SLA active duration calculated from main assignment timestamp
+  const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
   let subAssignmentTimeMs = 0;
   if (isSubAssigned && subAssignedAtTime) {
@@ -120,7 +122,7 @@ const normalizeTicket = (t, now) => {
     isResolved,
     isSubAssigned,
     assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
-    slaTimeFormatted: formatDuration(slaTimeMs),
+    slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
     subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
     finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
   };
