@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, TowerControl, Building, Loader2, ShieldCheck } from 'lucide-react';
-// Import your axiosInstance
 import axiosInstance from '../api/axiosInstance'; 
 
 export const Register = () => {
@@ -34,11 +33,11 @@ export const Register = () => {
   };
 
   return (
-    <div className="h-screen w-full flex items-center justify-center bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 p-4">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 p-4 sm:p-6 md:p-8 overflow-y-auto">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md" // Increased container width to match login
+        className="w-full max-w-sm sm:max-w-md my-auto"
       >
         {/* Header - Scaled up */}
         <div className="flex flex-col items-center mb-6">
@@ -49,7 +48,7 @@ export const Register = () => {
         </div>
 
         {/* Register Card - More breathing room */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
+        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
           <form onSubmit={handleRegister} className="flex flex-col gap-4">
             {[
               { icon: User, label: 'Full Name', key: 'name', type: 'text' },
@@ -58,7 +57,7 @@ export const Register = () => {
               { icon: Building, label: 'Company ID', key: 'companyId', type: 'text' },
             ].map((field) => (
               <div key={field.key} className="flex items-center bg-black/20 rounded-xl border border-white/10 focus-within:border-purple-500/50 transition-all px-2">
-                <field.icon className="ml-2 text-gray-400" size={20} />
+                <field.icon className="ml-2 text-gray-400 shrink-0" size={20} />
                 <input 
                   className="w-full bg-transparent p-3 text-white text-base outline-none"
                   type={field.type}
@@ -71,7 +70,7 @@ export const Register = () => {
             ))}
 
             <div className="flex items-center bg-black/20 rounded-xl border border-white/10 focus-within:border-purple-500/50 transition-all px-2">
-              <ShieldCheck className="ml-2 text-gray-400" size={20} />
+              <ShieldCheck className="ml-2 text-gray-400 shrink-0" size={20} />
               <select 
                 className="w-full bg-transparent p-3 text-white outline-none text-base cursor-pointer [&>option]:bg-indigo-950"
                 onChange={(e) => setFormData({...formData, role: e.target.value})}
@@ -91,7 +90,7 @@ export const Register = () => {
             <button 
               type="submit" 
               disabled={loading}
-              className="mt-2 w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl text-base transition-all shadow-lg shadow-purple-600/30"
+              className="mt-2 w-full bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold py-3 rounded-xl text-base transition-all shadow-lg shadow-purple-600/30 cursor-pointer"
             >
               {loading ? <Loader2 className="animate-spin mx-auto" size={22} /> : 'REGISTER'}
             </button>
