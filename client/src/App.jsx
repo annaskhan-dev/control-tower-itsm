@@ -13,23 +13,45 @@ import { UserManagement } from './pages/UserManagement';
 import { SlaSettings } from './components/SlaSettings';
 import { CreateTicketModal } from './components/common/CreateTicketModal';
 import DriverSupportLogs from './components/DriverSupportLogs';
+import { Menu, X } from 'lucide-react'; // Added icons for mobile toggle
 
 function MainLayout() {
   const { user, logout } = useAuth();
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false); // Added mobile menu state
 
   return (
-    <div className="flex h-screen bg-slate-100">
-      {/* Sidebar only shows if logged in, and now receives the 'user' prop */}
+    <div className="flex h-screen bg-slate-100 relative overflow-x-hidden">
+      
+      {/* Mobile Top Header Bar (Only visible on phones/tablets) */}
+      {user && (
+        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#13203B] border-b border-slate-800 flex items-center justify-between px-4 z-30">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center font-bold text-white text-xs">CT</div>
+            <span className="font-bold text-white text-sm tracking-wide">Control Tower</span>
+          </div>
+          <button
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="p-2 text-slate-200 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
+            aria-label="Toggle Menu"
+          >
+            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+      )}
+
+      {/* Sidebar only shows if logged in, now passes mobile props */}
       {user && (
         <Sidebar 
           user={user} 
           onOpenCreateTicket={() => setIsTicketModalOpen(true)} 
-          onLogout={logout} 
+          onLogout={logout}
+          mobileOpen={mobileOpen}
+          setMobileOpen={setMobileOpen}
         />
       )}
       
-      <main className={`flex-1 ${user ? 'p-4 overflow-y-auto' : ''}`}>
+      <main className={`flex-1 w-full min-w-0 ${user ? 'p-4 pt-20 lg:pt-4 overflow-y-auto' : ''}`}>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
