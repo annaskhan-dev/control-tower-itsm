@@ -1,14 +1,12 @@
 import React, {
   createContext,
-   useContext,
-   useState,
-   useCallback,
+  useContext,
+  useState,
+  useCallback,
   useEffect,
 } from "react";
 import { useAuth } from "./AuthContext";
 import axiosInstance from "../api/axiosInstance";
-// Optional: import your socket instance if you use one for real-time gateway broadcasts
-// import { socket } from "../api/socket"; 
 
 const TicketContext = createContext();
 
@@ -51,25 +49,21 @@ export const TicketProvider = ({ children }) => {
     setTickets((prevTickets) => [newTicket, ...prevTickets]);
   };
 
-  // Optional: Real-time Socket.io synchronization matching your backend gateway events
+  // Implemented missing updateTicket function for backend synchronization
+  const updateTicket = async (id, updatedFields) => {
+    try {
+      const response = await axiosInstance.put(`/tickets/${id}`, updatedFields);
+      const updatedTicket = response.data.ticket || response.data;
+      updateLocalTicket(id, updatedTicket);
+      return updatedTicket;
+    } catch (error) {
+      console.error("Error updating ticket:", error.response?.status, error.response?.data);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     if (!token) return;
-
-    /* 
-    // Uncomment if using socket.io-client
-    socket.on("ticketCreated", (newTicket) => {
-      addLocalTicket(newTicket);
-    });
-
-    socket.on("ticketUpdated", (updatedTicket) => {
-      updateLocalTicket(updatedTicket._id || updatedTicket.ticketId, updatedTicket);
-    });
-
-    return () => {
-      socket.off("ticketCreated");
-      socket.off("ticketUpdated");
-    };
-    */
   }, [token]);
 
   return (
@@ -77,6 +71,7 @@ export const TicketProvider = ({ children }) => {
       value={{ 
         tickets, 
         fetchTickets, 
+        updateTicket,
         updateLocalTicket, 
         addLocalTicket,
         isLoading 
