@@ -50,11 +50,11 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     }
   }, [isUserManagerOrAdmin]);
 
-  const handleAssignToMe = async (e, ticketId) => {
+  const handleAssignToMe = async (e, mongoId) => {
     e.stopPropagation();
     try {
       const currentUserName = user?.name || user?.fullName || user?.username || "Operator";
-      await updateTicket(ticketId, { assignee: currentUserName });
+      await updateTicket(mongoId, { assignee: currentUserName });
       fetchTickets(queue);
     } catch (err) {
       console.error("Failed to assign ticket to self", err);
@@ -62,10 +62,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     }
   };
 
-  const handleManagerAssign = async (ticketId, selectedOperatorName) => {
+  const handleManagerAssign = async (mongoId, selectedOperatorName) => {
     if (!selectedOperatorName) return;
     try {
-      await updateTicket(ticketId, { assignee: selectedOperatorName });
+      await updateTicket(mongoId, { assignee: selectedOperatorName });
       fetchTickets(queue);
     } catch (err) {
       console.error("Failed to assign ticket", err);
@@ -252,103 +252,106 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredTickets.map((t) => (
-                    <tr 
-                      key={t._id || t.id} 
-                      onClick={() => navigate(`/tickets/${t.ticketId}`)} 
-                      className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
-                    >
-                      <td className="p-4 font-bold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">{t.ticketId}</td>
-                      <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
-                      <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
-                      <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
-                      
-                      <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs" onClick={(e) => e.stopPropagation()}>
-                        {t.isAssigned ? (
-                          <span>{t.assigneeName}</span>
-                        ) : isUserOperator ? (
-                          <button
-                            onClick={(e) => handleAssignToMe(e, t.ticketId || t._id)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded-lg font-semibold transition-all shadow-xs cursor-pointer"
-                          >
-                            Assign to Me
-                          </button>
-                        ) : isUserManagerOrAdmin ? (
-                          <select
-                            defaultValue=""
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              handleManagerAssign(t.ticketId || t._id, e.target.value);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-white border border-slate-300 rounded-lg text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                          >
-                            <option value="" disabled>Assign to Operator...</option>
-                            {operators.map((op) => {
-                              const opName = op.name || op.fullName || op.username;
-                              return (
-                                <option key={op._id || op.id} value={opName}>
-                                  {opName}
-                                </option>
-                              );
-                            })}
-                          </select>
-                        ) : (
-                          <span className="text-slate-400 italic">Unassigned</span>
-                        )}
-                      </td>
+                  {filteredTickets.map((t) => {
+                    const mongoId = t._id || t.id;
+                    return (
+                      <tr 
+                        key={mongoId} 
+                        onClick={() => navigate(`/tickets/${t.ticketId}`)} 
+                        className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
+                      >
+                        <td className="p-4 font-bold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">{t.ticketId}</td>
+                        <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
+                        <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
+                        <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
+                        
+                        <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs" onClick={(e) => e.stopPropagation()}>
+                          {t.isAssigned ? (
+                            <span>{t.assigneeName}</span>
+                          ) : isUserOperator ? (
+                            <button
+                              onClick={(e) => handleAssignToMe(e, mongoId)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded-lg font-semibold transition-all shadow-xs cursor-pointer"
+                            >
+                              Assign to Me
+                            </button>
+                          ) : isUserManagerOrAdmin ? (
+                            <select
+                              defaultValue=""
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleManagerAssign(mongoId, e.target.value);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="bg-white border border-slate-300 rounded-lg text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                            >
+                              <option value="" disabled>Assign to Operator...</option>
+                              {operators.map((op) => {
+                                const opName = op.name || op.fullName || op.username;
+                                return (
+                                  <option key={op._id || op.id} value={opName}>
+                                    {opName}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          ) : (
+                            <span className="text-slate-400 italic">Unassigned</span>
+                          )}
+                        </td>
 
-                      <td className="p-4 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                          t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
-                        }`}>
-                          {t.assignmentTimeFormatted}
-                        </span>
-                      </td>
-                      <td className="p-4 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                          t.slaTimeFormatted !== "N/A" ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-slate-50 text-slate-400 italic"
-                        }`}>
-                          {t.slaTimeFormatted}
-                        </span>
-                      </td>
-                      <td className="p-4 text-xs whitespace-nowrap">
-                        <div className="font-semibold text-slate-700">{t.subAssignmentName || "—"}</div>
-                        {t.subAssignmentAt && (
-                          <div className="text-[10px] text-slate-400 mt-0.5">{formatDate(t.subAssignmentAt)}</div>
-                        )}
-                      </td>
-                      <td className="p-4 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                          t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? "bg-purple-50 text-purple-700 border border-purple-100" : "bg-slate-50 text-slate-400 italic"
-                        }`}>
-                          {t.subAssignmentTimeFormatted}
-                        </span>
-                      </td>
-                      <td className="p-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                          t.slaStatus === "Breached" ? "bg-rose-100 text-rose-700 border border-rose-200" : 
-                          t.slaStatus === "At Risk" ? "bg-amber-100 text-amber-700 border border-amber-200" : 
-                          "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                        }`}>
-                          {t.slaStatus}
-                        </span>
-                      </td>
-                      <td className="p-4 whitespace-nowrap">
-                        <div className="flex flex-col gap-1 items-start">
-                          <span className={`px-3 py-1 font-bold uppercase rounded-full text-[10px] tracking-wider shadow-2xs ${
-                            t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "bg-emerald-600 text-white" :
-                            "bg-blue-600 text-white"
+                        <td className="p-4 whitespace-nowrap">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                            t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
                           }`}>
-                            {t.status || "Open"}
+                            {t.assignmentTimeFormatted}
                           </span>
-                          <span className={`text-[11px] font-medium ${t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "text-emerald-700 font-bold" : "text-slate-400 italic"}`}>
-                            Total: {t.finalResolutionTimeFormatted}
+                        </td>
+                        <td className="p-4 whitespace-nowrap">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                            t.slaTimeFormatted !== "N/A" ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-slate-50 text-slate-400 italic"
+                          }`}>
+                            {t.slaTimeFormatted}
                           </span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="p-4 text-xs whitespace-nowrap">
+                          <div className="font-semibold text-slate-700">{t.subAssignmentName || "—"}</div>
+                          {t.subAssignmentAt && (
+                            <div className="text-[10px] text-slate-400 mt-0.5">{formatDate(t.subAssignmentAt)}</div>
+                          )}
+                        </td>
+                        <td className="p-4 whitespace-nowrap">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                            t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? "bg-purple-50 text-purple-700 border border-purple-100" : "bg-slate-50 text-slate-400 italic"
+                          }`}>
+                            {t.subAssignmentTimeFormatted}
+                          </span>
+                        </td>
+                        <td className="p-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                            t.slaStatus === "Breached" ? "bg-rose-100 text-rose-700 border border-rose-200" : 
+                            t.slaStatus === "At Risk" ? "bg-amber-100 text-amber-700 border border-amber-200" : 
+                            "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                          }`}>
+                            {t.slaStatus}
+                          </span>
+                        </td>
+                        <td className="p-4 whitespace-nowrap">
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className={`px-3 py-1 font-bold uppercase rounded-full text-[10px] tracking-wider shadow-2xs ${
+                              t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "bg-emerald-600 text-white" :
+                              "bg-blue-600 text-white"
+                            }`}>
+                              {t.status || "Open"}
+                            </span>
+                            <span className={`text-[11px] font-medium ${t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "text-emerald-700 font-bold" : "text-slate-400 italic"}`}>
+                              Total: {t.finalResolutionTimeFormatted}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
