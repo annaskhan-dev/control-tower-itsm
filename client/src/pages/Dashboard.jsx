@@ -141,8 +141,16 @@ const CustomTooltip = memo(({ active, payload, label }) => {
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
             <span className="text-slate-300 capitalize">{entry.name || entry.dataKey}:</span>
             <span className="font-bold text-white">{entry.value}</span>
+            {entry.payload && entry.payload.percentage !== undefined && (
+              <span className="text-slate-400 text-[10px]">({entry.payload.percentage}%)</span>
+            )}
           </div>
         ))}
+        {payload[0]?.payload?.details && (
+          <p className="text-[10px] text-slate-400 mt-1 italic border-t border-slate-700 pt-1">
+            {payload[0].payload.details}
+          </p>
+        )}
       </div>
     );
   }
@@ -152,32 +160,51 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * Isolated Pie Chart Component with animations disabled for buttery-smooth performance.
+ * Isolated Pie Chart Component with animations disabled for buttery-smooth performance and detailed data facts.
  */
-const OptimizedPieCard = memo(({ title, data }) => (
-  <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-60">
-    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{title}</h4>
-    <div className="h-44 w-full mt-1">
-      <ResponsiveContainer width="100%" height="100%" debounce={100}>
-        <PieChart>
-          <Pie 
-            data={data} 
-            innerRadius="50%" 
-            outerRadius="75%" 
-            paddingAngle={6} 
-            dataKey="value"
-            isAnimationActive={false}
-          >
-            {data.map((entry, idx) => (
-              <Cell key={`cell-${idx}`} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
-            ))}
-          </Pie>
-          <Tooltip content={<CustomTooltip />} />
-        </PieChart>
-      </ResponsiveContainer>
+const OptimizedPieCard = memo(({ title, data }) => {
+  const totalValue = useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
+
+  return (
+    <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
+      <div>
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{title}</h4>
+          <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">Total: {totalValue}</span>
+        </div>
+      </div>
+      <div className="h-32 w-full mt-1">
+        <ResponsiveContainer width="100%" height="100%" debounce={100}>
+          <PieChart>
+            <Pie 
+              data={data} 
+              innerRadius="45% " 
+              outerRadius="75%" 
+              paddingAngle={6} 
+              dataKey="value"
+              isAnimationActive={false}
+            >
+              {data.map((entry, idx) => (
+                <Cell key={`cell-${idx}`} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
+              ))}
+            </Pie>
+            <Tooltip content={<CustomTooltip />} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      {/* Detail / Facts points section added without altering original layout style */}
+      <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-1 text-[10px] text-slate-500">
+        {data.map((item, idx) => (
+          <div key={`fact-${idx}`} className="flex items-center gap-1.5 truncate">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+            <span className="truncate font-medium text-slate-700">{item.name}:</span>
+            <span className="font-bold text-slate-900">{item.value} ({totalValue > 0 ? Math.round((item.value / totalValue) * 100) : 0}%)</span>
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-));
+  );
+});
 
 OptimizedPieCard.displayName = "OptimizedPieCard";
 
@@ -340,13 +367,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         { name: "Low", count: normalizedTickets.filter((t) => t.priority === "Low").length },
       ],
       type: [
-        { name: "Request", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("request") || t.category.toLowerCase().includes("dispatch")).length, color: "#3b82f6" },
-        { name: "Problem", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("problem") || t.category.toLowerCase().includes("fleet")).length, color: "#f59e0b" },
+        { name: "Request", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("request") || t.category.toLowerCase().includes("dispatch")).length, color: "#3b82f6", details: "Standard requests & dispatches" },
+        { name: "Problem", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("problem") || t.category.toLowerCase().includes("fleet")).length, color: "#f59e0b", details: "Fleet & operational issues" },
       ].filter((d) => d.value > 0),
       sla: [
-        { name: "On Track", value: normalizedTickets.filter((t) => t.slaStatus === "On Track").length, color: "#10b981" },
-        { name: "At Risk", value: normalizedTickets.filter((t) => t.slaStatus === "At Risk").length, color: "#f59e0b" },
-        { name: "Breached", value: normalizedTickets.filter((t) => t.slaStatus === "Breached").length, color: "#ef4444" },
+        { name: "On Track", value: normalizedTickets.filter((t) => t.slaStatus === "On Track").length, color: "#10b981", details: "Meeting target timelines" },
+        { name: "At Risk", value: normalizedTickets.filter((t) => t.slaStatus === "At Risk").length, color: "#f59e0b", details: "Approaching deadline window" },
+        { name: "Breached", value: normalizedTickets.filter((t) => t.slaStatus === "Breached").length, color: "#ef4444", details: "Deadline expired uncompleted" },
       ].filter((d) => d.value > 0),
       trend: trend,
     };
@@ -396,9 +423,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Priority Distribution Chart */}
-        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-60">
+        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Priority Distribution</h4>
-          <div className="h-44 w-full mt-1">
+          <div className="h-36 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%" debounce={100}>
               <BarChart data={chartData.priority} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -414,16 +441,20 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               </BarChart>
             </ResponsiveContainer>
           </div>
+          <div className="pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-500 font-medium">
+            <span>P1/Critical: {chartData.priority.find(p => p.name === "Critical")?.count || 0}</span>
+            <span>Total Tracked: {stats.total}</span>
+          </div>
         </div>
 
-        {/* Polished Pie Charts */}
+        {/* Polished Pie Charts with Detailed Points & Facts */}
         <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
         {/* 7-Day Velocity Trend Chart */}
-        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-60">
+        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">7-Day Velocity</h4>
-          <div className="h-44 w-full mt-1">
+          <div className="h-36 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%" debounce={100}>
               <LineChart data={chartData.trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -441,6 +472,10 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                 />
               </LineChart>
             </ResponsiveContainer>
+          </div>
+          <div className="pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-500 font-medium">
+            <span>Peak: {Math.max(...chartData.trend.map(d => d.tickets), 0)} tix/day</span>
+            <span>Avg: {Math.round(stats.total / 7)} tix/day</span>
           </div>
         </div>
       </div>
