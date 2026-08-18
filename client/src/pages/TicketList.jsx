@@ -2,12 +2,14 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
+import api from "../services/api"; // Adjust based on your api utility path if needed
 
 export const TicketList = ({ onOpenCreateTicket }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [now, setNow] = useState(new Date());
+  const [operators, setOperators] = useState([]);
 
   // Update current time every minute for active duration calculations
   useEffect(() => {
@@ -15,14 +17,62 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     return () => clearInterval(interval);
   }, []);
   
-  const { tickets, fetchTickets, isLoading } = useTickets();
-  const { isAdmin, isManager } = useAuth();
+  const { tickets, fetchTickets, updateTicket, isLoading } = useTickets();
+  const { user, isAdmin, isManager, role } = useAuth();
   
+  const currentRole = (role || "").replace(/\s+/g, "_").toLowerCase();
+  const isUserOperator = currentRole === 'operator';
+  const isUserManagerOrAdmin = isAdmin || isManager || currentRole === 'super_admin' || currentRole === 'manager';
+
   const queue = searchParams.get("queue") || "all-work";
 
   useEffect(() => {
     fetchTickets(queue);
   }, [queue, fetchTickets]);
+
+  // Fetch operators list if manager/admin for the assignment dropdown
+  useEffect(() => {
+    const fetchOperators = async () => {
+      try {
+        const response = await api.get('/users'); // Adjust endpoint if your users list is retrieved differently
+        const allUsers = response.data || [];
+        const filteredOps = allUsers.filter(u => {
+          const r = (u.role || "").replace(/\s+/g, "_").toLowerCase();
+          return r === 'operator';
+        });
+        setOperators(filteredOps);
+      } catch (err) {
+        console.error("Failed to fetch operators list", err);
+      }
+    };
+    if (isUserManagerOrAdmin) {
+      fetchOperators();
+    }
+  }, [isUserManagerOrAdmin]);
+
+  const handleAssignToMe = async (e, ticketId) => {
+    e.stopPropagation(); // Prevent row click navigation
+    try {
+      const currentUserName = user?.name || user?.fullName || user?.username || "Operator";
+      await updateTicket(ticketId, { assignee: currentUserName });
+      fetchTickets(queue);
+    } catch (err) {
+      console.error("Failed to assign ticket to self", err);
+      alert(err.response?.data?.message || "Failed to assign ticket");
+    }
+  };
+
+  const handleManagerAssign = async (e, ticketId, selectedOperatorName) => {
+    e.stopPropagation();
+    if (!selectedOperatorName) return;
+    try {
+      await updateTicket(ticketId, { assignee: selectedOperatorName });
+      fetchTickets(queue);
+    } catch (err) {
+      console.error("Failed to assign ticket", err);
+      alert(err.response?.data?.message || "Failed to assign ticket");
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return "—";
@@ -34,7 +84,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const formatDuration = (ms) => {
     if (ms === null || ms === undefined || isNaN(ms)) return "—";
-    if (ms < 60000) return "Just now"; // Clean professional text for under a minute
+    if (ms < 60000) return "Just now"; 
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
     if (hours === 0 && mins === 0) return "Just now";
@@ -50,7 +100,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const resolvedAtTime = isResolved ? (resolvedAtRaw ? new Date(resolvedAtRaw).getTime() : now.getTime()) : null;
       const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-      // Robust SLA evaluation based on deadlines or explicit metadata matching Dashboard & Backend
       let slaStatus = t.slaStatus || t.sla_status || t.sla || "On Track";
       const deadlineRaw = t.slaDeadline || t.sla_deadline || t.dueDate || t.due_date;
       
@@ -70,7 +119,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         }
       }
 
-      // Parse Assignee safely
       let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || "Unassigned";
       if (typeof rawAssignee === "object" && rawAssignee !== null) {
         rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
@@ -78,7 +126,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
       const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
       
-      // Check sub-assignment status
       let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || t.sub_assigned_to || "";
       if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
         rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || "";
@@ -86,7 +133,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
       const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned" && subAssignmentName !== null;
 
-      // Timestamps matching backend fallback behaviors
       const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
       const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime;
       const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
@@ -94,28 +140,25 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at || (isSubAssigned ? (t.updatedAt || t.createdAt) : null);
       const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
 
-      // 1. Primary Assignment Time
       let primaryAssignmentMs = 0;
       if (isAssigned) {
         const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
         primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
       }
 
-      // 2. SLA / Active Assignment Time (strictly anchored to assignedAt when assigned)
       const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
-      // 3. Sub-Assignment Execution Time
       let subAssignmentTimeMs = 0;
       if (isSubAssigned && subAssignedAtTime) {
         subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subAssignedAtTime);
       }
 
-      // 4. Final Total Resolution Time
       const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
       return {
         ...t,
         assigneeName,
+        isAssigned,
         subAssignmentName,
         subAssignmentAt: subAssignedAtRaw,
         slaStatus,
@@ -134,6 +177,8 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         matchesQueue = t.status?.toLowerCase() === "open" && (t.slaStatus === "Breached" || t.slaStatus === "At Risk");
       } else if (queue === "open") {
         matchesQueue = t.status?.toLowerCase() === "open";
+      } else if (queue === "unassigned") {
+        matchesQueue = !t.isAssigned;
       }
 
       const searchStr = searchTerm.toLowerCase();
@@ -221,7 +266,39 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                       <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
                       <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
                       <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
-                      <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs">{t.assigneeName}</td>
+                      
+                      {/* Assignee column with role-based assignment controls */}
+                      <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs" onClick={(e) => e.stopPropagation()}>
+                        {t.isAssigned ? (
+                          <span>{t.assigneeName}</span>
+                        ) : isUserOperator ? (
+                          <button
+                            onClick={(e) => handleAssignToMe(e, t.ticketId || t._id)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded-lg font-semibold transition-all shadow-xs cursor-pointer"
+                          >
+                            Assign to Me
+                          </button>
+                        ) : isUserManagerOrAdmin ? (
+                          <select
+                            defaultValue=""
+                            onChange={(e) => handleManagerAssign(e, t.ticketId || t._id, e.target.value)}
+                            className="bg-white border border-slate-300 rounded-lg text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                          >
+                            <option value="" disabled>Assign to Operator...</option>
+                            {operators.map((op) => {
+                              const opName = op.name || op.fullName || op.username;
+                              return (
+                                <option key={op._id || op.id} value={opName}>
+                                  {opName}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        ) : (
+                          <span className="text-slate-400 italic">Unassigned</span>
+                        )}
+                      </td>
+
                       <td className="p-4 whitespace-nowrap">
                         <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                           t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"

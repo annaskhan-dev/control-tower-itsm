@@ -86,13 +86,30 @@ export class TicketsService {
     return await newSla.save();
   }
 
-  async update(id: string, updateTicketDto: UpdateTicketDto, companyId: string, userRole: string): Promise<Ticket> {
+  async update(
+    id: string, 
+    updateTicketDto: UpdateTicketDto, 
+    companyId: string, 
+    userRole: string, 
+    currentUserName?: string // Added parameter to verify self-assignment for operators
+  ): Promise<Ticket> {
     const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
     const restrictedUpdateRoles = ['operator', 'transporter', 'shipper_ops', 'sales_person'];
 
     if (restrictedUpdateRoles.includes(normalizedRole)) {
-      if (updateTicketDto.assignee !== undefined || updateTicketDto.category !== undefined) {
-        throw new ForbiddenException('You are not allowed to update Assignee or Category.');
+      if (updateTicketDto.category !== undefined) {
+        throw new ForbiddenException('You are not allowed to update Category.');
+      }
+      
+      // Allow operators to update assignee ONLY if they are assigning it to themselves
+      if (updateTicketDto.assignee !== undefined) {
+        if (normalizedRole === 'operator') {
+          if (currentUserName && updateTicketDto.assignee !== currentUserName) {
+            throw new ForbiddenException('Operators can only assign tickets to themselves.');
+          }
+        } else {
+          throw new ForbiddenException('You are not allowed to update Assignee.');
+        }
       }
     }
 
