@@ -3,7 +3,6 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Inbox, 
-  UserCheck, 
   InboxIcon, 
   AlertTriangle, 
   Users, 
@@ -41,8 +40,7 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user, mobileOpen, setMob
   // Define nav items with allowed roles matching backend permissions
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person'] },
-    { label: 'All Work', path: '/tickets?queue=all', icon: Inbox, roles: ['Super Admin', 'Manager', 'Operator', 'Agent'] },
-    { label: 'My Work', path: '/tickets?queue=my-work', icon: UserCheck, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person'] },
+    { label: 'Manage Tickets', path: '/tickets?queue=all', icon: Inbox, roles: ['Super Admin', 'Manager', 'Operator', 'Agent'] },
     { label: 'Unassigned', path: '/tickets?queue=unassigned', icon: InboxIcon, roles: ['Super Admin', 'Manager', 'Operator', 'Agent'] },
     { label: 'SLA Risk', path: '/tickets?queue=sla-risk', icon: AlertTriangle, roles: ['Super Admin', 'Manager', 'Operator', 'Agent'] },
     { label: 'SLA Settings', path: '/sla', icon: Clock, roles: ['Super Admin', 'Manager'] },
