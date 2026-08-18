@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
-import api from "../services/api"; // Adjust based on your api utility path if needed
+import api from "../services/api";
 
 export const TicketList = ({ onOpenCreateTicket }) => {
   const navigate = useNavigate();
@@ -11,7 +11,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   const [now, setNow] = useState(new Date());
   const [operators, setOperators] = useState([]);
 
-  // Update current time every minute for active duration calculations
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(interval);
@@ -20,11 +19,9 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   const { tickets, fetchTickets, updateTicket, isLoading } = useTickets();
   const { user, isAdmin, isManager, role } = useAuth();
   
-  // Safely extract and normalize role to prevent mismatch issues
   const userRoleRaw = role || user?.role || user?.userType || user?.type || "";
   const currentRole = typeof userRoleRaw === 'string' ? userRoleRaw.replace(/\s+/g, "_").toLowerCase() : "";
   
-  // Robust checks supporting variations like 'operator', 'support_operator', etc.
   const isUserOperator = currentRole.includes('operator');
   const isUserManagerOrAdmin = isAdmin || isManager || currentRole.includes('admin') || currentRole.includes('manager');
 
@@ -34,11 +31,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     fetchTickets(queue);
   }, [queue, fetchTickets]);
 
-  // Fetch operators list if manager/admin for the assignment dropdown
   useEffect(() => {
     const fetchOperators = async () => {
       try {
-        const response = await api.get('/users'); // Adjust endpoint if your users list is retrieved differently
+        const response = await api.get('/users');
         const allUsers = response.data || [];
         const filteredOps = allUsers.filter(u => {
           const r = (u.role || u.userType || "").replace(/\s+/g, "_").toLowerCase();
@@ -55,7 +51,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   }, [isUserManagerOrAdmin]);
 
   const handleAssignToMe = async (e, ticketId) => {
-    e.stopPropagation(); // Prevent row click navigation
+    e.stopPropagation();
     try {
       const currentUserName = user?.name || user?.fullName || user?.username || "Operator";
       await updateTicket(ticketId, { assignee: currentUserName });
@@ -66,8 +62,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     }
   };
 
-  const handleManagerAssign = async (e, ticketId, selectedOperatorName) => {
-    e.stopPropagation();
+  const handleManagerAssign = async (ticketId, selectedOperatorName) => {
     if (!selectedOperatorName) return;
     try {
       await updateTicket(ticketId, { assignee: selectedOperatorName });
@@ -192,7 +187,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   return (
     <div className="flex flex-col h-full font-sans bg-slate-50 text-slate-800">
-      {/* Header Bar */}
       <div className="flex justify-between items-center px-8 py-5 bg-white border-b border-slate-200 shadow-xs">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Support Tickets</h1>
@@ -209,7 +203,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         </button>
       </div>
       
-      {/* Filter / Search Bar */}
       <div className="px-8 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
         <div className="relative w-full max-w-md">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -228,7 +221,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           {isLoading ? (
@@ -271,7 +263,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                       <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
                       <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
                       
-                      {/* Assignee column with role-based assignment controls */}
                       <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs" onClick={(e) => e.stopPropagation()}>
                         {t.isAssigned ? (
                           <span>{t.assigneeName}</span>
@@ -285,7 +276,11 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         ) : isUserManagerOrAdmin ? (
                           <select
                             defaultValue=""
-                            onChange={(e) => handleManagerAssign(e, t.ticketId || t._id, e.target.value)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleManagerAssign(t.ticketId || t._id, e.target.value);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
                             className="bg-white border border-slate-300 rounded-lg text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                           >
                             <option value="" disabled>Assign to Operator...</option>
