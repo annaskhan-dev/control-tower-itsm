@@ -80,6 +80,8 @@ export const TicketDetail = () => {
     );
   }, [tickets, id]);
 
+  const isResolvedState = ["closed", "resolved", "completed", "done"].includes((ticket?.status || "").toLowerCase());
+
   // Compute if primary assignee is present
   const isPrimaryAssigned = useMemo(() => {
     if (!ticket) return false;
@@ -249,7 +251,6 @@ export const TicketDetail = () => {
 
   if (!ticket) return <div className="p-4 text-center text-slate-500 text-sm">Loading...</div>;
 
-  const isResolvedState = ["closed", "resolved", "completed", "done"].includes((ticket.status || "").toLowerCase());
   const isOverdue = ticket.slaDeadline && new Date(ticket.slaDeadline) < new Date() && !isResolvedState;
 
   return (
@@ -307,8 +308,12 @@ export const TicketDetail = () => {
 
             {/* Sub Assignment Panel with restriction indicator */}
             <div 
-              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${isRestricted || !isPrimaryAssigned ? 'cursor-not-allowed' : ''}`}
-              title={!isPrimaryAssigned ? "Please assign a primary assignee before selecting a sub-assignee" : (isRestricted ? "You do not have permission to modify this section" : "")}
+              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${isRestricted || !isPrimaryAssigned || isResolvedState ? 'cursor-not-allowed' : ''}`}
+              title={
+                isResolvedState 
+                  ? "Cannot modify sub-assignment for a resolved or closed ticket" 
+                  : (!isPrimaryAssigned ? "Please assign a primary assignee before selecting a sub-assignee" : (isRestricted ? "You do not have permission to modify this section" : ""))
+              }
             >
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
@@ -316,7 +321,7 @@ export const TicketDetail = () => {
                 </h3>
                 <button
                   onClick={() => handleUpdate({ subAssignment })}
-                  disabled={isUpdating || isRestricted || !isPrimaryAssigned}
+                  disabled={isUpdating || isRestricted || !isPrimaryAssigned || isResolvedState}
                   className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer"
                 >
                   {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
@@ -324,7 +329,14 @@ export const TicketDetail = () => {
                 </button>
               </div>
 
-              {!isPrimaryAssigned && (
+              {isResolvedState && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0" />
+                  <span>Sub-assignment cannot be changed because this ticket is resolved or closed.</span>
+                </div>
+              )}
+
+              {!isPrimaryAssigned && !isResolvedState && (
                 <div className="mb-3 p-3 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg flex items-center gap-2">
                   <AlertCircle size={14} className="shrink-0" />
                   <span>A primary assignee must be selected before a sub-assignee can be assigned.</span>
@@ -334,7 +346,7 @@ export const TicketDetail = () => {
               <div className="space-y-3">
                 <select
                   value={subAssignment}
-                  disabled={isRestricted || !isPrimaryAssigned}
+                  disabled={isRestricted || !isPrimaryAssigned || isResolvedState}
                   onChange={(e) => {
                     const val = e.target.value;
                     setSubAssignment(val);
@@ -357,7 +369,7 @@ export const TicketDetail = () => {
                   <input
                     type="text"
                     value={customSubAssignment}
-                    disabled={isRestricted || !isPrimaryAssigned}
+                    disabled={isRestricted || !isPrimaryAssigned || isResolvedState}
                     onChange={(e) => {
                       setCustomSubAssignment(e.target.value);
                     }}
@@ -395,10 +407,14 @@ export const TicketDetail = () => {
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Category</label>
                 <select 
-                  disabled={!canEditCategory || isRestricted} 
+                  disabled={!canEditCategory || isRestricted || isResolvedState} 
                   value={ticket.category || ""} 
                   onChange={(e) => handleUpdate({ category: e.target.value })} 
-                  title={isRestricted ? "You do not have permission to modify this category" : ""}
+                  title={
+                    isResolvedState 
+                      ? "Cannot modify category for a resolved or closed ticket" 
+                      : (isRestricted ? "You do not have permission to modify this category" : "")
+                  }
                   className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                   <option value="">Select Category</option>

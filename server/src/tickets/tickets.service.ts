@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
@@ -99,6 +100,19 @@ export class TicketsService {
     const existingTicket = await this.ticketModel.findOne({ ...baseQuery, companyId });
     if (!existingTicket) throw new NotFoundException(`Ticket with ID ${id} not found`);
 
+    // Check if the existing ticket is already resolved or closed
+    const currentStatus = (existingTicket.status || '').toLowerCase();
+    const isAlreadyResolved = ['closed', 'resolved', 'completed', 'done'].includes(currentStatus);
+
+    if (isAlreadyResolved) {
+      const isChangingCategory = updateTicketDto.category !== undefined && updateTicketDto.category !== existingTicket.category;
+      const isChangingSubAssignment = updateTicketDto.subAssignment !== undefined && updateTicketDto.subAssignment !== existingTicket.subAssignment;
+
+      if (isChangingCategory || isChangingSubAssignment) {
+        throw new BadRequestException('Cannot modify category or sub-assignment once a ticket is resolved or closed.');
+      }
+    }
+
     const updateData: any = { ...updateTicketDto };
 
     // Prevent SLA Deadline from ever being altered or recalculated during regular updates/sub-assignments
@@ -131,7 +145,8 @@ export class TicketsService {
 
     // Automatically handle resolvedAt timestamp when status changes
     if (updateData.status !== undefined && updateData.status !== existingTicket.status) {
-      if (updateData.status === 'Resolved') {
+      const isNewResolved = ['closed', 'resolved', 'completed', 'done'].includes(updateData.status.toLowerCase());
+      if (isNewResolved) {
         updateData.resolvedAt = new Date();
       } else {
         updateData.resolvedAt = null;

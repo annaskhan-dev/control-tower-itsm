@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   NotFoundException,
+  BadRequestException,
   UseGuards,
   Req,
 } from '@nestjs/common';
@@ -98,6 +99,26 @@ export class TicketsController {
     @Param('id') id: string,
     @Body() updateTicketDto: UpdateTicketDto,
   ) {
+    // 1. Fetch existing ticket to verify its current state
+    const existingTicket = await this.ticketsService.findOne(id, req.user.companyId);
+    if (!existingTicket) {
+      throw new NotFoundException(`Ticket with ID ${id} not found`);
+    }
+
+    const currentStatus = (existingTicket.status || '').toLowerCase();
+    const isAlreadyResolved = ['closed', 'resolved', 'completed', 'done'].includes(currentStatus);
+
+    // 2. If the ticket is already resolved/closed, block changes to category or subAssignment
+    if (isAlreadyResolved) {
+      const isChangingCategory = updateTicketDto.category && updateTicketDto.category !== existingTicket.category;
+      const isChangingSubAssignment = 'subAssignment' in updateTicketDto && updateTicketDto.subAssignment !== existingTicket.subAssignment;
+
+      if (isChangingCategory || isChangingSubAssignment) {
+        throw new BadRequestException('Cannot modify category or sub-assignment once a ticket is resolved or closed.');
+      }
+    }
+
+    // 3. Proceed with standard update process
     return this.ticketsService.update(id, updateTicketDto, req.user.companyId, req.user.role);
   }
 
