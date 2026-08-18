@@ -20,9 +20,13 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   const { tickets, fetchTickets, updateTicket, isLoading } = useTickets();
   const { user, isAdmin, isManager, role } = useAuth();
   
-  const currentRole = (role || "").replace(/\s+/g, "_").toLowerCase();
-  const isUserOperator = currentRole === 'operator';
-  const isUserManagerOrAdmin = isAdmin || isManager || currentRole === 'super_admin' || currentRole === 'manager';
+  // Safely extract and normalize role to prevent mismatch issues
+  const userRoleRaw = role || user?.role || user?.userType || user?.type || "";
+  const currentRole = typeof userRoleRaw === 'string' ? userRoleRaw.replace(/\s+/g, "_").toLowerCase() : "";
+  
+  // Robust checks supporting variations like 'operator', 'support_operator', etc.
+  const isUserOperator = currentRole.includes('operator');
+  const isUserManagerOrAdmin = isAdmin || isManager || currentRole.includes('admin') || currentRole.includes('manager');
 
   const queue = searchParams.get("queue") || "all-work";
 
@@ -37,8 +41,8 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         const response = await api.get('/users'); // Adjust endpoint if your users list is retrieved differently
         const allUsers = response.data || [];
         const filteredOps = allUsers.filter(u => {
-          const r = (u.role || "").replace(/\s+/g, "_").toLowerCase();
-          return r === 'operator';
+          const r = (u.role || u.userType || "").replace(/\s+/g, "_").toLowerCase();
+          return r.includes('operator');
         });
         setOperators(filteredOps);
       } catch (err) {

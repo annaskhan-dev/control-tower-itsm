@@ -62,10 +62,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isAuthenticated = !!token;
-  const isAdmin = user?.role === 'Super Admin';
-  const isManager = user?.role === 'Manager';
-  const isOperator = user?.role === 'Operator';
   const companyId = user?.companyId; 
+
+  // Robust normalized role extraction supporting various backend naming conventions & casing
+  const rawRole = user?.role || user?.userType || user?.type || "";
+  const normalizedRole = typeof rawRole === 'string' ? rawRole.replace(/\s+/g, "_").toLowerCase() : "";
+
+  // Flexible role helper flags
+  const role = rawRole;
+  const isAdmin = normalizedRole.includes('admin') || normalizedRole === 'super_admin';
+  const isManager = normalizedRole.includes('manager');
+  const isOperator = normalizedRole.includes('operator');
 
   return (
     <AuthContext.Provider value={{ 
@@ -75,6 +82,7 @@ export const AuthProvider = ({ children }) => {
         logout, 
         isLoading, 
         isAuthenticated,
+        role,
         isAdmin,
         isManager,
         isOperator,
