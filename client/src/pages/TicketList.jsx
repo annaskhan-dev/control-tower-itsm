@@ -4,6 +4,9 @@ import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
+// Module-level guard: survives component unmounts and remounts across route switches
+let globalLastFetchedQueue = null;
+
 export const TicketList = ({ onOpenCreateTicket }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -26,16 +29,17 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const queue = searchParams.get("queue") || "all-work";
 
-  // Permanent Fix: Use a ref guard to track the last fetched queue and prevent infinite loops, 
-  // and completely omit fetchTickets from the useEffect dependencies to avoid re-triggering.
-  const lastFetchedQueueRef = useRef(null);
-
+  // Permanent Fix: Uses module-level tracking combined with session validation to prevent loops
   useEffect(() => {
-    if (lastFetchedQueueRef.current !== queue) {
-      lastFetchedQueueRef.current = queue;
+    const sessionKey = `control_tower_queue_${queue}`;
+    const alreadyFetchedInSession = sessionStorage.getItem(sessionKey);
+
+    if (globalLastFetchedQueue !== queue || !alreadyFetchedInSession) {
+      globalLastFetchedQueue = queue;
+      sessionStorage.setItem(sessionKey, 'true');
       fetchTickets(queue);
     }
-  }, [queue]);
+  }, [queue, fetchTickets]);
 
   useEffect(() => {
     const fetchOperators = async () => {
@@ -61,7 +65,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     try {
       const currentUserName = user?.name || user?.username || user?.fullName || "Operator";
       await updateTicket(mongoId, { assignee: currentUserName });
-      fetchTickets(queue);
+      fetchTickets(queue, true); // Force refresh on action
     } catch (err) {
       console.error("Failed to assign ticket to self", err);
       alert(err.response?.data?.message || "Failed to assign ticket");
@@ -72,7 +76,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     if (!selectedOperatorName) return;
     try {
       await updateTicket(mongoId, { assignee: selectedOperatorName });
-      fetchTickets(queue);
+      fetchTickets(queue, true); // Force refresh on action
     } catch (err) {
       console.error("Failed to assign ticket", err);
       alert(err.response?.data?.message || "Failed to assign ticket");
