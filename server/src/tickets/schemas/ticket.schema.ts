@@ -15,11 +15,11 @@ export class Ticket extends Document {
   @Prop()
   source!: string;
 
-  @Prop({ required: true })
-  generator!: string; // <--- Stores the dynamic user role/name without falling back to a hardcoded default
+  @Prop({ required: true, default: 'Direct API / System' })
+  generator!: string; // <--- Automatically falls back to this default if left blank
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: false })
-  createdBy?: Types.ObjectId; // <--- Links to the specific user model who created it
+  createdBy?: Types.ObjectId;
 
   @Prop()
   type!: string;
