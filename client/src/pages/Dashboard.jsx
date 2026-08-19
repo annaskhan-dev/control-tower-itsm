@@ -235,12 +235,12 @@ export const Dashboard = ({ tickets: propTickets }) => {
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
 
-  // Fetch tickets via context provider on mount if empty
+  // Fetch tickets via context provider strictly once on mount if empty
   useEffect(() => {
-    if (!propTickets || propTickets.length === 0) {
+    if ((!propTickets || propTickets.length === 0) && contextTickets.length === 0) {
       fetchTickets('all-work');
     }
-  }, [fetchTickets, propTickets]);
+  }, []); // Empty dependency array prevents loop triggers
 
   // Fetch ticket statistics on mount
   useEffect(() => {
