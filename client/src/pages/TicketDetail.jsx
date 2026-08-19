@@ -13,7 +13,8 @@ import {
   Calendar,
   Trash2,
   AlertCircle,
-  UserPlus
+  UserPlus,
+  UserCheck
 } from "lucide-react";
 
 export const TicketDetail = () => {
@@ -23,6 +24,7 @@ export const TicketDetail = () => {
   const { user } = useAuth();
 
   const [description, setDescription] = useState("");
+  const [assignee, setAssignee] = useState("");
   const [subAssignment, setSubAssignment] = useState("");
   const [customSubAssignment, setCustomSubAssignment] = useState("");
   const [companyUsers, setCompanyUsers] = useState([]);
@@ -71,7 +73,9 @@ export const TicketDetail = () => {
   const canEditCategory = canEditField(user?.role, "category");
 
   // Check if current user is restricted (i.e. not Manager or Super Admin)
-  const isRestricted = !['Manager', 'Super Admin'].includes(user?.role);
+  const userRoleStr = (user?.role || "").toLowerCase();
+  const isManagerOrAdmin = ["manager", "super admin", "admin"].some(r => userRoleStr.includes(r));
+  const isRestricted = !isManagerOrAdmin;
 
   const ticket = useMemo(() => {
     if (!tickets) return null;
@@ -96,6 +100,13 @@ export const TicketDetail = () => {
   useEffect(() => {
     if (ticket) {
       setDescription(ticket.description || "");
+      
+      let rawAssignee = ticket.assignee || ticket.assignedTo || ticket.assigned_to || "Unassigned";
+      if (typeof rawAssignee === "object" && rawAssignee !== null) {
+        rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
+      }
+      setAssignee(typeof rawAssignee === "string" ? rawAssignee : "Unassigned");
+
       const val = ticket.subAssignment || "";
       const isExistingUser = companyUsers.some(u => (u.name || u.email) === val);
       if (val && !isExistingUser) {
@@ -198,6 +209,16 @@ export const TicketDetail = () => {
     const newPriority = payload.priority || ticket.priority;
     payload.slaDeadline = calculateDeadline(newCategory, newPriority);
 
+    // Track Primary Assignee timestamp modifications
+    if ('assignee' in payload) {
+      const oldAssignee = ticket.assignee || "Unassigned";
+      if (payload.assignee !== oldAssignee && payload.assignee !== "Unassigned") {
+        payload.assignedAt = new Date().toISOString();
+      } else if (payload.assignee === "Unassigned") {
+        payload.assignedAt = null;
+      }
+    }
+
     if ('subAssignment' in payload) {
       const finalVal = subAssignment === "custom" ? customSubAssignment : payload.subAssignment;
       payload.subAssignment = finalVal;
@@ -273,8 +294,7 @@ export const TicketDetail = () => {
           {/* Left Column: Description Panel & Sub Assignment */}
           <div className="lg:col-span-2 space-y-6">
             <div 
-              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${isRestricted ? 'cursor-not-allowed' : ''}`}
-              title={isRestricted ? "You do not have permission to modify this section" : ""}
+              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${!canEditDesc ? 'cursor-not-allowed' : ''}`}
             >
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-sm">Description</h3>
@@ -312,7 +332,7 @@ export const TicketDetail = () => {
               title={
                 isResolvedState 
                   ? "Cannot modify sub-assignment for a resolved or closed ticket" 
-                  : (!isPrimaryAssigned ? "Please assign a primary assignee before selecting a sub-assignee" : (isRestricted ? "You do not have permission to modify this section" : ""))
+                  : (!isPrimaryAssigned ? "Please assign a primary assignee before selecting a sub-assignee" : (isRestricted ? "Only Managers and Admins can modify sub-assignments" : ""))
               }
             >
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
@@ -328,6 +348,13 @@ export const TicketDetail = () => {
                   Assign
                 </button>
               </div>
+
+              {isRestricted && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0" />
+                  <span>Only Managers and Admins can modify sub-assignments.</span>
+                </div>
+              )}
 
               {isResolvedState && (
                 <div className="mb-3 p-3 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg flex items-center gap-2">
@@ -357,11 +384,15 @@ export const TicketDetail = () => {
                   className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                   <option value="">Select Company User</option>
-                  {companyUsers.map((u) => (
-                    <option key={u._id || u.id} value={u.name || u.email}>
-                      {u.name} ({u.role || "User"})
-                    </option>
-                  ))}
+                  {companyUsers.map((u) => {
+                    const userName = u.name || u.username;
+                    const userRole = u.role || 'Member';
+                    return (
+                      <option key={u._id || u.id} value={userName}>
+                        {userName} ({userRole})
+                      </option>
+                    );
+                  })}
                   <option value="custom">Other (Type Custom Text)...</option>
                 </select>
 
@@ -384,12 +415,50 @@ export const TicketDetail = () => {
           {/* Right Column: Properties & Live Durations */}
           <div className="space-y-4">
             <div 
-              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 space-y-4 ${isRestricted ? 'cursor-not-allowed' : ''}`}
-              title={isRestricted ? "You do not have permission to modify these properties" : ""}
+              className="bg-white border border-slate-200 rounded-xl shadow-xs p-5 space-y-4"
             >
               <h3 className="text-xs font-bold flex items-center gap-2 text-slate-700">
                 <ShieldAlert size={14} className="text-blue-600" /> Properties
               </h3>
+
+              {/* Primary Assignee Panel with Manager/Admin Restriction */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <UserCheck size={10} /> Assignee (Primary)
+                  </label>
+                  {!isRestricted && (
+                    <button
+                      onClick={() => handleUpdate({ assignee })}
+                      disabled={isUpdating || isResolvedState}
+                      className="text-[10px] text-blue-600 font-semibold hover:underline cursor-pointer disabled:opacity-50"
+                    >
+                      Update
+                    </button>
+                  )}
+                </div>
+                <select 
+                  disabled={isRestricted || isResolvedState} 
+                  value={assignee} 
+                  onChange={(e) => setAssignee(e.target.value)}
+                  title={isRestricted ? "Only Managers and Admins can change assignees" : ""}
+                  className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed bg-slate-50"
+                >
+                  <option value="Unassigned">Unassigned</option>
+                  {companyUsers.map((u) => {
+                    const userName = u.name || u.username;
+                    const userRole = u.role || 'Member';
+                    return (
+                      <option key={u._id || u.id} value={userName}>
+                        {userName} ({userRole})
+                      </option>
+                    );
+                  })}
+                </select>
+                {isRestricted && (
+                  <span className="text-[9px] text-slate-400 mt-0.5 block">Locked: Only Admins/Managers can reassign.</span>
+                )}
+              </div>
 
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Status</label>

@@ -52,7 +52,7 @@ export const checkPermission = (role, action) => {
 };
 
 /**
- * 2. Check for field-level edit permissions (e.g., 'sla', 'status')
+ * 2. Check for field-level edit permissions (e.g., 'sla', 'status', 'assignee')
  */
 export const canEditField = (role, field) => {
   return PERMISSIONS[role]?.canEdit?.includes(field) ?? false;

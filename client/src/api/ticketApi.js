@@ -78,7 +78,6 @@ export const updateSlaPriority = async (id, hours) => {
 
 /**
  * Removes an entire SLA config rule
- * RENAMED from deleteSlaConfig to deleteSlaCategory to match your import
  * @param {String} id - The MongoDB _id of the config
  */
 export const deleteSlaCategory = async (id) => {

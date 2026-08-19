@@ -41,11 +41,11 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response) {
-      console.error(`API Error [${error.config.url}]:`, error.response.status, error.response.data);
+      console.error(`API Error [${error.config?.url}]:`, error.response.status, error.response.data);
     }
 
     if (error.response?.status === 401) {
-      const isLoginRequest = error.config.url.includes('/auth/login');
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
       if (!isLoginRequest) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
