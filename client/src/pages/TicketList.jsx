@@ -4,9 +4,6 @@ import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
-// Module-level guard: survives component unmounts and remounts across route switches
-let globalLastFetchedQueue = null;
-
 export const TicketList = ({ onOpenCreateTicket }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -29,17 +26,15 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const queue = searchParams.get("queue") || "all-work";
 
-  // Permanent Fix: Uses module-level tracking combined with session validation to prevent loops
-  useEffect(() => {
-    const sessionKey = `control_tower_queue_${queue}`;
-    const alreadyFetchedInSession = sessionStorage.getItem(sessionKey);
+  // Bulletproof fetch guard: Prevents infinite loops by locking fetch to queue changes only
+  const fetchedRef = useRef(null);
 
-    if (globalLastFetchedQueue !== queue || !alreadyFetchedInSession) {
-      globalLastFetchedQueue = queue;
-      sessionStorage.setItem(sessionKey, 'true');
+  useEffect(() => {
+    if (fetchedRef.current !== queue) {
+      fetchedRef.current = queue;
       fetchTickets(queue);
     }
-  }, [queue, fetchTickets]);
+  }, [queue]); // Notice fetchTickets is intentionally omitted to prevent instability loops
 
   useEffect(() => {
     const fetchOperators = async () => {

@@ -1,18 +1,15 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useMemo,
-  useRef,
+import React, { 
+  createContext, 
+  useContext, 
+  useState, 
+  useCallback, 
+  useMemo, 
+  useRef 
 } from "react";
 import { useAuth } from "./AuthContext";
 import axiosInstance from "../api/axiosInstance";
 
 const TicketContext = createContext();
-
-// Global module-level session lock to prevent ANY component from looping requests
-let hasFetchedGlobal = false;
 
 export const TicketProvider = ({ children }) => {
   const [tickets, setTickets] = useState([]);
@@ -27,11 +24,7 @@ export const TicketProvider = ({ children }) => {
       return;
     }
 
-    // HARD LOCK: If already fetched globally this session and not forced, completely block duplicate requests
-    if (hasFetchedGlobal && !force && tickets.length > 0) {
-      return;
-    }
-
+    // Prevent duplicate concurrent requests for the same queue unless forced
     if (fetchingRef.current[queue] && !force) {
       return;
     }
@@ -45,14 +38,13 @@ export const TicketProvider = ({ children }) => {
       });
       const data = Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []);
       setTickets(data);
-      hasFetchedGlobal = true; // Mark as fetched globally
     } catch (error) {
       console.error("Error fetching tickets:", error.response?.status, error.response?.data);
     } finally {
       setIsLoading(false);
       fetchingRef.current[queue] = false;
     }
-  }, [token, tickets.length]);
+  }, [token]); // Removed tickets.length to stabilize the function reference
 
   const updateLocalTicket = useCallback((id, updatedFields) => {
     setTickets((prevTickets) =>
