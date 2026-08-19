@@ -2,12 +2,14 @@ import React, { useState, useEffect } from "react";
 import { X, Loader2 } from "lucide-react";
 import { createTicket, fetchSlaConfigs } from "../../api/ticketApi";
 import { useAuth } from "../../context/AuthContext";
+import api from "../../services/api"; // Ensure this points to your configured axios instance or fetch utility
 
 export const CreateTicketModal = ({ onClose, onSubmit }) => {
   const { token } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [slaConfigs, setSlaConfigs] = useState([]);
-  
+  const [users, setUsers] = useState([]); // State to hold real user records
+
   const [formData, setFormData] = useState({
     title: "",
     type: "Incident",
@@ -19,16 +21,24 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
   });
 
   useEffect(() => {
-    const loadConfigs = async () => {
+    const loadConfigsAndUsers = async () => {
       try {
-        const data = await fetchSlaConfigs();
-        setSlaConfigs(data || []);
+        // Fetch SLA Configurations and Users list concurrently
+        const [slaData, usersResponse] = await Promise.all([
+          fetchSlaConfigs(),
+          api.get("/users", { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        
+        setSlaConfigs(slaData || []);
+        // Handle different response structures (e.g. usersResponse.data or direct array)
+        const userData = usersResponse.data?.users || usersResponse.data || usersResponse;
+        setUsers(Array.isArray(userData) ? userData : []);
       } catch (error) {
-        console.error("Failed to fetch SLA configs:", error);
+        console.error("Failed to fetch initial modal data:", error);
       }
     };
-    loadConfigs();
-  }, []);
+    loadConfigsAndUsers();
+  }, [token]);
 
   const handleCategoryChange = (categoryName) => {
     const config = slaConfigs.find((c) => c.category === categoryName);
@@ -113,15 +123,17 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
                 onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
                 className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
               >
-                {[
-                  "Unassigned", 
-                  "Admin", 
-                  "Operator", 
-                  "Dispatcher", 
-                  "Transporter", 
-                  "Shipper Ops", 
-                  "Sales Person"
-                ].map(o => <option key={o} value={o}>{o}</option>)}
+                <option value="Unassigned">Unassigned</option>
+                {users.map((u) => {
+                  const userName = u.name || u.username;
+                  const userRole = u.role || 'Member';
+                  const displayLabel = `${userName} (${userRole})`;
+                  return (
+                    <option key={u._id || u.id || userName} value={userName}>
+                      {displayLabel}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
