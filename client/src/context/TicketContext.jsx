@@ -3,6 +3,7 @@ import React, {
   useContext,
   useState,
   useCallback,
+  useMemo,
 } from "react";
 import { useAuth } from "./AuthContext";
 import axiosInstance from "../api/axiosInstance";
@@ -75,19 +76,20 @@ export const TicketProvider = ({ children }) => {
     }
   };
 
+  // Memoize the context value object to prevent cascading re-render loops
+  const value = useMemo(() => ({
+    tickets, 
+    setTickets,
+    fetchTickets, 
+    updateTicket,
+    updateLocalTicket, 
+    addLocalTicket,
+    isLoading,
+    setIsLoading
+  }), [tickets, isLoading, fetchTickets]);
+
   return (
-    <TicketContext.Provider
-      value={{ 
-        tickets, 
-        setTickets,
-        fetchTickets, 
-        updateTicket,
-        updateLocalTicket, 
-        addLocalTicket,
-        isLoading,
-        setIsLoading
-      }}
-    >
+    <TicketContext.Provider value={value}>
       {children}
     </TicketContext.Provider>
   );
