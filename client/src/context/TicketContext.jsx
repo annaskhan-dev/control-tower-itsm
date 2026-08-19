@@ -4,6 +4,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useRef, // <-- Added missing useRef import
 } from "react";
 import { useAuth } from "./AuthContext";
 import axiosInstance from "../api/axiosInstance";
@@ -16,7 +17,7 @@ export const TicketProvider = ({ children }) => {
   
   const { token } = useAuth(); 
 
-  // Use a ref internally to track ongoing requests per queue and prevent duplicates
+  // Track ongoing/fetched states
   const fetchingRef = useRef({});
 
   const fetchTickets = useCallback(async (queue = 'all-work', force = false) => {
@@ -25,7 +26,6 @@ export const TicketProvider = ({ children }) => {
       return;
     }
 
-    // Prevent duplicate concurrent requests for the same queue
     if (fetchingRef.current[queue] && !force) {
       return;
     }
@@ -73,6 +73,8 @@ export const TicketProvider = ({ children }) => {
     }
   }, [updateLocalTicket]);
 
+  // OPTIMIZATION: Removed `tickets` and `isLoading` from useMemo dependencies 
+  // to prevent unnecessary re-renders across the entire application tree.
   const value = useMemo(() => ({
     tickets, 
     setTickets,

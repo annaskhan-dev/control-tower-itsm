@@ -4,43 +4,54 @@ import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axiosInstance';
 import { Download } from 'lucide-react';
 
+// Module-level guard: survives component unmounts/remounts during route navigation
+let globalLastFetchedCompany = null;
+
 export const DashboardPage = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth(); 
 
-  // Use a ref to track the last fetched companyID to completely block duplicate loops
-  const lastFetchedCompanyRef = useRef(null);
+  const companyID = user?.companyID || user?.id;
 
   useEffect(() => {
-    const companyID = user?.companyID;
+    let isMounted = true;
 
     if (!companyID) {
-      setLoading(false);
+      if (isMounted) setLoading(false);
       return;
     }
 
-    // Prevent refetching if we already fetched for this exact companyID during this session/mount
-    if (lastFetchedCompanyRef.current === companyID) {
+    // If we already fetched for this company ID in this session, skip entirely
+    if (globalLastFetchedCompany === companyID) {
+      if (isMounted) setLoading(false);
       return;
     }
 
     const fetchTickets = async () => {
-      lastFetchedCompanyRef.current = companyID; // Lock it immediately
+      globalLastFetchedCompany = companyID; // Lock globally
       try {
         const response = await axiosInstance.get('/tickets', {
           params: { companyID }
         });
-        setTickets(response.data);
+        if (isMounted) {
+          setTickets(response.data);
+        }
       } catch (error) {
         console.error("Failed to fetch tickets:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchTickets();
-  }, [user?.companyID]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [companyID]);
 
   // Function to filter last 1 month and export tickets to Excel (CSV format)
   const handleExportExcel = () => {
@@ -48,7 +59,6 @@ export const DashboardPage = () => {
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(currentDate.getMonth() - 1);
 
-    // Filter tickets created within the last 1 month
     const recentTickets = tickets.filter((t) => {
       const dateValue = t.createdAt || t.created_at;
       if (!dateValue) return false;
@@ -61,10 +71,8 @@ export const DashboardPage = () => {
       return;
     }
 
-    // Define CSV headers
     const headers = ["Ticket ID", "Title", "Type", "Priority", "Assignee", "SLA", "Status", "Created At"];
 
-    // Map ticket data to CSV rows
     const csvRows = recentTickets.map((t) => {
       const dateValue = t.createdAt || t.created_at;
       const formattedDate = dateValue ? new Date(dateValue).toLocaleString() : "";
@@ -95,10 +103,7 @@ export const DashboardPage = () => {
       return [ticketId, title, type, priority, assignee, slaField, status, createdAt].join(",");
     });
 
-    // Combine headers and rows
     const csvContent = [headers.join(","), ...csvRows].join("\n");
-
-    // Create a downloadable blob and trigger file download
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
