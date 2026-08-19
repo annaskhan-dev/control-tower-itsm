@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, memo } from "react";
+import React, { useState, useEffect, useMemo, memo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { fetchTicketStats } from '../api/axiosInstance';
 import { useTickets } from "../context/TicketContext";
@@ -235,19 +235,23 @@ export const Dashboard = ({ tickets: propTickets }) => {
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
 
-  // Fetch tickets via context provider strictly once on mount if empty
+  // Component-level ref guard to ensure single invocation on mount
+  const hasFetchedRef = useRef(false);
+
   useEffect(() => {
-    if ((!propTickets || propTickets.length === 0) && contextTickets.length === 0) {
+    if (!hasFetchedRef.current && ((!propTickets || propTickets.length === 0) && contextTickets.length === 0)) {
+      hasFetchedRef.current = true;
       fetchTickets('all-work');
     }
-  }, []); // Empty dependency array prevents loop triggers
+  }, [fetchTickets, propTickets, contextTickets.length]);
 
-  // Fetch ticket statistics on mount
+  // Fetch ticket statistics on mount securely
   useEffect(() => {
+    let isMounted = true;
     const getStatsData = async () => {
       try {
         const data = await fetchTicketStats();
-        if (data) {
+        if (data && isMounted) {
           setBackendStats(data);
         }
       } catch (err) {
@@ -255,6 +259,9 @@ export const Dashboard = ({ tickets: propTickets }) => {
       }
     };
     getStatsData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const normalizedTickets = useMemo(() => (Array.isArray(tickets) ? tickets : []).map((t) => normalizeTicket(t, now)), [tickets, now]);

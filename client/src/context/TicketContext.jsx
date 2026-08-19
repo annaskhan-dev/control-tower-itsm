@@ -3,17 +3,18 @@ import React, {
   useContext,
   useState,
   useCallback,
-  useRef,
 } from "react";
 import { useAuth } from "./AuthContext";
 import axiosInstance from "../api/axiosInstance";
 
 const TicketContext = createContext();
 
+// Module-level guard: persists outside component mounts/unmounts
+let globalIsFetching = false;
+
 export const TicketProvider = ({ children }) => {
   const [tickets, setTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const fetchedRef = useRef(false); // Prevents duplicate double-fetches on mount
   
   const { token } = useAuth(); 
 
@@ -23,25 +24,30 @@ export const TicketProvider = ({ children }) => {
       return;
     }
 
-    // Prevent redundant fetches if we already have tickets loaded, unless forced
-    if (!force && fetchedRef.current && tickets.length > 0) {
+    // Block if a request is already globally active
+    if (globalIsFetching && !force) {
       return;
     }
     
+    globalIsFetching = true;
     setIsLoading(true);
+    
     try {
       const response = await axiosInstance.get('/tickets', {
         params: { queue }
       });
       const data = Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []);
       setTickets(data);
-      fetchedRef.current = true;
     } catch (error) {
       console.error("Error fetching tickets:", error.response?.status, error.response?.data);
     } finally {
       setIsLoading(false);
+      // Release lock after a short cool-down
+      setTimeout(() => {
+        globalIsFetching = false;
+      }, 1000);
     }
-  }, [token, tickets.length]);
+  }, [token]);
 
   const updateLocalTicket = (id, updatedFields) => {
     setTickets((prevTickets) =>
