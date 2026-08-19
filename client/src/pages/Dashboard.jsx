@@ -5,17 +5,24 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
 } from "recharts";
-import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight } from "lucide-react";
+import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight, Layers } from "lucide-react";
 
 /**
  * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
- * 100% accurate primary assignment, SLA tracking, and sub-assignment telemetry.
+ * 100% accurate primary assignment, SLA tracking, source origin telemetry, and sub-assignment.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
   if (typeof rawAssignee === "object" && rawAssignee !== null) {
     rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
   }
+
+  // Source / Origin parsing matching backend rules (Sales, Support, Ops, etc.)
+  let rawSource = t.source || t.origin || t.channel || t.raisedBy || t.created_by_role || "Direct";
+  if (typeof rawSource === "object" && rawSource !== null) {
+    rawSource = rawSource.name || rawSource.role || rawSource.type || "Direct";
+  }
+  const sourceName = typeof rawSource === "string" && rawSource.trim() !== "" ? rawSource.trim() : "Direct";
 
   // Sub-assignee parsing matching backend rules
   let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || t.sub_assigned_to || t.subAssignee || null;
@@ -35,7 +42,6 @@ const normalizeTicket = (t, now) => {
     else sla = "On Track";
   }
   
-  // Real-time SLA deadline validation against current timestamp or resolution time
   const deadlineRaw = t.slaDeadline || t.sla_deadline || t.dueDate || t.due_date;
   if (deadlineRaw) {
     const deadline = new Date(deadlineRaw);
@@ -67,7 +73,6 @@ const normalizeTicket = (t, now) => {
   const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
   const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned";
 
-  // Timestamps matching backend fallback behaviors
   const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
   const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime;
   const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
@@ -80,14 +85,12 @@ const normalizeTicket = (t, now) => {
   
   const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-  // Timelapses in ms
   let primaryAssignmentMs = 0;
   if (isAssigned) {
     const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
     primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
   }
 
-  // Synchronized SLA active duration calculated from main assignment timestamp
   const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
   let subAssignmentTimeMs = 0;
@@ -112,6 +115,7 @@ const normalizeTicket = (t, now) => {
     ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     assigneeName,
+    sourceName,
     subAssignmentName,
     subAssignmentAt: subAssignedAtRaw,
     status: t.status || "Open",
@@ -160,13 +164,13 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * Isolated Pie Chart Component with animations disabled for buttery-smooth performance and detailed data facts.
+ * Isolated Pie Chart Component optimized for layout spacing and card consistency.
  */
 const OptimizedPieCard = memo(({ title, data }) => {
   const totalValue = useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
 
   return (
-    <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
+    <div className="p-5 border border-slate-200/85 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-68">
       <div>
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{title}</h4>
@@ -178,9 +182,9 @@ const OptimizedPieCard = memo(({ title, data }) => {
           <PieChart>
             <Pie 
               data={data} 
-              innerRadius="45%" 
-              outerRadius="75%" 
-              paddingAngle={6} 
+              innerRadius="42%" 
+              outerRadius="72%" 
+              paddingAngle={5} 
               dataKey="value"
               isAnimationActive={false}
             >
@@ -192,12 +196,12 @@ const OptimizedPieCard = memo(({ title, data }) => {
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-1 text-[10px] text-slate-500">
-        {data.map((item, idx) => (
+      <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 overflow-hidden">
+        {data.slice(0, 4).map((item, idx) => (
           <div key={`fact-${idx}`} className="flex items-center gap-1.5 truncate">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
             <span className="truncate font-medium text-slate-700">{item.name}:</span>
-            <span className="font-bold text-slate-900">{item.value} ({totalValue > 0 ? Math.round((item.value / totalValue) * 100) : 0}%)</span>
+            <span className="font-bold text-slate-900">{item.value}</span>
           </div>
         ))}
       </div>
@@ -253,6 +257,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         t.ticketId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.sourceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.category.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesStatus = 
@@ -289,7 +294,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     }
 
     const headers = [
-      "Ticket ID", "Title", "Description", "Source", "Category", "Priority", 
+      "Ticket ID", "Title", "Description", "Source / Team", "Category", "Priority", 
       "Ticket Status", "SLA Health", "SLA Deadline", "Assignee", "Assigned At", 
       "Assignment Duration", "SLA Active Duration", "Sub-Assignee", "Sub-Assigned At", 
       "Sub-Assignment Duration", "Resolved At", "Final Resolution Duration", "Company ID", "Created At"
@@ -306,7 +311,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         `"${(t.ticketId || "").toString().replace(/"/g, '""')}"`,
         `"${(t.title || "").replace(/"/g, '""')}"`,
         `"${(t.description || "").replace(/"/g, '""')}"`,
-        `"${(t.source || "").replace(/"/g, '""')}"`,
+        `"${(t.sourceName || "").replace(/"/g, '""')}"`,
         `"${(t.category || "").replace(/"/g, '""')}"`,
         `"${(t.priority || "").replace(/"/g, '""')}"`,
         `"${(t.status || "").replace(/"/g, '""')}"`,
@@ -345,6 +350,21 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   }), [normalizedTickets]);
 
   const chartData = useMemo(() => {
+    // Aggregate distinct team sources dynamically from the records database
+    const sourceCounts = {};
+    normalizedTickets.forEach((t) => {
+      const src = t.sourceName || "Direct";
+      sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+    });
+
+    const sourceColors = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"];
+    const sourcePieData = Object.keys(sourceCounts).map((key, idx) => ({
+      name: key,
+      value: sourceCounts[key],
+      color: sourceColors[idx % sourceColors.length],
+      details: `Tickets originated from ${key}`
+    }));
+
     const last7Days = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
@@ -360,16 +380,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     }));
 
     return {
+      sources: sourcePieData,
       priority: [
         { name: "Critical", count: normalizedTickets.filter((t) => t.priority === "Critical").length },
         { name: "High", count: normalizedTickets.filter((t) => t.priority === "High").length },
         { name: "Medium", count: normalizedTickets.filter((t) => t.priority === "Medium").length },
         { name: "Low", count: normalizedTickets.filter((t) => t.priority === "Low").length },
       ],
-      type: [
-        { name: "Request", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("request") || t.category.toLowerCase().includes("dispatch")).length, color: "#3b82f6", details: "Standard requests & dispatches" },
-        { name: "Problem", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("problem") || t.category.toLowerCase().includes("fleet")).length, color: "#f59e0b", details: "Fleet & operational issues" },
-      ].filter((d) => d.value > 0),
       sla: [
         { name: "On Track", value: normalizedTickets.filter((t) => t.slaStatus === "On Track").length, color: "#10b981", details: "Meeting target timelines" },
         { name: "At Risk", value: normalizedTickets.filter((t) => t.slaStatus === "At Risk").length, color: "#f59e0b", details: "Approaching deadline window" },
@@ -387,7 +404,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Operational Dashboard</h2>
-          <p className="text-sm text-slate-500 mt-1">Real-time ticketing lifecycle, assignment timelines, and SLA monitoring</p>
+          <p className="text-sm text-slate-500 mt-1">Real-time ticketing lifecycle, team source origin, and SLA monitoring</p>
         </div>
         <button
           onClick={handleExportExcel}
@@ -397,7 +414,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </button>
       </div>
 
-      {/* Top Metric Cards */}
+      {/* Top Metric Cards - Fixed Layout Spacing matching image */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "Total Tickets", val: stats.total, icon: Ticket, color: "blue" },
@@ -407,25 +424,28 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         ].map((item) => (
           <div 
             key={item.label} 
-            className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-shadow duration-200"
+            className="p-5 bg-white border border-slate-200/85 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-shadow duration-200"
           >
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
-              <h3 className={`text-2xl font-bold ${item.color === 'rose' ? 'text-rose-600' : 'text-slate-900'} mt-1`}>{item.val}</h3>
+            <div className="overflow-hidden">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 truncate">{item.label}</p>
+              <h3 className={`text-2xl font-bold ${item.color === 'rose' ? 'text-rose-600' : 'text-slate-900'} mt-1 truncate`}>{item.val}</h3>
             </div>
-            <div className="p-3 bg-slate-50 text-slate-600 rounded-xl">
+            <div className="p-3 bg-slate-50 text-slate-600 rounded-xl shrink-0">
               <item.icon size={22} />
             </div>
           </div>
         ))}
       </div>
 
-      {/* Charts Grid */}
+      {/* Charts Grid including Team Source Distribution */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Ticket Source Breakdown Chart (Sales, Ops, Support, etc.) */}
+        <OptimizedPieCard title="Ticket Source / Team" data={chartData.sources} />
+
         {/* Priority Distribution Chart */}
-        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
-          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Priority Distribution</h4>
-          <div className="h-36 w-full mt-1">
+        <div className="p-5 border border-slate-200/85 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-68">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Priority Breakdown</h4>
+          <div className="h-32 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%" debounce={100}>
               <BarChart data={chartData.priority} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -442,19 +462,18 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             </ResponsiveContainer>
           </div>
           <div className="pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-500 font-medium">
-            <span>P1/Critical: {chartData.priority.find(p => p.name === "Critical")?.count || 0}</span>
-            <span>Total Tracked: {stats.total}</span>
+            <span>Critical P1: {chartData.priority.find(p => p.name === "Critical")?.count || 0}</span>
+            <span>Tracked: {stats.total}</span>
           </div>
         </div>
 
-        {/* Polished Pie Charts with Detailed Points & Facts */}
-        <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
+        {/* SLA Health Pie Chart */}
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
         {/* 7-Day Velocity Trend Chart */}
-        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
+        <div className="p-5 border border-slate-200/85 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-68">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">7-Day Velocity</h4>
-          <div className="h-36 w-full mt-1">
+          <div className="h-32 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%" debounce={100}>
               <LineChart data={chartData.trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -474,24 +493,24 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             </ResponsiveContainer>
           </div>
           <div className="pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-500 font-medium">
-            <span>Peak: {Math.max(...chartData.trend.map(d => d.tickets), 0)} tix/day</span>
-            <span>Avg: {Math.round(stats.total / 7)} tix/day</span>
+            <span>Peak: {Math.max(...chartData.trend.map(d => d.tickets), 0)}/day</span>
+            <span>Avg: {Math.round(stats.total / 7)}/day</span>
           </div>
         </div>
       </div>
 
-      {/* Ticket List Table Section - Restyled to Ticket List Design */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      {/* Ticket List Table Section */}
+      <div className="bg-white rounded-2xl border border-slate-200/85 shadow-xs overflow-hidden">
         {/* Table Toolbar Header */}
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-slate-50/40">
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Tickets Directory</h3>
-              <span className="px-2 py-0.5 text-xs font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
-                {filteredTickets.length}
+              <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
+                {filteredTickets.length} Records
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">Manage, track, and filter operational support records</p>
+            <p className="text-xs text-slate-500 mt-0.5">Manage, track source origin, and filter operational support logs</p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -500,7 +519,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
-                placeholder="Search tickets..."
+                placeholder="Search tickets, sources..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
@@ -525,11 +544,12 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
         {/* Table Content */}
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
+          <table className="w-full text-left border-collapse min-w-[1050px]">
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider font-bold">
                 <th className="py-3 px-4">Ticket ID</th>
                 <th className="py-3 px-4">Subject / Title</th>
+                <th className="py-3 px-4">Source / Team</th>
                 <th className="py-3 px-4">Category</th>
                 <th className="py-3 px-4">Priority</th>
                 <th className="py-3 px-4">Assignee</th>
@@ -546,8 +566,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                       {t.ticketId}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[260px] truncate">
+                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[220px] truncate">
                     {t.title}
+                  </td>
+                  <td className="py-3.5 px-4 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200/60">
+                      <Layers size={12} className="text-slate-400" /> {t.sourceName}
+                    </span>
                   </td>
                   <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
                     {t.category || "—"}
@@ -593,7 +618,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               ))}
               {filteredTickets.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="py-16 text-center text-sm text-slate-400 italic">
+                  <td colSpan="9" className="py-16 text-center text-sm text-slate-400 italic">
                     No matching tickets found. Try adjusting your search query or filter settings.
                   </td>
                 </tr>
