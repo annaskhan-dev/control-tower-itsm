@@ -5,11 +5,11 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
 } from "recharts";
-import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight, Calendar } from "lucide-react";
+import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight, Calendar, CheckCircle2, ShieldCheck, Users } from "lucide-react";
 
 /**
  * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
- * 100% accurate primary assignment, SLA tracking, and sub-assignment telemetry.
+ * 100% accurate primary assignment, SLA tracking, source tracking, and sub-assignment telemetry.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
@@ -22,6 +22,10 @@ const normalizeTicket = (t, now) => {
   if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
   }
+
+  // Ticket source parsing (Step 1)
+  const rawSource = (t.source || t.origin || t.channel || t.department || "Direct / Other").toString().trim();
+  const source = rawSource.charAt(0).toUpperCase() + rawSource.slice(1).toLowerCase();
 
   const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
   const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
@@ -114,8 +118,10 @@ const normalizeTicket = (t, now) => {
     assigneeName,
     subAssignmentName,
     subAssignmentAt: subAssignedAtRaw,
+    source,
     status: t.status || "Open",
     createdAt: t.createdAt || t.created_at || new Date().toISOString(),
+    resolvedAt: resolvedAtRaw,
     priority,
     category: rawCategoryStr,
     slaStatus: sla,
@@ -125,6 +131,7 @@ const normalizeTicket = (t, now) => {
     slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
     subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
     finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
+    resolutionMs: finalResolutionTimeMs,
   };
 };
 
@@ -212,8 +219,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [loading, setLoading] = useState(propTickets.length === 0);
   const [now] = useState(() => new Date());
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [velocityDays, setVelocityDays] = useState(7); // Configurable velocity timeframe (up to 30 days)
+  const [statusFilter, setStatusFilter] = useState("all"); // Supports: all, open, in_progress, closed, resolved
+  const [priorityFilter, setPriorityFilter] = useState("all"); // Step 5: Priority-based filtering
+  const [velocityDays, setVelocityDays] = useState(7); 
 
   useEffect(() => {
     if (propTickets && propTickets.length > 0) {
@@ -248,22 +256,30 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
+  // Step 3 & Step 5: Strict Status and Priority Filter Matching with exact count parity validation
   const filteredTickets = useMemo(() => {
     return normalizedTickets.filter((t) => {
       const matchesSearch = 
         t.ticketId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.category.toLowerCase().includes(searchQuery.toLowerCase());
+        t.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.source.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesStatus = 
-        statusFilter === "all" ? true :
-        statusFilter === "resolved" ? t.isResolved :
-        statusFilter === "open" ? !t.isResolved : true;
+      let matchesStatus = true;
+      if (statusFilter === "open") {
+        matchesStatus = !t.isResolved && t.status.toLowerCase() !== "in progress";
+      } else if (statusFilter === "in_progress") {
+        matchesStatus = !t.isResolved && t.status.toLowerCase() === "in progress";
+      } else if (statusFilter === "closed" || statusFilter === "resolved") {
+        matchesStatus = t.isResolved;
+      }
 
-      return matchesSearch && matchesStatus;
+      const matchesPriority = priorityFilter === "all" ? true : t.priority.toLowerCase() === priorityFilter.toLowerCase();
+
+      return matchesSearch && matchesStatus && matchesPriority;
     });
-  }, [normalizedTickets, searchQuery, statusFilter]);
+  }, [normalizedTickets, searchQuery, statusFilter, priorityFilter]);
 
   const handleExportExcel = () => {
     const currentDate = new Date();
@@ -330,19 +346,67 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     document.body.removeChild(link);
   };
 
-  const stats = useMemo(() => ({
-    total: normalizedTickets.length,
-    open: normalizedTickets.filter((t) => !t.isResolved).length,
-    unassigned: normalizedTickets.filter((t) => t.assigneeName.toLowerCase() === "unassigned").length,
-    slaRisk: normalizedTickets.filter((t) => ["Breached", "At Risk"].includes(t.slaStatus)).length,
-  }), [normalizedTickets]);
+  // Stats ensuring 100% numerical parity check across statuses (Step 3)
+  const stats = useMemo(() => {
+    const total = normalizedTickets.length;
+    const openCount = normalizedTickets.filter((t) => !t.isResolved && t.status.toLowerCase() !== "in progress").length;
+    const inProgressCount = normalizedTickets.filter((t) => !t.isResolved && t.status.toLowerCase() === "in progress").length;
+    const closedCount = normalizedTickets.filter((t) => t.isResolved).length;
+    const unassigned = normalizedTickets.filter((t) => t.assigneeName.toLowerCase() === "unassigned").length;
+    const slaRisk = normalizedTickets.filter((t) => ["Breached", "At Risk"].includes(t.slaStatus)).length;
+    const resolvedTotal = closedCount;
+
+    return { total, open: openCount, inProgress: inProgressCount, closed: closedCount, unassigned, slaRisk, resolvedTotal };
+  }, [normalizedTickets]);
+
+  // Step 4: Operator Resolution Leaderboard calculations
+  const operatorResolutionMetrics = useMemo(() => {
+    const operatorMap = {};
+    normalizedTickets.forEach((t) => {
+      const op = t.assigneeName;
+      if (!operatorMap[op]) {
+        operatorMap[op] = { name: op, totalAssigned: 0, resolvedCount: 0, totalResTimeMs: 0 };
+      }
+      operatorMap[op].totalAssigned += 1;
+      if (t.isResolved) {
+        operatorMap[op].resolvedCount += 1;
+        if (t.resolutionMs) {
+          operatorMap[op].totalResTimeMs += t.resolutionMs;
+        }
+      }
+    });
+
+    return Object.values(operatorMap).map((op) => {
+      const avgMs = op.resolvedCount > 0 ? op.totalResTimeMs / op.resolvedCount : 0;
+      const hours = Math.floor(avgMs / (1000 * 60 * 60));
+      const mins = Math.floor((avgMs % (1000 * 60 * 60)) / (1000 * 60));
+      return {
+        ...op,
+        avgResolutionTime: op.resolvedCount > 0 ? `${hours}h ${mins}m` : "N/A",
+      };
+    }).sort((a, b) => b.resolvedCount - a.resolvedCount);
+  }, [normalizedTickets]);
+
+  // Step 5: Priority resolution breakdowns
+  const priorityBreakdown = useMemo(() => {
+    const levels = ["Critical", "High", "Medium", "Low"];
+    return levels.map((lvl) => {
+      const matching = normalizedTickets.filter((t) => t.priority === lvl);
+      const resolved = matching.filter((t) => t.isResolved).length;
+      return {
+        name: lvl,
+        total: matching.length,
+        resolved: resolved,
+        unresolved: matching.length - resolved,
+      };
+    });
+  }, [normalizedTickets]);
 
   const chartData = useMemo(() => {
     const timeFrameDays = Number(velocityDays) || 7;
     const dynamicDaysArray = Array.from({ length: timeFrameDays }).map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (timeFrameDays - 1 - i));
-      // For longer ranges (> 14 days), show short date (e.g., Aug 10), otherwise show weekday name
       const label = timeFrameDays > 14 
         ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
         : d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
@@ -357,8 +421,16 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       }).length,
     }));
 
+    // Step 1: Ticket Source breakdown metrics for pie display
+    const salesCount = normalizedTickets.filter((t) => t.source.toLowerCase().includes("sale")).length;
+    const otherSourceCount = normalizedTickets.length - salesCount;
+
     return {
-      priority: [
+      source: [
+        { name: "Sales", value: salesCount, color: "#8b5cf6", details: "Tickets raised by Sales department" },
+        { name: "Other Teams", value: otherSourceCount, color: "#0ea5e9", details: "Support, Operations & Direct channels" },
+      ].filter((d) => d.value > 0),
+      priorityBar: [
         { name: "Critical", count: normalizedTickets.filter((t) => t.priority === "Critical").length },
         { name: "High", count: normalizedTickets.filter((t) => t.priority === "High").length },
         { name: "Medium", count: normalizedTickets.filter((t) => t.priority === "Medium").length },
@@ -385,7 +457,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Operational Dashboard</h2>
-          <p className="text-sm text-slate-500 mt-1">Real-time ticketing lifecycle, assignment timelines, and SLA monitoring</p>
+          <p className="text-sm text-slate-500 mt-1">Real-time ticketing lifecycle, department source visibility, assignment timelines, and SLA monitoring</p>
         </div>
         <button
           onClick={handleExportExcel}
@@ -395,61 +467,67 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </button>
       </div>
 
-      {/* Top Metric Cards */}
+      {/* Top Metric Cards (Ensuring Status Parity Sum: Open + In Progress + Closed = Total) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total Tickets", val: stats.total, icon: Ticket, color: "blue" },
-          { label: "Open Work", val: stats.open, icon: Clock, color: "indigo" },
-          { label: "Unassigned", val: stats.unassigned, icon: UserX, color: "amber" },
-          { label: "SLA Risk", val: stats.slaRisk, icon: AlertTriangle, color: "rose" },
-        ].map((item) => (
-          <div 
-            key={item.label} 
-            className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-shadow duration-200"
-          >
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
-              <h3 className={`text-2xl font-bold ${item.color === 'rose' ? 'text-rose-600' : 'text-slate-900'} mt-1`}>{item.val}</h3>
-            </div>
-            <div className="p-3 bg-slate-50 text-slate-600 rounded-xl">
-              <item.icon size={22} />
-            </div>
+        <div className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-shadow duration-200">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Tickets</p>
+            <h3 className="text-2xl font-bold text-slate-900 mt-1">{stats.total}</h3>
           </div>
-        ))}
+          <div className="p-3 bg-slate-50 text-slate-600 rounded-xl"><Ticket size={22} /></div>
+        </div>
+        <div className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-shadow duration-200">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Active / Open</p>
+            <h3 className="text-2xl font-bold text-indigo-600 mt-1">{stats.open + stats.inProgress}</h3>
+          </div>
+          <div className="p-3 bg-slate-50 text-indigo-600 rounded-xl"><Clock size={22} /></div>
+        </div>
+        <div className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-shadow duration-200">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Closed / Resolved</p>
+            <h3 className="text-2xl font-bold text-emerald-600 mt-1">{stats.closed}</h3>
+          </div>
+          <div className="p-3 bg-slate-50 text-emerald-600 rounded-xl"><CheckCircle2 size={22} /></div>
+        </div>
+        <div className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-shadow duration-200">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">SLA Risk / Breach</p>
+            <h3 className="text-2xl font-bold text-rose-600 mt-1">{stats.slaRisk}</h3>
+          </div>
+          <div className="p-3 bg-slate-50 text-rose-600 rounded-xl"><AlertTriangle size={22} /></div>
+        </div>
       </div>
 
-      {/* Charts Grid */}
+      {/* Step 1 & Step 5 Analytics Charts Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Priority Distribution Chart */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Priority Distribution</h4>
           <div className="h-36 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%" debounce={100}>
-              <BarChart data={chartData.priority} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+              <BarChart data={chartData.priorityBar} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
                 <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar 
-                  dataKey="count" 
-                  fill="#3b82f6" 
-                  radius={[6, 6, 0, 0]} 
-                  isAnimationActive={false}
-                />
+                <Bar dataKey="count" fill="#3b82f6" radius={[6, 6, 0, 0]} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           </div>
           <div className="pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-500 font-medium">
-            <span>P1/Critical: {chartData.priority.find(p => p.name === "Critical")?.count || 0}</span>
+            <span>Critical P1: {chartData.priorityBar.find(p => p.name === "Critical")?.count || 0}</span>
             <span>Total Tracked: {stats.total}</span>
           </div>
         </div>
 
-        {/* Polished Pie Charts with Detailed Points & Facts */}
-        <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
+        {/* Step 1: Tickets by Source Breakdown Card */}
+        <OptimizedPieCard title="Tickets by Source" data={chartData.source} />
+
+        {/* SLA Health Pie Chart */}
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
-        {/* Configurable Velocity Trend Chart (Up to 30 Days) */}
+        {/* Velocity Trend Chart (Up to 30 Days) */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Velocity Trend</h4>
@@ -474,15 +552,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} interval={velocityDays > 14 ? 3 : 1} />
                 <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Line 
-                  type="monotone" 
-                  dataKey="tickets" 
-                  stroke="#10b981" 
-                  strokeWidth={3} 
-                  dot={{ r: velocityDays > 14 ? 2 : 4, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }} 
-                  activeDot={{ r: 6, fill: '#059669', strokeWidth: 2, stroke: '#ffffff' }}
-                  isAnimationActive={false}
-                />
+                <Line type="monotone" dataKey="tickets" stroke="#10b981" strokeWidth={3} dot={{ r: velocityDays > 14 ? 2 : 4, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }} activeDot={{ r: 6, fill: '#059669', strokeWidth: 2, stroke: '#ffffff' }} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -493,10 +563,80 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section */}
+      {/* Step 4 & Step 5: Advanced Operational Insight Cards (Operator Resolution Breakdown & Priority Resolution Counts) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Operator Resolution Breakdown */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <Users size={18} className="text-blue-600" />
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Operator Resolution Leaderboard</h3>
+            </div>
+            <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md">{operatorResolutionMetrics.length} Operators</span>
+          </div>
+          <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+            {operatorResolutionMetrics.map((op, idx) => (
+              <div key={`op-${idx}`} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100 text-xs">
+                <div>
+                  <p className="font-bold text-slate-800">{op.name}</p>
+                  <p className="text-[10px] text-slate-500">Assigned: {op.totalAssigned} | Avg Time: {op.avgResolutionTime}</p>
+                </div>
+                <div className="text-right">
+                  <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg text-[11px]">
+                    {op.resolvedCount} Resolved
+                  </span>
+                </div>
+              </div>
+            ))}
+            {operatorResolutionMetrics.length === 0 && (
+              <p className="text-xs text-slate-400 italic text-center py-6">No operator assignment records found.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Step 5: Priority-Based Resolution Counts Panel */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs lg:col-span-2 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={18} className="text-indigo-600" />
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Priority Level Resolution Tracking</h3>
+            </div>
+            <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md">Total Resolved: {stats.resolvedTotal}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {priorityBreakdown.map((pTier, idx) => (
+              <div key={`priority-tier-${idx}`} className="p-3.5 rounded-xl border border-slate-200/70 bg-slate-50/50 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    pTier.name === "Critical" ? "bg-rose-100 text-rose-700 border border-rose-200" :
+                    pTier.name === "High" ? "bg-amber-100 text-amber-700 border border-amber-200" :
+                    pTier.name === "Medium" ? "bg-blue-100 text-blue-700 border border-blue-100" :
+                    "bg-slate-100 text-slate-600 border border-slate-200"
+                  }`}>
+                    {pTier.name} Priority
+                  </span>
+                  <span className="text-xs font-bold text-slate-700">Total: {pTier.total}</span>
+                </div>
+                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden my-1">
+                  <div 
+                    className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${pTier.total > 0 ? (pTier.resolved / pTier.total) * 100 : 0}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[11px] font-medium text-slate-600 mt-1">
+                  <span className="text-emerald-600 font-bold">Resolved: {pTier.resolved}</span>
+                  <span className="text-slate-500">Unresolved: {pTier.unresolved}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Ticket List Table Section with Step 3 & Step 5 Filters */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {/* Table Toolbar Header */}
-        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-slate-50/40">
+        <div className="p-5 border-b border-slate-100 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-slate-50/40">
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Tickets Directory</h3>
@@ -509,18 +649,18 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
             {/* Search Bar */}
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full sm:w-56">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
-                placeholder="Search tickets..."
+                placeholder="Search tickets, source..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
               />
             </div>
 
-            {/* Filter Dropdown */}
+            {/* Step 3: Status Filter Tabs / Dropdown with exact parity counts */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Filter className="text-slate-400 shrink-0" size={16} />
               <select
@@ -528,9 +668,25 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 cursor-pointer w-full sm:w-auto"
               >
-                <option value="all">All Statuses</option>
-                <option value="open">Open / Active</option>
-                <option value="resolved">Resolved / Closed</option>
+                <option value="all">All Statuses ({stats.total})</option>
+                <option value="open">Open ({stats.open})</option>
+                <option value="in_progress">In Progress ({stats.inProgress})</option>
+                <option value="closed">Closed / Resolved ({stats.closed})</option>
+              </select>
+            </div>
+
+            {/* Step 5: Priority-based Filter */}
+            <div className="w-full sm:w-auto">
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 cursor-pointer w-full sm:w-auto"
+              >
+                <option value="all">All Priorities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
               </select>
             </div>
           </div>
@@ -538,11 +694,12 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
         {/* Table Content */}
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
+          <table className="w-full text-left border-collapse min-w-[1050px]">
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider font-bold">
                 <th className="py-3 px-4">Ticket ID</th>
                 <th className="py-3 px-4">Subject / Title</th>
+                <th className="py-3 px-4">Source</th>
                 <th className="py-3 px-4">Category</th>
                 <th className="py-3 px-4">Priority</th>
                 <th className="py-3 px-4">Assignee</th>
@@ -559,8 +716,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                       {t.ticketId}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[260px] truncate">
+                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[240px] truncate">
                     {t.title}
+                  </td>
+                  <td className="py-3.5 px-4 whitespace-nowrap">
+                    <span className="font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[10px]">
+                      {t.source}
+                    </span>
                   </td>
                   <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
                     {t.category || "—"}
@@ -606,7 +768,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               ))}
               {filteredTickets.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="py-16 text-center text-sm text-slate-400 italic">
+                  <td colSpan="9" className="py-16 text-center text-sm text-slate-400 italic">
                     No matching tickets found. Try adjusting your search query or filter settings.
                   </td>
                 </tr>
