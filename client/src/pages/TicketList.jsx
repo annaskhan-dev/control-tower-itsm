@@ -77,7 +77,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     const d = new Date(dateString);
     return isNaN(d.getTime()) 
       ? "Invalid" 
-      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   const formatDuration = (ms) => {
@@ -201,69 +201,72 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   }, [ticketData, queue, searchTerm, isUserManagerOrAdmin, user]);
 
   return (
-    <div className="flex flex-col h-full font-sans bg-slate-50 text-slate-800">
-      <div className="flex justify-between items-center px-8 py-5 bg-white border-b border-slate-200 shadow-xs">
+    <div className="flex flex-col h-full font-sans bg-slate-50 text-slate-900 antialiased selection:bg-blue-600 selection:text-white">
+      {/* Header Bar */}
+      <div className="flex justify-between items-center px-8 py-5 bg-white border-b border-slate-200 shadow-2xs">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Support Tickets</h1>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-            Queue: <span className="text-blue-600 font-bold">{queue.replace("-", " ")}</span>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Support Tickets</h1>
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mt-0.5">
+            Queue: <span className="text-blue-600 font-semibold capitalize">{queue.replace("-", " ")}</span>
           </p>
         </div>
         <button 
           onClick={onOpenCreateTicket} 
-          className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all shadow-md shadow-blue-500/20 flex items-center gap-2 cursor-pointer"
+          className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-all shadow-sm shadow-blue-500/20 flex items-center gap-2 cursor-pointer"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
           Add Ticket
         </button>
       </div>
       
-      <div className="px-8 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-        <div className="relative w-full max-w-md">
+      {/* Filters and Search Toolbar */}
+      <div className="px-8 py-4 bg-slate-50/75 border-b border-slate-200 flex items-center justify-between gap-4">
+        <div className="relative w-full max-w-sm">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           </span>
           <input
             type="text"
             placeholder="Search by Ticket ID or Title..."
-            className="w-full pl-10 pr-4 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-2xs"
+            className="w-full pl-10 pr-4 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all shadow-2xs placeholder:text-slate-400 text-slate-800"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="text-xs font-medium text-slate-500">
-          Showing <span className="font-bold text-slate-700">{filteredTickets.length}</span> tickets
+        <div className="text-xs font-medium text-slate-500 whitespace-nowrap">
+          Showing <span className="font-semibold text-slate-800">{filteredTickets.length}</span> tickets
         </div>
       </div>
 
+      {/* Main Content Area / Table */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           {isLoading ? (
-            <div className="p-16 text-center text-sm font-medium text-slate-400 animate-pulse flex flex-col items-center gap-3">
-              <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="p-16 text-center text-xs font-medium text-slate-400 animate-pulse flex flex-col items-center gap-3">
+              <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
               Loading tickets database...
             </div>
           ) : filteredTickets.length === 0 ? (
-            <div className="p-16 text-center text-sm text-slate-400 italic flex flex-col items-center gap-2">
-              <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7m16 0v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5m16 0h-2.586a1 1 0 0 0-.707.293l-2.414 2.414a1 1 0 0 1-.707.293h-3.172a1 1 0 0 1-.707-.293l-2.414-2.414A1 1 0 0 0 6.586 13H4"/></svg>
+            <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
+              <svg className="w-9 h-9 text-slate-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7m16 0v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5m16 0h-2.586a1 1 0 0 0-.707.293l-2.414 2.414a1 1 0 0 1-.707.293h-3.172a1 1 0 0 1-.707-.293l-2.414-2.414A1 1 0 0 0 6.586 13H4"/></svg>
               No tickets found in this view queue.
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600 border-collapse min-w-[1100px]">
-                <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
+              <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1100px]">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                   <tr>
-                    <th className="p-4">ID</th>
-                    <th className="p-4">Entry</th>
-                    <th className="p-4">Title</th>
-                    <th className="p-4">Category</th>
-                    <th className="p-4">Assignee</th>
-                    <th className="p-4">Assignment Time</th>
-                    <th className="p-4">SLA Active Time</th>
-                    <th className="p-4">Sub-Assignment</th>
-                    <th className="p-4">Sub-Assignee Time</th>
-                    <th className="p-4">SLA Health</th>
-                    <th className="p-4">Status & Resolution</th>
+                    <th className="py-3.5 px-4 font-semibold">ID</th>
+                    <th className="py-3.5 px-4 font-semibold">Entry</th>
+                    <th className="py-3.5 px-4 font-semibold">Title</th>
+                    <th className="py-3.5 px-4 font-semibold">Category</th>
+                    <th className="py-3.5 px-4 font-semibold">Assignee</th>
+                    <th className="py-3.5 px-4 font-semibold">Assignment Time</th>
+                    <th className="py-3.5 px-4 font-semibold">SLA Active Time</th>
+                    <th className="py-3.5 px-4 font-semibold">Sub-Assignment</th>
+                    <th className="py-3.5 px-4 font-semibold">Sub-Assignee Time</th>
+                    <th className="py-3.5 px-4 font-semibold">SLA Health</th>
+                    <th className="py-3.5 px-4 font-semibold">Status & Resolution</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -276,20 +279,20 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                       <tr 
                         key={mongoId} 
                         onClick={() => navigate(`/tickets/${t.ticketId}`)} 
-                        className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
+                        className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
                       >
-                        <td className="p-4 font-bold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">{t.ticketId}</td>
-                        <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
-                        <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
-                        <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
+                        <td className="py-3.5 px-4 font-semibold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">{t.ticketId}</td>
+                        <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
+                        <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[200px] truncate" title={t.title}>{t.title}</td>
+                        <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{t.category || "—"}</td>
                         
-                        <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {t.isAssigned ? (
-                            <span>{t.assigneeName}</span>
+                            <span className="text-slate-800 font-medium">{t.assigneeName}</span>
                           ) : !isUserManagerOrAdmin ? (
                             <button
                               onClick={(e) => handleAssignToMe(e, mongoId)}
-                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded-lg font-semibold transition-all shadow-xs cursor-pointer"
+                              className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-[11px] px-2.5 py-1 rounded-md font-medium transition-all shadow-2xs cursor-pointer"
                             >
                               Assign to Me
                             </button>
@@ -303,7 +306,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                                   handleManagerAssign(mongoId, e.target.value);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed cursor-pointer"
+                                className="w-full py-1 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
                               >
                                 <option value="Unassigned">Assign to Operator...</option>
                                 {operators.map((u) => {
@@ -320,51 +323,51 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                           )}
                         </td>
 
-                        <td className="p-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-md font-medium ${
                             t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
                           }`}>
                             {t.assignmentTimeFormatted}
                           </span>
                         </td>
-                        <td className="p-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                            t.slaTimeFormatted !== "N/A" ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-slate-50 text-slate-400 italic"
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-md font-medium ${
+                            t.slaTimeFormatted !== "N/A" ? "bg-blue-50 text-blue-700 border border-blue-100/80" : "bg-slate-50 text-slate-400 italic"
                           }`}>
                             {t.slaTimeFormatted}
                           </span>
                         </td>
-                        <td className="p-4 text-xs whitespace-nowrap">
-                          <div className="font-semibold text-slate-700">{t.subAssignmentName || "—"}</div>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="font-medium text-slate-700">{t.subAssignmentName || "—"}</div>
                           {t.subAssignmentAt && (
                             <div className="text-[10px] text-slate-400 mt-0.5">{formatDate(t.subAssignmentAt)}</div>
                           )}
                         </td>
-                        <td className="p-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                            t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? "bg-purple-50 text-purple-700 border border-purple-100" : "bg-slate-50 text-slate-400 italic"
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-md font-medium ${
+                            t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? "bg-purple-50 text-purple-700 border border-purple-100/80" : "bg-slate-50 text-slate-400 italic"
                           }`}>
                             {t.subAssignmentTimeFormatted}
                           </span>
                         </td>
-                        <td className="p-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                            t.slaStatus === "Breached" ? "bg-rose-100 text-rose-700 border border-rose-200" : 
-                            t.slaStatus === "At Risk" ? "bg-amber-100 text-amber-700 border border-amber-200" : 
-                            "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
+                            t.slaStatus === "Breached" ? "bg-rose-50 text-rose-700 border border-rose-200" : 
+                            t.slaStatus === "At Risk" ? "bg-amber-50 text-amber-700 border border-amber-200" : 
+                            "bg-emerald-50 text-emerald-700 border border-emerald-200"
                           }`}>
                             {t.slaStatus}
                           </span>
                         </td>
-                        <td className="p-4 whitespace-nowrap">
+                        <td className="py-3.5 px-4 whitespace-nowrap">
                           <div className="flex flex-col gap-1 items-start">
-                            <span className={`px-3 py-1 font-bold uppercase rounded-full text-[10px] tracking-wider shadow-2xs ${
+                            <span className={`px-2.5 py-0.5 font-bold uppercase rounded-md text-[10px] tracking-wider shadow-2xs ${
                               t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "bg-emerald-600 text-white" :
                               "bg-blue-600 text-white"
                             }`}>
                               {t.status || "Open"}
                             </span>
-                            <span className={`text-[11px] font-medium ${t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "text-emerald-700 font-bold" : "text-slate-400 italic"}`}>
+                            <span className={`text-[10px] font-medium ${t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "text-emerald-700 font-semibold" : "text-slate-400 italic"}`}>
                               Total: {t.finalResolutionTimeFormatted}
                             </span>
                           </div>
