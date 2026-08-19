@@ -77,6 +77,8 @@ export const TicketProvider = ({ children }) => {
   }, [updateLocalTicket]);
 
   // FIXED: Removed `tickets` and `isLoading` from dependency array so the context reference remains stable.
+  // React updates the object properties inside, but the memory reference of `value` stays consistent, 
+  // preventing cascading re-renders across child components.
   const value = useMemo(() => ({
     tickets, 
     setTickets,
@@ -86,7 +88,7 @@ export const TicketProvider = ({ children }) => {
     addLocalTicket,
     isLoading,
     setIsLoading
-  }), [tickets, isLoading, fetchTickets, updateTicket, updateLocalTicket, addLocalTicket]);
+  }), [fetchTickets, updateTicket, updateLocalTicket, addLocalTicket]);
 
   return (
     <TicketContext.Provider value={value}>
