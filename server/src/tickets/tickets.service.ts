@@ -207,9 +207,9 @@ export class TicketsService {
   ): Promise<Ticket[]> {
     const query: any = { companyId };
 
-    // Role-based visibility check
+    // Role-based visibility check: Allow full company ticket viewing for Managers, Admins, AND operational roles
     const normalizedRole = (userRole || '').replace(/\s+/g, '_').toLowerCase();
-    const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
+    const canViewAllTickets = ['manager', 'super_admin', 'admin', 'operator', 'transporter', 'shipper_ops', 'sales_person', 'agent'].includes(normalizedRole);
     
     const genericPlaceholders = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person', 'shipper_ops', 'sales_person'];
     const isGenericName = !userName || genericPlaceholders.includes(userName.toLowerCase().trim());
@@ -217,7 +217,8 @@ export class TicketsService {
     if (queue === 'unassigned') {
       query.assignee = { $in: ['Unassigned', null, ''] };
     } else {
-      if (!isManagerOrAdmin && !isGenericName) {
+      // Only restrict query by personal name if they are NOT allowed to view all tickets AND have a specific personal name
+      if (!canViewAllTickets && !isGenericName) {
         const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
         query.$or = [
           { assignee: new RegExp(`^${userName}$`, 'i') },
@@ -270,12 +271,12 @@ export class TicketsService {
     
     if (userRole && userName) {
       const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
-      const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
+      const canViewAllTickets = ['manager', 'super_admin', 'admin', 'operator', 'transporter', 'shipper_ops', 'sales_person', 'agent'].includes(normalizedRole);
       
       const genericPlaceholders = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person', 'shipper_ops', 'sales_person'];
       const isGenericName = genericPlaceholders.includes(userName.toLowerCase().trim());
 
-      if (!isManagerOrAdmin && !isGenericName) {
+      if (!canViewAllTickets && !isGenericName) {
         const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
         query.$or = [
           { assignee: new RegExp(`^${userName}$`, 'i') },
