@@ -208,19 +208,19 @@ export class TicketsService {
     const query: any = { companyId };
 
     // Role-based visibility check
-    const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
+    const normalizedRole = (userRole || '').replace(/\s+/g, '_').toLowerCase();
     const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
 
-    // If viewing the unassigned queue, allow operators to see unassigned records regardless of personal filter
     if (queue === 'unassigned') {
       query.assignee = { $in: ['Unassigned', null, ''] };
     } else {
-      if (!isManagerOrAdmin) {
-        // Non-management roles only see tickets assigned/sub-assigned to them
+      if (!isManagerOrAdmin && userName) {
+        const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
         query.$or = [
           { assignee: new RegExp(`^${userName}$`, 'i') },
           { assignedTo: new RegExp(`^${userName}$`, 'i') },
-          { subAssignment: new RegExp(`^${userName}$`, 'i') }
+          { subAssignment: new RegExp(`^${userName}$`, 'i') },
+          { assignee: new RegExp(cleanName, 'i') }
         ];
       }
       
@@ -262,8 +262,25 @@ export class TicketsService {
     return ticketObj;
   }
 
-  async getStats(companyId: string) {
-    const tickets = await this.ticketModel.find({ companyId }).exec();
+  async getStats(companyId: string, userRole?: string, userName?: string) {
+    const query: any = { companyId };
+    
+    // Optional role restriction for stats so non-managers only see their metrics
+    if (userRole && userName) {
+      const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
+      const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
+      if (!isManagerOrAdmin) {
+        const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
+        query.$or = [
+          { assignee: new RegExp(`^${userName}$`, 'i') },
+          { assignedTo: new RegExp(`^${userName}$`, 'i') },
+          { subAssignment: new RegExp(`^${userName}$`, 'i') },
+          { assignee: new RegExp(cleanName, 'i') }
+        ];
+      }
+    }
+
+    const tickets = await this.ticketModel.find(query).exec();
     const categoryStats = tickets.reduce((acc: any, ticket) => {
       const cat = ticket.category || 'Uncategorized';
       acc[cat] = (acc[cat] || 0) + 1;
@@ -272,10 +289,10 @@ export class TicketsService {
 
     return {
       total: tickets.length,
-      open: tickets.filter((t) => t.status === 'Open').length,
-      inProgress: tickets.filter((t) => t.status === 'In Progress').length,
-      resolved: tickets.filter((t) => t.status === 'Resolved').length,
-      critical: tickets.filter((t) => t.priority === 'Critical').length,
+      open: tickets.filter((t) => (t.status || '').toLowerCase() === 'open').length,
+      inProgress: tickets.filter((t) => (t.status || '').toLowerCase() === 'in progress').length,
+      resolved: tickets.filter((t) => ['resolved', 'closed', 'completed', 'done'].includes((t.status || '').toLowerCase())).length,
+      critical: tickets.filter((t) => (t.priority || '').toLowerCase() === 'critical').length,
       byCategory: categoryStats,
     };
   }
