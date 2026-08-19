@@ -311,45 +311,29 @@ export class TicketsService {
       return acc;
     }, {});
 
-    // Robust aggregation mirroring frontend/database normalization mapping
+    // Multi-aliased aggregation so the frontend widget catches the property name instantly
     const aggregateGeneratorStats = await this.ticketModel.aggregate([
       { $match: query },
       {
-        $addFields: {
-          effectiveSourceField: {
-            $ifNull: [
-              "$generator",
-              { $ifNull: ["$subAssignment", "$assignee"] }
-            ]
-          }
-        }
-      },
-      {
         $group: {
           _id: {
-            $switch: {
-              branches: [
-                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "sales", options: "i" } }, then: "Sales Person" },
-                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "shipper", options: "i" } }, then: "Shipper Ops" },
-                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "super_admin|super admin", options: "i" } }, then: "Super Admin" },
-                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "operator", options: "i" } }, then: "Operator" },
-                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "manager|admin", options: "i" } }, then: "Manager" },
-                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "transporter", options: "i" } }, then: "Transporter" }
-              ],
-              default: "Direct API / System"
-            }
+            $ifNull: ["$generator", { $ifNull: ["$source", "Direct API / System"] }]
           },
           count: { $sum: 1 }
         }
       },
       {
         $project: {
-          _id: 0,
+          _id: 1,
           name: "$_id",
+          label: "$_id",
+          key: "$_id",
           count: 1
         }
       }
     ]);
+
+    const fallbackStats = [{ _id: 'Direct API / System', name: 'Direct API / System', label: 'Direct API / System', key: 'Direct API / System', count: tickets.length }];
 
     return {
       total: tickets.length,
@@ -358,7 +342,7 @@ export class TicketsService {
       resolved: tickets.filter((t) => ['resolved', 'closed', 'completed', 'done'].includes((t.status || '').toLowerCase())).length,
       critical: tickets.filter((t) => (t.priority || '').toLowerCase() === 'critical').length,
       byCategory: categoryStats,
-      byGenerator: aggregateGeneratorStats.length > 0 ? aggregateGeneratorStats : [{ name: 'Direct API / System', count: tickets.length }],
+      byGenerator: aggregateGeneratorStats.length > 0 ? aggregateGeneratorStats : fallbackStats,
     };
   }
 
