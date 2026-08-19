@@ -26,7 +26,8 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const queue = searchParams.get("queue") || "all-work";
 
-  // Permanent Fix: Use a ref guard to track the last fetched queue and prevent infinite loops
+  // Permanent Fix: Use a ref guard to track the last fetched queue and prevent infinite loops, 
+  // and completely omit fetchTickets from the useEffect dependencies to avoid re-triggering.
   const lastFetchedQueueRef = useRef(null);
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       lastFetchedQueueRef.current = queue;
       fetchTickets(queue);
     }
-  }, [queue, fetchTickets]);
+  }, [queue]);
 
   useEffect(() => {
     const fetchOperators = async () => {
