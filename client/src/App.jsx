@@ -13,14 +13,26 @@ import { UserManagement } from './pages/UserManagement';
 import { SlaSettings } from './components/SlaSettings';
 import { CreateTicketModal } from './components/common/CreateTicketModal';
 import DriverSupportLogs from './components/DriverSupportLogs';
-import { Menu, X } from 'lucide-react'; // Added icons for mobile toggle
+import { Menu, X } from 'lucide-react';
+
+// Dedicated helper component to safely redirect users based on role upon login/root hit
+function RootRedirect() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+
+  const userRole = (user?.role || '').toLowerCase();
+  const isRestrictedRole = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person'].some(
+    r => userRole.includes(r)
+  );
+
+  return <Navigate to={isRestrictedRole ? "/tickets?queue=all" : "/dashboard"} replace />;
+}
 
 function MainLayout() {
   const { user, logout } = useAuth();
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false); // Added mobile menu state
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Normalize user role check for standard restricted roles
   const userRole = (user?.role || '').toLowerCase();
   const isRestrictedRole = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person'].some(
     r => userRole.includes(r)
@@ -47,7 +59,7 @@ function MainLayout() {
         </div>
       )}
 
-      {/* Sidebar only shows if logged in, now passes mobile props */}
+      {/* Sidebar only shows if logged in, passes mobile props */}
       {user && (
         <Sidebar 
           user={user} 
@@ -60,14 +72,16 @@ function MainLayout() {
       
       <main className={`flex-1 w-full min-w-0 ${user ? 'p-4 pt-20 lg:pt-4 overflow-y-auto' : ''}`}>
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={user ? <Navigate to={defaultHomeRoute} replace /> : <Navigate to="/login" replace />} />
+          {/* Public & Root Smart Routing */}
+          <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
           {/* Protected Routes - Dashboard restricted to Super Admin / Manager */}
           <Route path="/dashboard" element={
-            <ProtectedRoute allowedRoles={['Super Admin', 'Manager']}> <Dashboard /> </ProtectedRoute>
+            isRestrictedRole ? <Navigate to="/tickets?queue=all" replace /> : (
+              <ProtectedRoute allowedRoles={['Super Admin', 'Manager']}> <Dashboard /> </ProtectedRoute>
+            )
           } />
           
           <Route path="/tickets" element={
