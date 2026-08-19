@@ -231,7 +231,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     const getStatsData = async () => {
       try {
         const data = await fetchTicketStats();
-        console.log("RAW BACKEND STATS RESPONSE:", data); // Diagnostic log added
+        console.log("RAW BACKEND STATS RESPONSE:", data);
         if (data) {
           setBackendStats(data);
         }
@@ -415,14 +415,14 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
     const generatorColors = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#6366f1"];
     
-    // Aggregate dynamically from normalized tickets to ensure chart entries always populate
+    // Aggregate dynamically from normalized tickets to ensure chart entries always populate as a secure fallback
     let derivedGeneratorMap = {};
     normalizedTickets.forEach(t => {
       const src = t.source || "Direct API / System";
       derivedGeneratorMap[src] = (derivedGeneratorMap[src] || 0) + 1;
     });
 
-    // Merge with stats.byGenerator if available
+    // Merge/select stats.byGenerator if available, falling back to derived map
     const activeGenSourceMap = Object.keys(stats.byGenerator || {}).length > 0 ? stats.byGenerator : derivedGeneratorMap;
 
     const generatorEntries = Object.entries(activeGenSourceMap).map(([name, value], idx) => ({
@@ -448,7 +448,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         { name: "At Risk", value: normalizedTickets.filter((t) => t.slaStatus === "At Risk").length, color: "#f59e0b", details: "Approaching deadline window" },
         { name: "Breached", value: normalizedTickets.filter((t) => t.slaStatus === "Breached").length, color: "#ef4444", details: "Deadline expired uncompleted" },
       ].filter((d) => d.value > 0),
-      generator: generatorEntries,
+      generator: generatorEntries, // <-- Synchronized with activeGenSourceMap / stats.byGenerator properly!
       trend: trend,
     };
   }, [normalizedTickets, stats.byGenerator]);
