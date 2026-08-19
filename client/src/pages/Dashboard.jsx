@@ -8,8 +8,7 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Layers } from "lucide-react";
 
 /**
- * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
- * 100% accurate primary assignment, SLA tracking, and sub-assignment telemetry.
+ * Enhanced Normalization Engine: Robust source/generator field fallback mapping.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
@@ -58,19 +57,34 @@ const normalizeTicket = (t, now) => {
 
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "General").toString();
   
-  // Robust source / generator extraction with fallback
-  const rawSourceObj = t.generator || t.source || t.origin || t.channel || t.createdByRole || t.creator || t.created_by;
+  // Ultra-robust source/generator extraction check
   let rawSourceStr = "";
-  
-  if (typeof rawSourceObj === "string" && rawSourceObj.trim() !== "") {
-    rawSourceStr = rawSourceObj.trim();
-  } else if (typeof rawSourceObj === "object" && rawSourceObj !== null) {
-    rawSourceStr = rawSourceObj.name || rawSourceObj.title || rawSourceObj.role || rawSourceObj.type || "";
-  } else if (t.metadata && (t.metadata.source || t.metadata.generator || t.metadata.channel)) {
-    rawSourceStr = t.metadata.source || t.metadata.generator || t.metadata.channel;
+  const possibleSourceFields = [
+    t.generator, t.source, t.origin, t.channel, t.createdByRole, 
+    t.creator, t.created_by, t.type, t.role, t.department
+  ];
+
+  for (const field of possibleSourceFields) {
+    if (!field) continue;
+    if (typeof field === "string" && field.trim() !== "" && field !== "undefined" && field !== "null") {
+      rawSourceStr = field.trim();
+      break;
+    }
+    if (typeof field === "object") {
+      const extracted = field.name || field.title || field.role || field.type || field.label || field.username;
+      if (extracted && typeof extracted === "string" && extracted.trim() !== "") {
+        rawSourceStr = extracted.trim();
+        break;
+      }
+    }
   }
-  
-  if (!rawSourceStr || rawSourceStr === "undefined" || rawSourceStr === "null") {
+
+  if (!rawSourceStr && t.metadata) {
+    const metaSource = t.metadata.source || t.metadata.generator || t.metadata.channel || t.metadata.origin;
+    if (metaSource) rawSourceStr = String(metaSource).trim();
+  }
+
+  if (!rawSourceStr) {
     rawSourceStr = t.companyId ? "Company Portal" : "Direct System";
   }
 
@@ -188,7 +202,7 @@ const GeneratorListCard = memo(({ title, data }) => {
             <div key={`gen-row-${idx}`} className="flex items-center justify-between py-1">
               <span className="text-sm font-medium text-slate-700 truncate pr-2">{item.name}</span>
               <span className="text-xs font-bold px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100/60 whitespace-nowrap">
-                {item.count} {item.count === 1 ? 'ticket' : 'tickets'}
+                {item.count} {item.count === 1 ? 'resolved' : 'resolved'}
               </span>
             </div>
           ))
@@ -201,7 +215,7 @@ const GeneratorListCard = memo(({ title, data }) => {
 
       <div className="pt-2 border-t border-slate-100">
         <p className="text-[11px] text-slate-400 italic">
-          Total tickets generated mapped per individual source channel.
+          Reflecting creation telemetry across distinct creators and sources.
         </p>
       </div>
     </div>
@@ -425,7 +439,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
       {/* Widgets Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <GeneratorListCard title="Tickets by Generator / Source" data={chartData.generator} />
+        <GeneratorListCard title="TICKETS BY GENERATOR / SOURCE" data={chartData.generator} />
 
         {/* 7-Day Velocity Trend Chart */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64 sm:col-span-2">
