@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Logic to determine the base URL
-const apiBaseUrl = import.meta.env?.VITE_API_URL || process.env?.REACT_APP_API_URL || 'http://localhost:5000';
+// Logic to determine the base URL with a secure production fallback
+const apiBaseUrl = import.meta.env?.VITE_API_URL || process.env?.REACT_APP_API_URL || 'https://control-tower-itsm-production.up.railway.app';
 
 const axiosInstance = axios.create({
   // We append /api here
