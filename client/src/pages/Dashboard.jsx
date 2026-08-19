@@ -22,7 +22,6 @@ const normalizeTicket = (t, now) => {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
   }
 
-  // Comprehensive extraction checking all common backend keys for creator / source roles
   const creatorObj = t.createdBy || t.creator || t.raisedBy || t.user || {};
   const creatorRoleStr = typeof creatorObj === "object" ? (creatorObj.role || creatorObj.department || creatorObj.type || "") : "";
   
@@ -71,7 +70,7 @@ const normalizeTicket = (t, now) => {
   else if (rawPriorityStr.includes("high") || rawPriorityStr.includes("p2")) priority = "High";
   else if (rawPriorityStr.includes("med") || rawPriorityStr.includes("p3")) priority = "Medium";
 
-  const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
+  const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "General").toString();
   const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
   const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
   
@@ -139,16 +138,8 @@ const CustomTooltip = memo(({ active, payload, label }) => {
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
             <span className="text-slate-300 capitalize">{entry.name || entry.dataKey}:</span>
             <span className="font-bold text-white">{entry.value}</span>
-            {entry.payload && entry.payload.percentage !== undefined && (
-              <span className="text-slate-400 text-[10px]">({entry.payload.percentage}%)</span>
-            )}
           </div>
         ))}
-        {payload[0]?.payload?.details && (
-          <p className="text-[10px] text-slate-400 mt-1 italic border-t border-slate-700 pt-1">
-            {payload[0].payload.details}
-          </p>
-        )}
       </div>
     );
   }
@@ -157,7 +148,7 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * Optimized Pie Card Component
+ * Optimized Pie Card Component for SLA Health
  */
 const OptimizedPieCard = memo(({ title, data }) => {
   const totalValue = useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
@@ -253,8 +244,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         t.ticketId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.source.toLowerCase().includes(searchQuery.toLowerCase());
+        t.category.toLowerCase().includes(searchQuery.toLowerCase());
       
       let matchesStatus = true;
       if (statusFilter === "open") {
@@ -272,9 +262,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   }, [normalizedTickets, searchQuery, statusFilter, priorityFilter]);
 
   const handleExportExcel = () => {
-    const headers = ["Ticket ID", "Title", "Source", "Category", "Priority", "Status", "SLA Health", "Assignee", "Resolved At", "Created At"];
+    const headers = ["Ticket ID", "Title", "Category", "Priority", "Status", "SLA Health", "Assignee", "Resolved At", "Created At"];
     const csvRows = normalizedTickets.map((t) => [
-      `"${t.ticketId}"`, `"${t.title.replace(/"/g, '""')}"`, `"${t.source}"`, `"${t.category}"`, 
+      `"${t.ticketId}"`, `"${t.title.replace(/"/g, '""')}"`, `"${t.category}"`, 
       `"${t.priority}"`, `"${t.status}"`, `"${t.slaStatus}"`, `"${t.assigneeName}"`, 
       `"${t.resolvedAt ? new Date(t.resolvedAt).toLocaleString() : ""}"`, `"${new Date(t.createdAt).toLocaleString()}"`
     ].join(","));
@@ -348,7 +338,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       }).length,
     }));
 
-    // Dynamic source count parsing
     const salesCount = normalizedTickets.filter((t) => t.source === "Sales").length;
     const operatorCount = normalizedTickets.filter((t) => t.source === "Operator").length;
     const transporterCount = normalizedTickets.filter((t) => t.source === "Transporter").length;
@@ -356,17 +345,17 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     const managerCount = normalizedTickets.filter((t) => t.source === "Manager").length;
     const otherCount = normalizedTickets.filter((t) => !["Sales", "Operator", "Transporter", "Admin", "Manager"].includes(t.source)).length;
 
-    const sourceDataList = [
-      { name: "Sales", value: salesCount, color: "#8b5cf6" },
-      { name: "Operator", value: operatorCount, color: "#0ea5e9" },
-      { name: "Transporter", value: transporterCount, color: "#f59e0b" },
-      { name: "Admin", value: adminCount, color: "#10b981" },
-      { name: "Manager", value: managerCount, color: "#ec4899" },
-      { name: "Other", value: otherCount, color: "#64748b" },
+    const sourceList = [
+      { name: "Sales", value: salesCount, color: "bg-purple-500" },
+      { name: "Operator", value: operatorCount, color: "bg-sky-500" },
+      { name: "Transporter", value: transporterCount, color: "bg-amber-500" },
+      { name: "Admin", value: adminCount, color: "bg-emerald-500" },
+      { name: "Manager", value: managerCount, color: "bg-pink-500" },
+      { name: "Other", value: otherCount, color: "bg-slate-500" },
     ].filter((d) => d.value > 0);
 
     return {
-      source: sourceDataList,
+      sources: sourceList,
       priorityBar: priorityBreakdown.map(p => ({ name: p.name, count: p.total })),
       sla: [
         { name: "On Track", value: normalizedTickets.filter((t) => t.slaStatus === "On Track").length, color: "#10b981" },
@@ -427,8 +416,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Analytics Charts Grid */}
+      {/* Analytics Charts Grid - Replaced Donut Chart with Tickets Raised by Source Listing */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Priority Breakdown */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs flex flex-col justify-between h-64">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Priority Breakdown</h4>
           <div className="h-36 w-full mt-1">
@@ -448,11 +438,33 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Tickets Raised by Source (Properly mapped to Sales, Operator, Transporter, etc.) */}
-        <OptimizedPieCard title="Tickets Raised by Source" data={chartData.source} />
+        {/* Tickets Raised By Source Listing Card */}
+        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs flex flex-col justify-between h-64">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tickets Raised by Source</h4>
+            <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">Total: {stats.total}</span>
+          </div>
+          <div className="space-y-2 my-2 overflow-y-auto max-h-36 pr-1">
+            {chartData.sources.map((src, idx) => (
+              <div key={`src-stat-${idx}`} className="flex items-center justify-between text-xs bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${src.color}`} />
+                  <span className="font-semibold text-slate-700">{src.name}</span>
+                </div>
+                <span className="font-bold text-slate-900">{src.value} tickets</span>
+              </div>
+            ))}
+          </div>
+          <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-500 font-medium flex justify-between">
+            <span>Active Sources</span>
+            <span>{chartData.sources.length} Categories</span>
+          </div>
+        </div>
 
+        {/* SLA Health Chart */}
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
+        {/* Velocity Trend Chart */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs flex flex-col justify-between h-64">
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Velocity Trend</h4>
@@ -553,7 +565,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section */}
+      {/* Ticket List Table Section - Source Column Removed, Category Restored */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-slate-50/40">
           <div>
@@ -563,7 +575,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                 {filteredTickets.length}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">Manage and inspect support tickets by source, status, and priority</p>
+            <p className="text-xs text-slate-500 mt-0.5">Manage and inspect support tickets by category, status, and priority</p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -571,7 +583,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
-                placeholder="Search ticket, source..."
+                placeholder="Search ticket, category..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
@@ -614,7 +626,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               <tr className="bg-slate-50/70 border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider font-bold">
                 <th className="py-3 px-4">Ticket ID</th>
                 <th className="py-3 px-4">Subject / Title</th>
-                <th className="py-3 px-4">Source</th>
+                <th className="py-3 px-4">Category</th>
                 <th className="py-3 px-4">Priority</th>
                 <th className="py-3 px-4">Assignee</th>
                 <th className="py-3 px-4">SLA Health</th>
@@ -635,7 +647,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                   </td>
                   <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
                     <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                      {t.source}
+                      {t.category}
                     </span>
                   </td>
                   <td className="py-3.5 px-4 whitespace-nowrap">
