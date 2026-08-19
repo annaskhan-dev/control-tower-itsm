@@ -274,12 +274,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     });
   }, [normalizedTickets, searchQuery, statusFilter, priorityFilterTab]);
 
-const generatorBreakdown = useMemo(() => {
-  return Object.entries(stats?.byGenerator || {}).map(([name, count]) => ({
-    name,
-    count,
-  }));
-}, [stats?.byGenerator]);
+const generatorBreakdown = Object.entries(stats?.byGenerator || {}).map(([name, count]) => ({ name, count }));
   const operatorResolutionStats = useMemo(() => {
     const resolvedTickets = normalizedTickets.filter(t => t.isResolved);
     const map = {};
