@@ -8,8 +8,8 @@ import {
 import { Ticket, AlertTriangle, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight, Calendar, CheckCircle2, ShieldCheck, Users } from "lucide-react";
 
 /**
- * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
- * 100% accurate primary assignment, source tracking, and sub-assignment telemetry.
+ * Enhanced Normalization Engine: Safely parses backend fields to extract exact ticket 
+ * source roles (Sales, Operator, Transporter, Admin, Manager, etc.) preventing "Other" fallbacks.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
@@ -22,16 +22,22 @@ const normalizeTicket = (t, now) => {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
   }
 
-  // Comprehensive source/origin role or department parsing (Sales, Operator, Transporter, Admin, Manager, etc.)
-  const rawSource = (t.source || t.origin || t.channel || t.department || t.raisedByRole || "Direct / Other").toString().trim().toLowerCase();
-  let source = "Other / Direct";
+  // Comprehensive extraction checking all common backend keys for creator / source roles
+  const creatorObj = t.createdBy || t.creator || t.raisedBy || t.user || {};
+  const creatorRoleStr = typeof creatorObj === "object" ? (creatorObj.role || creatorObj.department || creatorObj.type || "") : "";
+  
+  const rawSource = (
+    t.source || t.origin || t.channel || t.department || t.raisedByRole || t.creatorRole || creatorRoleStr || "Other"
+  ).toString().trim().toLowerCase();
+
+  let source = "Other";
   if (rawSource.includes("sale")) source = "Sales";
-  else if (rawSource.includes("op")) source = "Operator";
-  else if (rawSource.includes("trans")) source = "Transporter";
+  else if (rawSource.includes("op") || rawSource.includes("agent")) source = "Operator";
+  else if (rawSource.includes("trans") || rawSource.includes("driver") || rawSource.includes("logistics")) source = "Transporter";
   else if (rawSource.includes("admin")) source = "Admin";
   else if (rawSource.includes("manag")) source = "Manager";
   else if (rawSource.includes("support")) source = "Support";
-  else {
+  else if (rawSource !== "other" && rawSource !== "") {
     source = rawSource.charAt(0).toUpperCase() + rawSource.slice(1);
   }
 
@@ -197,7 +203,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); 
   const [priorityFilter, setPriorityFilter] = useState("all"); 
-  const [velocityDays, setVelocityDays] = useState(7); // Flexible velocity up to 30 days
+  const [velocityDays, setVelocityDays] = useState(7);
 
   useEffect(() => {
     if (propTickets && propTickets.length > 0) {
@@ -231,7 +237,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
-  // Main Ticket Status & Metrics breakdown matching unified counts
   const stats = useMemo(() => {
     const total = normalizedTickets.length;
     const openCount = normalizedTickets.filter((t) => !t.isResolved && t.status.toLowerCase() !== "in progress").length;
@@ -257,7 +262,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       } else if (statusFilter === "in_progress") {
         matchesStatus = !t.isResolved && t.status.toLowerCase() === "in progress";
       } else if (statusFilter === "closed") {
-        matchesStatus = t.isResolved; // Explicit separate closed tab view
+        matchesStatus = t.isResolved;
       }
 
       const matchesPriority = priorityFilter === "all" ? true : t.priority.toLowerCase() === priorityFilter.toLowerCase();
@@ -285,7 +290,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     document.body.removeChild(link);
   };
 
-  // Operator Resolution Analytics
   const operatorResolutionMetrics = useMemo(() => {
     const operatorMap = {};
     normalizedTickets.forEach((t) => {
@@ -311,7 +315,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     }).sort((a, b) => b.resolvedCount - a.resolvedCount);
   }, [normalizedTickets]);
 
-  // Priority breakdown including resolved vs unresolved counts
   const priorityBreakdown = useMemo(() => {
     const levels = ["Critical", "High", "Medium", "Low"];
     return levels.map((lvl) => {
@@ -326,7 +329,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     });
   }, [normalizedTickets]);
 
-  // Chart data calculations including source breakdown for Sales, Operator, Transporter, Admin, Manager
   const chartData = useMemo(() => {
     const timeFrameDays = Math.min(Math.max(Number(velocityDays) || 7, 1), 30);
     const dynamicDaysArray = Array.from({ length: timeFrameDays }).map((_, i) => {
@@ -346,7 +348,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       }).length,
     }));
 
-    // Explicit ticket source counts
+    // Dynamic source count parsing
     const salesCount = normalizedTickets.filter((t) => t.source === "Sales").length;
     const operatorCount = normalizedTickets.filter((t) => t.source === "Operator").length;
     const transporterCount = normalizedTickets.filter((t) => t.source === "Transporter").length;
@@ -425,9 +427,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Analytics Charts Grid including Ticket Source Breakdown (Sales, Operator, Transporter, Admin, Manager) */}
+      {/* Analytics Charts Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Priority Distribution Chart */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs flex flex-col justify-between h-64">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Priority Breakdown</h4>
           <div className="h-36 w-full mt-1">
@@ -447,13 +448,11 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Tickets Raised by Source (Sales, Operator, Transporter, Admin, Manager) */}
+        {/* Tickets Raised by Source (Properly mapped to Sales, Operator, Transporter, etc.) */}
         <OptimizedPieCard title="Tickets Raised by Source" data={chartData.source} />
 
-        {/* SLA Health Pie Chart */}
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
-        {/* Velocity Trend Chart with up to 30 Days Selection */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs flex flex-col justify-between h-64">
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Velocity Trend</h4>
@@ -489,9 +488,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Advanced Operational Insight Cards (Operator Resolution & Priority Resolution Tracking) */}
+      {/* Advanced Operational Insight Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Operator Resolution Leaderboard */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
@@ -514,13 +512,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                 </div>
               </div>
             ))}
-            {operatorResolutionMetrics.length === 0 && (
-              <p className="text-xs text-slate-400 italic text-center py-6">No operator assignment records found.</p>
-            )}
           </div>
         </div>
 
-        {/* Priority-Based Resolution Counts Panel (High, Critical, Medium, Low) */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs lg:col-span-2 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
@@ -559,9 +553,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section with Separate Closed Status Tab Support */}
+      {/* Ticket List Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        {/* Table Toolbar Header */}
         <div className="p-5 border-b border-slate-100 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-slate-50/40">
           <div>
             <div className="flex items-center gap-2">
@@ -574,7 +567,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {/* Search Bar */}
             <div className="relative w-full sm:w-56">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
@@ -586,7 +578,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               />
             </div>
 
-            {/* Status Filter Dropdown including separate Closed Tab filter */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Filter className="text-slate-400 shrink-0" size={16} />
               <select
@@ -601,7 +592,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               </select>
             </div>
 
-            {/* Priority Filter (High, Critical, etc.) */}
             <div className="w-full sm:w-auto">
               <select
                 value={priorityFilter}
@@ -618,7 +608,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Table Content */}
         <div className="w-full overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[950px]">
             <thead>
@@ -688,13 +677,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                   </td>
                 </tr>
               ))}
-              {filteredTickets.length === 0 && (
-                <tr>
-                  <td colSpan="8" className="py-16 text-center text-sm text-slate-400 italic">
-                    No matching tickets found. Try adjusting your search query or filter settings.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
