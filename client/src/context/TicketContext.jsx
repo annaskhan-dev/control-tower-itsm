@@ -3,7 +3,6 @@ import React, {
   useContext,
   useState,
   useCallback,
-  useEffect,
 } from "react";
 import { useAuth } from "./AuthContext";
 import axiosInstance from "../api/axiosInstance";
@@ -27,7 +26,8 @@ export const TicketProvider = ({ children }) => {
       const response = await axiosInstance.get('/tickets', {
         params: { queue }
       });
-      setTickets(response.data);
+      const data = Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []);
+      setTickets(data);
     } catch (error) {
       console.error("Error fetching tickets:", error.response?.status, error.response?.data);
     } finally {
@@ -49,7 +49,6 @@ export const TicketProvider = ({ children }) => {
     setTickets((prevTickets) => [newTicket, ...prevTickets]);
   };
 
-  // Implemented missing updateTicket function for backend synchronization
   const updateTicket = async (id, updatedFields) => {
     try {
       const response = await axiosInstance.put(`/tickets/${id}`, updatedFields);
@@ -62,19 +61,17 @@ export const TicketProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    if (!token) return;
-  }, [token]);
-
   return (
     <TicketContext.Provider
       value={{ 
         tickets, 
+        setTickets,
         fetchTickets, 
         updateTicket,
         updateLocalTicket, 
         addLocalTicket,
-        isLoading 
+        isLoading,
+        setIsLoading
       }}
     >
       {children}

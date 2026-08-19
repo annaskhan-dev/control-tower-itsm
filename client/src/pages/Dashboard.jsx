@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, memo } from "react";
 import { Link } from "react-router-dom";
-import axiosInstance, { fetchTicketStats } from '../api/axiosInstance';
+import { fetchTicketStats } from '../api/axiosInstance';
+import { useTickets } from "../context/TicketContext";
 import {
   XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid,
@@ -57,7 +58,6 @@ const normalizeTicket = (t, now) => {
 
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "General").toString();
   
-  // Extract source/generator safely
   let rawSourceStr = "";
   const candidateSources = [
     t.generator, t.source, t.origin, t.channel, t.createdByRole, 
@@ -226,11 +226,23 @@ const GeneratorListCard = memo(({ title, data }) => {
 GeneratorListCard.displayName = "GeneratorListCard";
 
 export const Dashboard = ({ tickets: propTickets }) => {
-  const [tickets, setTickets] = useState(propTickets || []);
-  const [loading, setLoading] = useState(!propTickets || propTickets.length === 0);
+  const { tickets: contextTickets, isLoading: contextLoading, fetchTickets } = useTickets();
+  
+  // Use context tickets if available, otherwise fallback to prop tickets
+  const tickets = (propTickets && propTickets.length > 0) ? propTickets : contextTickets;
+  const loading = contextLoading && (!tickets || tickets.length === 0);
+
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
 
+  // Fetch tickets via context provider on mount if empty
+  useEffect(() => {
+    if (!propTickets || propTickets.length === 0) {
+      fetchTickets('all-work');
+    }
+  }, [fetchTickets, propTickets]);
+
+  // Fetch ticket statistics on mount
   useEffect(() => {
     const getStatsData = async () => {
       try {
@@ -245,44 +257,7 @@ export const Dashboard = ({ tickets: propTickets }) => {
     getStatsData();
   }, []);
 
-  // Sync tickets if passed via props later
-  useEffect(() => {
-    if (propTickets && Array.isArray(propTickets)) {
-      setTickets(propTickets);
-      setLoading(false);
-    }
-  }, [propTickets]);
-
-  // Fetch tickets only once on mount if propTickets weren't supplied
-  useEffect(() => {
-    if (!propTickets || propTickets.length === 0) {
-      let isMounted = true;
-      const fetchTickets = async () => {
-        const token = localStorage.getItem('access_token');
-        if (!token) {
-          if (isMounted) setLoading(false);
-          return;
-        }
-
-        try {
-          const response = await axiosInstance.get('/tickets');
-          const data = Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []);
-          if (isMounted) {
-            setTickets(data);
-          }
-        } catch (error) {
-          console.error("Failed to fetch tickets:", error);
-          if (isMounted) setTickets([]);
-        } finally {
-          if (isMounted) setLoading(false);
-        }
-      };
-      fetchTickets();
-      return () => { isMounted = false; };
-    }
-  }, []); // Run strictly once on mount
-
-  const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
+  const normalizedTickets = useMemo(() => (Array.isArray(tickets) ? tickets : []).map((t) => normalizeTicket(t, now)), [tickets, now]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "—";

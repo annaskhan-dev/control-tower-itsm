@@ -107,6 +107,9 @@ function MainLayout() {
         </Routes>
       </main>
 
+      {/* DriverSupportLogs placed safely inside authenticated layout boundary */}
+      {user && <DriverSupportLogs />}
+
       {user && isTicketModalOpen && (
         <CreateTicketModal onClose={() => setIsTicketModalOpen(false)} />
       )}
@@ -120,7 +123,6 @@ export default function App() {
       <TicketProvider> 
         <Router>
           <MainLayout />
-          <DriverSupportLogs />
         </Router>
       </TicketProvider> 
     </AuthProvider>
