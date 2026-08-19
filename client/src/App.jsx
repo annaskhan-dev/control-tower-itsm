@@ -20,6 +20,13 @@ function MainLayout() {
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false); // Added mobile menu state
 
+  // Normalize user role check for standard restricted roles
+  const userRole = (user?.role || '').toLowerCase();
+  const isRestrictedRole = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person'].some(
+    r => userRole.includes(r)
+  );
+  const defaultHomeRoute = isRestrictedRole ? "/tickets?queue=all" : "/dashboard";
+
   return (
     <div className="flex h-screen bg-slate-100 relative overflow-x-hidden">
       
@@ -54,13 +61,13 @@ function MainLayout() {
       <main className={`flex-1 w-full min-w-0 ${user ? 'p-4 pt-20 lg:pt-4 overflow-y-auto' : ''}`}>
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
+          <Route path="/" element={user ? <Navigate to={defaultHomeRoute} replace /> : <Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Protected Routes */}
+          {/* Protected Routes - Dashboard restricted to Super Admin / Manager */}
           <Route path="/dashboard" element={
-            <ProtectedRoute> <Dashboard /> </ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Super Admin', 'Manager']}> <Dashboard /> </ProtectedRoute>
           } />
           
           <Route path="/tickets" element={
@@ -73,13 +80,16 @@ function MainLayout() {
 
           {/* Role-Restricted Routes */}
           <Route path="/users" element={
-            <ProtectedRoute allowedRoles={['Super Admin']}> <UserManagement /> </ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Super Admin', 'Manager']}> <UserManagement /> </ProtectedRoute>
           } />
 
           {/* SLA Settings Route */}
           <Route path="/sla" element={
-            <ProtectedRoute allowedRoles={['Super Admin']}> <SlaSettings /> </ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Super Admin', 'Manager']}> <SlaSettings /> </ProtectedRoute>
           } />
+
+          {/* Catch-all fallback */}
+          <Route path="*" element={<Navigate to={defaultHomeRoute} replace />} />
         </Routes>
       </main>
 
