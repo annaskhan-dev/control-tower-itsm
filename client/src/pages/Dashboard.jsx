@@ -231,7 +231,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     const getStatsData = async () => {
       try {
         const data = await fetchTicketStats();
-        console.log("RAW BACKEND STATS RESPONSE:", data);
         if (data) {
           setBackendStats(data);
         }
@@ -349,41 +348,12 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   };
 
   const stats = useMemo(() => {
+    // Robust direct aggregation from normalized tickets (guarantees accuracy from DB fields like generator/source)
     let generatorMap = {};
-    
-    const rawGenSource = 
-      backendStats?.byGenerator || 
-      backendStats?.generators || 
-      backendStats?.sourceCounts || 
-      backendStats?.bySource ||
-      backendStats?.ticketSources ||
-      backendStats?.data?.byGenerator ||
-      backendStats?.data?.generators ||
-      backendStats?.data?.sources ||
-      (Array.isArray(backendStats) ? backendStats : null);
-
-    if (Array.isArray(rawGenSource)) {
-      rawGenSource.forEach(item => {
-        const key = item.name || item.key || item.label || item._id || item.source || item.generator || "Direct API / System";
-        const val = Number(item.count || item.total || item.value || item.docCount || 1);
-        generatorMap[key] = (generatorMap[key] || 0) + val;
-      });
-    } else if (rawGenSource && typeof rawGenSource === "object") {
-      Object.keys(rawGenSource).forEach(k => {
-        const val = rawGenSource[k];
-        const count = typeof val === 'object' && val !== null ? Number(val.count || val.total || val.value || 0) : Number(val);
-        generatorMap[k] = isNaN(count) ? 0 : count;
-      });
-    }
-
-    // Fallback: Always aggregate directly from normalized tickets if backend stats don't supply populated generator info
-    if (Object.keys(generatorMap).length === 0 || Object.values(generatorMap).reduce((a, b) => a + b, 0) === 0) {
-      generatorMap = {};
-      normalizedTickets.forEach(t => {
-        const src = t.source || "Direct API / System";
-        generatorMap[src] = (generatorMap[src] || 0) + 1;
-      });
-    }
+    normalizedTickets.forEach(t => {
+      const src = t.generator || t.source || t.creator || "Direct API / System";
+      generatorMap[src] = (generatorMap[src] || 0) + 1;
+    });
 
     const openCount = normalizedTickets.filter((t) => !t.isResolved).length;
     const unassignedCount = normalizedTickets.filter((t) => t.assigneeName.toLowerCase() === "unassigned").length;
@@ -415,17 +385,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
     const generatorColors = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#6366f1"];
     
-    // Aggregate dynamically from normalized tickets to ensure chart entries always populate as a secure fallback
-    let derivedGeneratorMap = {};
-    normalizedTickets.forEach(t => {
-      const src = t.source || "Direct API / System";
-      derivedGeneratorMap[src] = (derivedGeneratorMap[src] || 0) + 1;
-    });
-
-    // Merge/select stats.byGenerator if available, falling back to derived map
-    const activeGenSourceMap = Object.keys(stats.byGenerator || {}).length > 0 ? stats.byGenerator : derivedGeneratorMap;
-
-    const generatorEntries = Object.entries(activeGenSourceMap).map(([name, value], idx) => ({
+    const generatorEntries = Object.entries(stats.byGenerator || {}).map(([name, value], idx) => ({
       name,
       value: Number(value) || 0,
       color: generatorColors[idx % generatorColors.length],
@@ -448,7 +408,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         { name: "At Risk", value: normalizedTickets.filter((t) => t.slaStatus === "At Risk").length, color: "#f59e0b", details: "Approaching deadline window" },
         { name: "Breached", value: normalizedTickets.filter((t) => t.slaStatus === "Breached").length, color: "#ef4444", details: "Deadline expired uncompleted" },
       ].filter((d) => d.value > 0),
-      generator: generatorEntries, // <-- Synchronized with activeGenSourceMap / stats.byGenerator properly!
+      generator: generatorEntries,
       trend: trend,
     };
   }, [normalizedTickets, stats.byGenerator]);
@@ -609,7 +569,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                     <div className="flex flex-col gap-1 items-start">
                       <span className={`px-3 py-1 font-bold uppercase rounded-full text-[10px] tracking-wider shadow-2xs ${
                         t.status.toLowerCase() === "resolved" || t.status.toLowerCase() === "closed" ? "bg-emerald-600 text-white" :
-                        "bg-blue-600 text-white"
+                        "blue-600 text-white bg-blue-600"
                       }`}>
                         {t.status || "Open"}
                       </span>
