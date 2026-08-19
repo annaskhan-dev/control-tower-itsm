@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
@@ -49,7 +49,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     }
   }, [isUserManagerOrAdmin]);
 
-  const handleAssignToMe = async (e, mongoId) => {
+  const handleAssignToMe = useCallback(async (e, mongoId) => {
     e.stopPropagation();
     try {
       const currentUserName = user?.name || user?.username || user?.fullName || "Operator";
@@ -59,9 +59,9 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       console.error("Failed to assign ticket to self", err);
       alert(err.response?.data?.message || "Failed to assign ticket");
     }
-  };
+  }, [user, updateTicket, fetchTickets, queue]);
 
-  const handleManagerAssign = async (mongoId, selectedOperatorName) => {
+  const handleManagerAssign = useCallback(async (mongoId, selectedOperatorName) => {
     if (!selectedOperatorName) return;
     try {
       await updateTicket(mongoId, { assignee: selectedOperatorName });
@@ -70,7 +70,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       console.error("Failed to assign ticket", err);
       alert(err.response?.data?.message || "Failed to assign ticket");
     }
-  };
+  }, [updateTicket, fetchTickets, queue]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "—";
@@ -152,8 +152,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       }
 
       const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
-
-      // Extracted Generator / Source Entry Info
       const entrySource = t.generator || t.source || "System / Direct";
 
       return {

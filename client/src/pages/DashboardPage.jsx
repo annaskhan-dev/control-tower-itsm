@@ -9,6 +9,7 @@ export const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth(); 
 
+  // FIXED: Depend on `user?.companyID` instead of the whole `user` object reference to prevent loops
   useEffect(() => {
     const fetchTickets = async () => {
       if (!user?.companyID) {
@@ -29,7 +30,7 @@ export const DashboardPage = () => {
     };
 
     fetchTickets();
-  }, [user]);
+  }, [user?.companyID]);
 
   // Function to filter last 1 month and export tickets to Excel (CSV format)
   const handleExportExcel = () => {
@@ -109,7 +110,7 @@ export const DashboardPage = () => {
         </div>
         <button
           onClick={handleExportExcel}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm flex items-center gap-2"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer"
         >
           <Download size={16} /> Export to Excel
         </button>
@@ -121,3 +122,5 @@ export const DashboardPage = () => {
     </div>
   );
 };
+
+export default DashboardPage;

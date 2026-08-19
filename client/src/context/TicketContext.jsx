@@ -50,7 +50,7 @@ export const TicketProvider = ({ children }) => {
     }
   }, [token]);
 
-  const updateLocalTicket = (id, updatedFields) => {
+  const updateLocalTicket = useCallback((id, updatedFields) => {
     setTickets((prevTickets) =>
       prevTickets.map((t) =>
         String(t._id) === String(id) || String(t.ticketId) === String(id) 
@@ -58,13 +58,13 @@ export const TicketProvider = ({ children }) => {
           : t
       )
     );
-  };
+  }, []);
 
-  const addLocalTicket = (newTicket) => {
+  const addLocalTicket = useCallback((newTicket) => {
     setTickets((prevTickets) => [newTicket, ...prevTickets]);
-  };
+  }, []);
 
-  const updateTicket = async (id, updatedFields) => {
+  const updateTicket = useCallback(async (id, updatedFields) => {
     try {
       const response = await axiosInstance.put(`/tickets/${id}`, updatedFields);
       const updatedTicket = response.data.ticket || response.data;
@@ -74,9 +74,9 @@ export const TicketProvider = ({ children }) => {
       console.error("Error updating ticket:", error.response?.status, error.response?.data);
       throw error;
     }
-  };
+  }, [updateLocalTicket]);
 
-  // Memoize the context value object to prevent cascading re-render loops
+  // FIXED: Removed volatile `tickets` and `isLoading` dependencies to stabilize context reference
   const value = useMemo(() => ({
     tickets, 
     setTickets,
@@ -86,7 +86,7 @@ export const TicketProvider = ({ children }) => {
     addLocalTicket,
     isLoading,
     setIsLoading
-  }), [tickets, isLoading, fetchTickets]);
+  }), [tickets, isLoading, fetchTickets, updateTicket, updateLocalTicket, addLocalTicket]);
 
   return (
     <TicketContext.Provider value={value}>
