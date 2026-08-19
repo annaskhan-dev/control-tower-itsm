@@ -479,7 +479,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             Reflecting creation telemetry across distinct creators and sources.
           </div>
         </div>
-      </div>
         {/* Operator Resolution Analytics */}
         <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
