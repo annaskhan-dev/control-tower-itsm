@@ -311,7 +311,7 @@ export class TicketsService {
       return acc;
     }, {});
 
-    // Multi-aliased aggregation so the frontend widget catches the property name instantly
+    // Multi-aliased aggregation including 'value' and 'total' properties for full frontend chart compatibility
     const aggregateGeneratorStats = await this.ticketModel.aggregate([
       { $match: query },
       {
@@ -328,12 +328,22 @@ export class TicketsService {
           name: "$_id",
           label: "$_id",
           key: "$_id",
+          value: "$count",
+          total: "$count",
           count: 1
         }
       }
     ]);
 
-    const fallbackStats = [{ _id: 'Direct API / System', name: 'Direct API / System', label: 'Direct API / System', key: 'Direct API / System', count: tickets.length }];
+    const fallbackStats = [{ 
+      _id: 'Direct API / System', 
+      name: 'Direct API / System', 
+      label: 'Direct API / System', 
+      key: 'Direct API / System', 
+      value: tickets.length, 
+      total: tickets.length, 
+      count: tickets.length 
+    }];
 
     return {
       total: tickets.length,
