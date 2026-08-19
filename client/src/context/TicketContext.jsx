@@ -4,7 +4,6 @@ import React, {
   useState, 
   useCallback, 
   useMemo, 
-  ref as _ref,
   useRef 
 } from "react";
 import { useAuth } from "./AuthContext";
@@ -25,7 +24,6 @@ export const TicketProvider = ({ children }) => {
       return;
     }
 
-    // Prevent duplicate concurrent requests for the same queue unless forced
     if (fetchingRef.current[queue] && !force) {
       return;
     }
@@ -73,7 +71,7 @@ export const TicketProvider = ({ children }) => {
     }
   }, [updateLocalTicket]);
 
-  // Optimized value memoization: functions are stable, tickets/isLoading are passed directly
+  // ✅ Fixed: Removed `tickets` and `isLoading` from dependency array to stabilize context reference
   const value = useMemo(() => ({
     tickets, 
     setTickets,
@@ -83,7 +81,7 @@ export const TicketProvider = ({ children }) => {
     addLocalTicket,
     isLoading,
     setIsLoading
-  }), [tickets, isLoading, fetchTickets, updateTicket, updateLocalTicket, addLocalTicket]);
+  }), [fetchTickets, updateTicket, updateLocalTicket, addLocalTicket]);
 
   return (
     <TicketContext.Provider value={value}>

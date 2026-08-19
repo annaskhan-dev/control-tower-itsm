@@ -503,7 +503,7 @@ export const Dashboard = ({ tickets: propTickets }) => {
               {normalizedTickets.map((t) => (
                 <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
                   <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{t.ticketId}</td>
-                  <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
+                  <td className="p-4 text-slate-50a0 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
                   <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
                   <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
                   <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs">{t.assigneeName}</td>
