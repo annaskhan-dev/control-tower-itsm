@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
 } from "recharts";
-import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight } from "lucide-react";
+import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight, Users } from "lucide-react";
 
 /**
  * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
@@ -21,6 +21,12 @@ const normalizeTicket = (t, now) => {
   let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || t.sub_assigned_to || t.subAssignee || null;
   if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
+  }
+
+  // Creator / Raised By parsing
+  let rawCreator = t.creator || t.createdBy || t.raisedBy || t.author || t.client || "Unspecified";
+  if (typeof rawCreator === "object" && rawCreator !== null) {
+    rawCreator = rawCreator.name || rawCreator.fullName || rawCreator.role || rawCreator.email || "Unspecified";
   }
 
   const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
@@ -62,6 +68,7 @@ const normalizeTicket = (t, now) => {
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
   
   const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
+  const creatorName = typeof rawCreator === "string" ? rawCreator.trim() : "Unspecified";
   const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
   
   const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
@@ -112,6 +119,7 @@ const normalizeTicket = (t, now) => {
     ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     assigneeName,
+    creatorName,
     subAssignmentName,
     subAssignmentAt: subAssignedAtRaw,
     status: t.status || "Open",
@@ -253,6 +261,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         t.ticketId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.creatorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.category.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesStatus = 
@@ -263,14 +272,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       return matchesSearch && matchesStatus;
     });
   }, [normalizedTickets, searchQuery, statusFilter]);
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "—";
-    const d = new Date(dateString);
-    return isNaN(d.getTime()) 
-      ? "Invalid" 
-      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
 
   const handleExportExcel = () => {
     const currentDate = new Date();
@@ -290,7 +291,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
     const headers = [
       "Ticket ID", "Title", "Description", "Source", "Category", "Priority", 
-      "Ticket Status", "SLA Health", "SLA Deadline", "Assignee", "Assigned At", 
+      "Ticket Status", "SLA Health", "SLA Deadline", "Creator", "Assignee", "Assigned At", 
       "Assignment Duration", "SLA Active Duration", "Sub-Assignee", "Sub-Assigned At", 
       "Sub-Assignment Duration", "Resolved At", "Final Resolution Duration", "Company ID", "Created At"
     ];
@@ -312,6 +313,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         `"${(t.status || "").replace(/"/g, '""')}"`,
         `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
         `"${slaDeadlineFormatted}"`,
+        `"${(t.creatorName || "").replace(/"/g, '""')}"`,
         `"${(t.assigneeName || "").replace(/"/g, '""')}"`,
         `"${assignedAtFormatted}"`,
         `"${t.assignmentTimeFormatted || "Unassigned"}"`,
@@ -337,12 +339,21 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     document.body.removeChild(link);
   };
 
-  const stats = useMemo(() => ({
-    total: normalizedTickets.length,
-    open: normalizedTickets.filter((t) => !t.isResolved).length,
-    unassigned: normalizedTickets.filter((t) => t.assigneeName.toLowerCase() === "unassigned").length,
-    slaRisk: normalizedTickets.filter((t) => ["Breached", "At Risk"].includes(t.slaStatus)).length,
-  }), [normalizedTickets]);
+  const stats = useMemo(() => {
+    const creatorBreakdown = {};
+    normalizedTickets.forEach((t) => {
+      const creator = t.creatorName || "Unspecified";
+      creatorBreakdown[creator] = (creatorBreakdown[creator] || 0) + 1;
+    });
+
+    return {
+      total: normalizedTickets.length,
+      open: normalizedTickets.filter((t) => !t.isResolved).length,
+      unassigned: normalizedTickets.filter((t) => t.assigneeName.toLowerCase() === "unassigned").length,
+      slaRisk: normalizedTickets.filter((t) => ["Breached", "At Risk"].includes(t.slaStatus)).length,
+      creatorBreakdown: Object.entries(creatorBreakdown).sort((a, b) => b[1] - a[1]),
+    };
+  }, [normalizedTickets]);
 
   const chartData = useMemo(() => {
     const last7Days = Array.from({ length: 7 }).map((_, i) => {
@@ -397,8 +408,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </button>
       </div>
 
-      {/* Top Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Top Metric Cards (Expanded to 5 items to include Creator Breakdown) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { label: "Total Tickets", val: stats.total, icon: Ticket, color: "blue" },
           { label: "Open Work", val: stats.open, icon: Clock, color: "indigo" },
@@ -418,6 +429,28 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             </div>
           </div>
         ))}
+
+        {/* Creator Breakdown Dynamic Card */}
+        <div className="p-4 bg-white border border-slate-200/80 rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow duration-200">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Tickets by Creator</p>
+            <div className="p-2 bg-slate-50 text-slate-600 rounded-xl">
+              <Users size={18} />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1 max-h-20 overflow-y-auto pr-1 text-xs">
+            {stats.creatorBreakdown.length > 0 ? (
+              stats.creatorBreakdown.map(([creatorName, count]) => (
+                <div key={creatorName} className="flex items-center justify-between text-slate-700">
+                  <span className="truncate pr-2 font-medium capitalize">{creatorName}:</span>
+                  <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">{count}</span>
+                </div>
+              ))
+            ) : (
+              <span className="text-slate-400 italic text-[11px]">No creator data</span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Charts Grid */}
@@ -480,7 +513,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section - Restyled to Ticket List Design */}
+      {/* Ticket List Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {/* Table Toolbar Header */}
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-slate-50/40">
@@ -530,7 +563,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               <tr className="bg-slate-50/70 border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider font-bold">
                 <th className="py-3 px-4">Ticket ID</th>
                 <th className="py-3 px-4">Subject / Title</th>
-                <th className="py-3 px-4">Category</th>
+                <th className="py-3 px-4">Creator</th>
                 <th className="py-3 px-4">Priority</th>
                 <th className="py-3 px-4">Assignee</th>
                 <th className="py-3 px-4">SLA Health</th>
@@ -546,11 +579,11 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                       {t.ticketId}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[260px] truncate">
+                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[240px] truncate">
                     {t.title}
                   </td>
-                  <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                    {t.category || "—"}
+                  <td className="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap capitalize">
+                    {t.creatorName}
                   </td>
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
