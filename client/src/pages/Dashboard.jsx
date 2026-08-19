@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, memo } from "react";
+import React, { useState, useEffect, useMemo, memo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { fetchTicketStats } from '../api/axiosInstance';
 import { useTickets } from "../context/TicketContext";
@@ -226,7 +226,7 @@ const GeneratorListCard = memo(({ title, data }) => {
 GeneratorListCard.displayName = "GeneratorListCard";
 
 export const Dashboard = ({ tickets: propTickets }) => {
-  const { tickets: contextTickets, isLoading: contextLoading } = useTickets();
+  const { tickets: contextTickets, isLoading: contextLoading, fetchTickets } = useTickets();
   
   const tickets = (propTickets && propTickets.length > 0) ? propTickets : contextTickets;
   const loading = contextLoading && (!tickets || tickets.length === 0);
@@ -234,9 +234,23 @@ export const Dashboard = ({ tickets: propTickets }) => {
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
 
+  // Use ref guards to prevent infinite fetch loop executions on render
+  const hasFetchedTicketsRef = useRef(false);
+  const hasFetchedStatsRef = useRef(false);
+
+  useEffect(() => {
+    if (!propTickets && fetchTickets && !hasFetchedTicketsRef.current) {
+      hasFetchedTicketsRef.current = true;
+      fetchTickets('all-work');
+    }
+  }, [fetchTickets, propTickets]);
+
   useEffect(() => {
     let isMounted = true;
     const getStatsData = async () => {
+      if (hasFetchedStatsRef.current) return;
+      hasFetchedStatsRef.current = true;
+
       try {
         const data = await fetchTicketStats();
         if (data && isMounted) {
