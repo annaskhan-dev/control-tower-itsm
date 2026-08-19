@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
 } from "recharts";
-import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, UserCheck } from "lucide-react";
+import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download } from "lucide-react";
 
 /**
  * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
@@ -35,7 +35,6 @@ const normalizeTicket = (t, now) => {
     else sla = "On Track";
   }
   
-  // Real-time SLA deadline validation against current timestamp or resolution time
   const deadlineRaw = t.slaDeadline || t.sla_deadline || t.dueDate || t.due_date;
   if (deadlineRaw) {
     const deadline = new Date(deadlineRaw);
@@ -60,6 +59,7 @@ const normalizeTicket = (t, now) => {
   else if (rawPriorityStr.includes("med") || rawPriorityStr.includes("p3")) priority = "Medium";
 
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
+  const rawSourceStr = (t.source || t.generator || t.origin || t.channel || t.createdByRole || "Manual / System").toString();
   
   const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
   const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
@@ -67,7 +67,6 @@ const normalizeTicket = (t, now) => {
   const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
   const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned";
 
-  // Timestamps matching backend fallback behaviors
   const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
   const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime;
   const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
@@ -80,14 +79,12 @@ const normalizeTicket = (t, now) => {
   
   const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-  // Timelapses in ms
   let primaryAssignmentMs = 0;
   if (isAssigned) {
     const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
     primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
   }
 
-  // Synchronized SLA active duration calculated from main assignment timestamp
   const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
   let subAssignmentTimeMs = 0;
@@ -111,7 +108,7 @@ const normalizeTicket = (t, now) => {
     id: t._id || t.id || t.ticketId || t.code || "N/A",
     ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
-    source: t.source || t.generator || t.origin || t.channel || "Manual",
+    source: rawSourceStr,
     assigneeName,
     subAssignmentName,
     subAssignmentAt: subAssignedAtRaw,
@@ -142,9 +139,6 @@ const CustomTooltip = memo(({ active, payload, label }) => {
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
             <span className="text-slate-300 capitalize">{entry.name || entry.dataKey}:</span>
             <span className="font-bold text-white">{entry.value}</span>
-            {entry.payload && entry.payload.percentage !== undefined && (
-              <span className="text-slate-400 text-[10px]">({entry.payload.percentage}%)</span>
-            )}
           </div>
         ))}
         {payload[0]?.payload?.details && (
@@ -161,10 +155,10 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * Isolated Pie Chart Component with animations disabled for buttery-smooth performance and detailed data facts.
+ * Optimized Pie Card with defensive checks
  */
 const OptimizedPieCard = memo(({ title, data }) => {
-  const totalValue = useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
+  const totalValue = useMemo(() => data.reduce((acc, curr) => acc + (Number(curr.value) || 0), 0), [data]);
 
   return (
     <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
@@ -199,7 +193,6 @@ const OptimizedPieCard = memo(({ title, data }) => {
           </div>
         )}
       </div>
-      {/* Detail / Facts points section */}
       <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-1 text-[10px] text-slate-500">
         {data.length > 0 ? (
           data.map((item, idx) => (
@@ -225,11 +218,11 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [backendStats, setBackendStats] = useState({ total: 0, byGenerator: {} });
   const [now] = useState(() => new Date());
 
-  // Fetch backend ticket stats including byGenerator
   useEffect(() => {
     const getStatsData = async () => {
       try {
         const data = await fetchTicketStats();
+        console.log("Fetched Backend Stats:", data); // Debug log to inspect structure in browser console
         if (data) {
           setBackendStats(data);
         }
@@ -347,24 +340,26 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   };
 
   const stats = useMemo(() => {
-    // Robust extraction supporting multiple backend response formats
     let generatorMap = {};
-    const rawGenSource = backendStats?.byGenerator || backendStats?.generators || backendStats?.sourceCounts;
+    const rawGenSource = backendStats?.byGenerator || backendStats?.generators || backendStats?.sourceCounts || backendStats?.bySource;
 
     if (Array.isArray(rawGenSource)) {
       rawGenSource.forEach(item => {
         const key = item._id || item.name || item.generator || item.source || "Unknown";
-        const val = item.count || item.total || item.value || 1;
+        const val = Number(item.count || item.total || item.value || 1);
         generatorMap[key] = val;
       });
     } else if (rawGenSource && typeof rawGenSource === "object") {
-      generatorMap = { ...rawGenSource };
+      Object.keys(rawGenSource).forEach(k => {
+        generatorMap[k] = Number(rawGenSource[k]) || 0;
+      });
     }
 
-    // Fallback: If backendStats doesn't provide generator counts, aggregate directly from normalized tickets
-    if (Object.keys(generatorMap).length === 0 && normalizedTickets.length > 0) {
+    // Always aggregate directly from normalized tickets as primary or fallback to guarantee chart rendering
+    if (Object.keys(generatorMap).length === 0 || Object.values(generatorMap).reduce((a, b) => a + b, 0) === 0) {
+      generatorMap = {};
       normalizedTickets.forEach(t => {
-        const src = t.source || "Manual";
+        const src = t.source || "Manual / System";
         generatorMap[src] = (generatorMap[src] || 0) + 1;
       });
     }
