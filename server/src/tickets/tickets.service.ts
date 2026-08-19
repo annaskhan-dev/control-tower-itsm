@@ -311,22 +311,33 @@ export class TicketsService {
       return acc;
     }, {});
 
-    // Robust aggregation fallback across generator, source, assignee, and createdBy fields
+    // Robust aggregation mirroring frontend/database normalization mapping
     const aggregateGeneratorStats = await this.ticketModel.aggregate([
       { $match: query },
       {
-        $group: {
-          _id: { 
+        $addFields: {
+          effectiveSourceField: {
             $ifNull: [
-              "$generator", 
-              { $ifNull: [
-                "$source", 
-                { $ifNull: [
-                  "$assignee", 
-                  { $ifNull: ["$createdBy", "Direct API / System"] }
-                ]}
-              ]}
-            ] 
+              "$generator",
+              { $ifNull: ["$subAssignment", "$assignee"] }
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $switch: {
+              branches: [
+                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "sales", options: "i" } }, then: "Sales Person" },
+                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "shipper", options: "i" } }, then: "Shipper Ops" },
+                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "super_admin|super admin", options: "i" } }, then: "Super Admin" },
+                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "operator", options: "i" } }, then: "Operator" },
+                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "manager|admin", options: "i" } }, then: "Manager" },
+                { case: { $regexMatch: { input: "$effectiveSourceField", regex: "transporter", options: "i" } }, then: "Transporter" }
+              ],
+              default: "Direct API / System"
+            }
           },
           count: { $sum: 1 }
         }
@@ -334,13 +345,7 @@ export class TicketsService {
       {
         $project: {
           _id: 0,
-          name: { 
-            $cond: {
-              if: { $in: ["$_id", ["Unassigned", "", null]] },
-              then: "Direct API / System",
-              else: "$_id"
-            }
-          },
+          name: "$_id",
           count: 1
         }
       }
