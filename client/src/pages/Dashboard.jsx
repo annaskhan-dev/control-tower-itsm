@@ -274,7 +274,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     });
   }, [normalizedTickets, searchQuery, statusFilter, priorityFilterTab]);
 
-const generatorBreakdown = Object.entries(stats?.byGenerator || {}).map(([name, count]) => ({ name, count }));
   const operatorResolutionStats = useMemo(() => {
     const resolvedTickets = normalizedTickets.filter(t => t.isResolved);
     const map = {};
@@ -460,24 +459,27 @@ const generatorBreakdown = Object.entries(stats?.byGenerator || {}).map(([name, 
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
               <UserCheck size={16} className="text-blue-600" /> Tickets by Generator / Source
             </h4>
-            <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">Total: {stats.total}</span>
+            <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">Total: {stats?.total || 0}</span>
           </div>
+          
           <div className="py-3 flex flex-col gap-2 max-h-40 overflow-y-auto">
-            {generatorBreakdown.map((gen, idx) => (
+            {Object.entries(stats?.byGenerator || {}).map(([name, count], idx) => (
               <div key={`gen-${idx}`} className="flex items-center justify-between text-xs">
-                <span className="font-medium text-slate-600 truncate max-w-[170px]">{gen.name}</span>
-                <span className="font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full shrink-0">{gen.count} tickets</span>
+                <span className="font-medium text-slate-600 truncate max-w-[170px]">{name}</span>
+                <span className="font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full shrink-0">{count} tickets</span>
               </div>
             ))}
-            {generatorBreakdown.length === 0 && (
+            
+            {Object.keys(stats?.byGenerator || {}).length === 0 && (
               <p className="text-xs text-slate-400 italic text-center py-2">No generator data available</p>
             )}
           </div>
+
           <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-100 italic">
             Reflecting creation telemetry across distinct creators and sources.
           </div>
         </div>
-
+      </div>
         {/* Operator Resolution Analytics */}
         <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
