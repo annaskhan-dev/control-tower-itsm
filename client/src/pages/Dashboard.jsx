@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, memo, useRef } from "react";
+import React, { useState, useEffect, useMemo, memo } from "react";
 import { Link } from "react-router-dom";
 import axiosInstance, { fetchTicketStats } from '../api/axiosInstance';
 import {
@@ -8,7 +8,7 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Layers } from "lucide-react";
 
 /**
- * Enhanced Normalization Engine with deep structural inspection for source/generator fields.
+ * Normalization Engine: Robust source/generator field extraction mapping.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
@@ -57,12 +57,11 @@ const normalizeTicket = (t, now) => {
 
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "General").toString();
   
-  // Exhaustive source / generator property exploration
+  // Extract source/generator safely
   let rawSourceStr = "";
   const candidateSources = [
     t.generator, t.source, t.origin, t.channel, t.createdByRole, 
-    t.creator, t.created_by, t.type, t.role, t.department, t.sourceChannel,
-    t.ticketSource, t.sourceType
+    t.creator, t.created_by, t.type, t.role, t.department, t.sourceChannel
   ];
 
   for (const candidate of candidateSources) {
@@ -72,7 +71,7 @@ const normalizeTicket = (t, now) => {
       break;
     }
     if (typeof candidate === "object") {
-      const subVal = candidate.name || candidate.title || candidate.role || candidate.type || candidate.label || candidate.username || candidate.source;
+      const subVal = candidate.name || candidate.title || candidate.role || candidate.type || candidate.label || candidate.username;
       if (subVal && typeof subVal === "string" && subVal.trim() !== "") {
         rawSourceStr = subVal.trim();
         break;
@@ -86,7 +85,6 @@ const normalizeTicket = (t, now) => {
     if (metaSource) rawSourceStr = String(metaSource).trim();
   }
 
-  // Ultimate fallback if no explicit generator/source field is found
   if (!rawSourceStr) {
     rawSourceStr = t.companyId ? "Company Portal" : "Direct System";
   }
@@ -227,14 +225,11 @@ const GeneratorListCard = memo(({ title, data }) => {
 
 GeneratorListCard.displayName = "GeneratorListCard";
 
-export const Dashboard = ({ tickets: propTickets = [] }) => {
-  const [tickets, setTickets] = useState(propTickets);
-  const [loading, setLoading] = useState(propTickets.length === 0);
+export const Dashboard = ({ tickets: propTickets }) => {
+  const [tickets, setTickets] = useState(propTickets || []);
+  const [loading, setLoading] = useState(!propTickets || propTickets.length === 0);
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
-  
-  // Guard ref to prevent infinite fetch loop bugs
-  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
     const getStatsData = async () => {
@@ -250,42 +245,42 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     getStatsData();
   }, []);
 
+  // Sync tickets if passed via props later
   useEffect(() => {
-    if (propTickets && propTickets.length > 0) {
+    if (propTickets && Array.isArray(propTickets)) {
       setTickets(propTickets);
       setLoading(false);
     }
   }, [propTickets]);
 
+  // Fetch tickets only once on mount if propTickets weren't supplied
   useEffect(() => {
-    if ((!propTickets || propTickets.length === 0) && !hasFetchedRef.current) {
-      hasFetchedRef.current = true;
+    if (!propTickets || propTickets.length === 0) {
+      let isMounted = true;
       const fetchTickets = async () => {
         const token = localStorage.getItem('access_token');
         if (!token) {
-          setLoading(false);
+          if (isMounted) setLoading(false);
           return;
         }
 
         try {
           const response = await axiosInstance.get('/tickets');
           const data = Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []);
-          setTickets(data);
-          
-          // Debug inspector: logs raw incoming ticket keys to your console so you can inspect properties instantly
-          if (data.length > 0) {
-            console.log("Sample Raw Ticket Payload Structure:", data[0]);
+          if (isMounted) {
+            setTickets(data);
           }
         } catch (error) {
           console.error("Failed to fetch tickets:", error);
-          setTickets([]);
+          if (isMounted) setTickets([]);
         } finally {
-          setLoading(false);
+          if (isMounted) setLoading(false);
         }
       };
       fetchTickets();
+      return () => { isMounted = false; };
     }
-  }, [propTickets]);
+  }, []); // Run strictly once on mount
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
