@@ -96,7 +96,7 @@ function MainLayout() {
           {/* Analytics & Reports Route - Restricted to Admin/Manager */}
           <Route path="/analytics" element={
             isRestrictedRole ? <Navigate to="/tickets?queue=all" replace /> : (
-              <ProtectedRoute allowedRoles={['Super Admin', 'Manager']}> <Analytics /> </ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Super Admin', 'Manager','Admin']}> <Analytics /> </ProtectedRoute>
             )
           } />
 

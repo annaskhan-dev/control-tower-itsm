@@ -43,7 +43,7 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user, mobileOpen, setMob
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Manager'] },
     { label: 'Manage Tickets', path: '/tickets?queue=all', icon: Inbox, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter'] },
     { label: 'Unassigned', path: '/tickets?queue=unassigned', icon: InboxIcon, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter'] },
-    { label: 'Analytics & Reports', path: '/analytics', icon: BarChart3, roles: ['Super Admin', 'Manager'] }, // <-- Newly added option
+    { label: 'Analytics & Reports', path: '/analytics', icon: BarChart3, roles: ['Super Admin', 'Manager','Admin'] }, // <-- Newly added option
     { label: 'SLA Risk', path: '/tickets?queue=sla-risk', icon: AlertTriangle, roles: ['Super Admin', 'Manager'] },
     { label: 'SLA Settings', path: '/sla', icon: Clock, roles: ['Super Admin', 'Manager'] },
     { label: 'User Management', path: '/users', icon: Users, roles: ['Super Admin', 'Manager'] },
