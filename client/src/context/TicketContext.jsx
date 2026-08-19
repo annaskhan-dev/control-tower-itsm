@@ -10,14 +10,14 @@ import axiosInstance from "../api/axiosInstance";
 
 const TicketContext = createContext();
 
-// Module-level guard: persists outside component mounts/unmounts
-let globalIsFetching = false;
-
 export const TicketProvider = ({ children }) => {
   const [tickets, setTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   
   const { token } = useAuth(); 
+
+  // Use a ref internally to track ongoing requests per queue and prevent duplicates
+  const fetchingRef = useRef({});
 
   const fetchTickets = useCallback(async (queue = 'all-work', force = false) => {
     if (!token) {
@@ -25,12 +25,12 @@ export const TicketProvider = ({ children }) => {
       return;
     }
 
-    // Block if a request is already globally active
-    if (globalIsFetching && !force) {
+    // Prevent duplicate concurrent requests for the same queue
+    if (fetchingRef.current[queue] && !force) {
       return;
     }
-    
-    globalIsFetching = true;
+
+    fetchingRef.current[queue] = true;
     setIsLoading(true);
     
     try {
@@ -43,10 +43,7 @@ export const TicketProvider = ({ children }) => {
       console.error("Error fetching tickets:", error.response?.status, error.response?.data);
     } finally {
       setIsLoading(false);
-      // Release lock after a short cool-down
-      setTimeout(() => {
-        globalIsFetching = false;
-      }, 1000);
+      fetchingRef.current[queue] = false;
     }
   }, [token]);
 
@@ -66,7 +63,7 @@ export const TicketProvider = ({ children }) => {
 
   const updateTicket = useCallback(async (id, updatedFields) => {
     try {
-      const response = await axiosInstance.put(`/tickets/${id}`, updatedFields);
+      const response = await axiosInstance.patch(`/tickets/${id}`, updatedFields);
       const updatedTicket = response.data.ticket || response.data;
       updateLocalTicket(id, updatedTicket);
       return updatedTicket;
@@ -76,9 +73,6 @@ export const TicketProvider = ({ children }) => {
     }
   }, [updateLocalTicket]);
 
-  // FIXED: Removed `tickets` and `isLoading` from dependency array so the context reference remains stable.
-  // React updates the object properties inside, but the memory reference of `value` stays consistent, 
-  // preventing cascading re-renders across child components.
   const value = useMemo(() => ({
     tickets, 
     setTickets,
@@ -88,7 +82,7 @@ export const TicketProvider = ({ children }) => {
     addLocalTicket,
     isLoading,
     setIsLoading
-  }), [fetchTickets, updateTicket, updateLocalTicket, addLocalTicket]);
+  }), [tickets, isLoading, fetchTickets, updateTicket, updateLocalTicket, addLocalTicket]);
 
   return (
     <TicketContext.Provider value={value}>

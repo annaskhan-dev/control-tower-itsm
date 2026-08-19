@@ -1,125 +1,61 @@
-import axiosInstance from './axiosInstance';
+import axios from 'axios';
 
-// --- Ticket API Calls ---
+// Logic to determine the base URL with a secure production fallback
+const apiBaseUrl = import.meta.env?.VITE_API_URL || process.env?.REACT_APP_API_URL || 'https://control-tower-itsm-production.up.railway.app';
 
-/**
- * Fetches tickets based on optional query filters/params.
- * @param {Object|String} params - Query parameters or view type string
- */
-export const fetchTickets = async (params = {}) => {
-  try {
-    // Normalize params if a string filter like 'all-work' is passed
-    const queryParams = typeof params === 'string' ? { view: params } : params;
-    const response = await axiosInstance.get('/tickets', { params: queryParams });
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching tickets:", error.response?.status, error.response?.data);
-    throw error;
+const axiosInstance = axios.create({
+  // We append /api here
+  baseURL: `${apiBaseUrl}/api`,
+  timeout: 10000,
+});
+
+// DEBUGGING: This will print the actual URL your app is using to your browser console
+console.log("Axios Base URL is set to:", axiosInstance.defaults.baseURL);
+
+// Request Interceptor
+axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
-};
 
-/**
- * Fetches dashboard statistics (including byGenerator)
- */
-export const fetchTicketStats = async () => {
-  try {
-    const response = await axiosInstance.get('/tickets/stats');
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching ticket stats:", error.response?.status, error.response?.data);
-    throw error;
+  const userString = localStorage.getItem('user');
+  if (userString) {
+    try {
+      const user = JSON.parse(userString);
+      if (user?.companyId) {
+        config.headers['x-company-id'] = user.companyId;
+      }
+    } catch (e) {
+      console.error("Interceptor: Error parsing user for x-company-id", e);
+    }
   }
-};
 
-export const createTicket = async (ticketData) => {
-  try {
-    const response = await axiosInstance.post('/tickets', ticketData);
-    return response.data;
-  } catch (error) {
-    console.error("Error creating ticket:", error.response?.status, error.response?.data);
-    throw error;
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
+// Response Interceptor
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response) {
+      console.error(`API Error [${error.config?.url}]:`, error.response.status, error.response.data);
+    }
+
+    if (error.response?.status === 401) {
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      if (!isLoginRequest) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }
+    }
+    return Promise.reject(error);
   }
-};
+);
 
-/**
- * Updates an existing ticket by ID
- * @param {String} id - The MongoDB _id or ticketId
- * @param {Object} updateData - Fields to update
- */
-export const updateTicket = async (id, updateData) => {
-  try {
-    const response = await axiosInstance.patch(`/tickets/${id}`, updateData);
-    return response.data;
-  } catch (error) {
-    console.error("Error updating ticket:", error.response?.status, error.response?.data);
-    throw error;
-  }
-};
-
-export const deleteTicket = async (id) => {
-  try {
-    const response = await axiosInstance.delete(`/tickets/${id}`);
-    return response.data;
-  } catch (error) {
-    console.error("Error deleting ticket:", error.response?.status, error.response?.data);
-    throw error;
-  }
-};
-
-// --- SLA Configuration API Calls ---
-
-/**
- * Fetches all SLA rules (Category + Priority + Hours)
- */
-export const fetchSlaConfigs = async () => {
-  try {
-    const response = await axiosInstance.get('/tickets/sla-configs');
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching SLA configs:", error.response?.status, error.response?.data);
-    throw error;
-  }
-};
-
-/**
- * Creates a new category entry and default SLA rules
- * @param {Object} categoryData - e.g., { categoryName: "New Category" }
- */
-export const createSlaCategory = async (categoryData) => {
-  try {
-    const response = await axiosInstance.post('/tickets/sla-configs/categories', categoryData);
-    return response.data;
-  } catch (error) {
-    console.error("Error creating SLA category:", error.response?.status, error.response?.data);
-    throw error;
-  }
-};
-
-/**
- * Updates the hours for a specific SLA rule
- * @param {String} id - The MongoDB _id of the config
- * @param {Number} hours - The new duration
- */
-export const updateSlaPriority = async (id, hours) => {
-  try {
-    const response = await axiosInstance.patch(`/tickets/sla-configs/${id}`, { hours });
-    return response.data;
-  } catch (error) {
-    console.error("Error updating priority hours:", error.response?.status, error.response?.data);
-    throw error;
-  }
-};
-
-/**
- * Removes an entire SLA config rule
- * @param {String} id - The MongoDB _id of the config
- */
-export const deleteSlaCategory = async (id) => {
-  try {
-    const response = await axiosInstance.delete(`/tickets/sla-configs/${id}`);
-    return response.data;
-  } catch (error) {
-    console.error("Error deleting SLA config:", error.response?.status, error.response?.data);
-    throw error;
-  }
-};
+export default axiosInstance;
