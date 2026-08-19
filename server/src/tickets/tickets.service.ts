@@ -207,25 +207,35 @@ export class TicketsService {
   ): Promise<Ticket[]> {
     const query: any = { companyId };
 
-    // Role-based visibility check: Allow full company ticket viewing for Managers, Admins, AND operational roles
+    // Only Managers and Admins can see all tickets globally
     const normalizedRole = (userRole || '').replace(/\s+/g, '_').toLowerCase();
-    const canViewAllTickets = ['manager', 'super_admin', 'admin', 'operator', 'transporter', 'shipper_ops', 'sales_person', 'agent'].includes(normalizedRole);
+    const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
     
     const genericPlaceholders = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person', 'shipper_ops', 'sales_person'];
     const isGenericName = !userName || genericPlaceholders.includes(userName.toLowerCase().trim());
 
     if (queue === 'unassigned') {
+      // Unassigned queue shows all unassigned tickets to everyone
       query.assignee = { $in: ['Unassigned', null, ''] };
     } else {
-      // Only restrict query by personal name if they are NOT allowed to view all tickets AND have a specific personal name
-      if (!canViewAllTickets && !isGenericName) {
-        const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
-        query.$or = [
-          { assignee: new RegExp(`^${userName}$`, 'i') },
-          { assignedTo: new RegExp(`^${userName}$`, 'i') },
-          { subAssignment: new RegExp(`^${userName}$`, 'i') },
-          { assignee: new RegExp(cleanName, 'i') }
-        ];
+      // For operators and non-admin roles, restrict views strictly to their own assigned tickets
+      if (!isManagerOrAdmin) {
+        if (isGenericName) {
+          // If a generic user name placeholder is passed, make sure it matches their exact role name or query safely
+          query.$or = [
+            { assignee: new RegExp(`^${userName}$`, 'i') },
+            { assignedTo: new RegExp(`^${userName}$`, 'i') },
+            { subAssignment: new RegExp(`^${userName}$`, 'i') }
+          ];
+        } else {
+          const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
+          query.$or = [
+            { assignee: new RegExp(`^${userName}$`, 'i') },
+            { assignedTo: new RegExp(`^${userName}$`, 'i') },
+            { subAssignment: new RegExp(`^${userName}$`, 'i') },
+            { assignee: new RegExp(cleanName, 'i') }
+          ];
+        }
       }
       
       if (queue === 'open') {
@@ -271,19 +281,28 @@ export class TicketsService {
     
     if (userRole && userName) {
       const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
-      const canViewAllTickets = ['manager', 'super_admin', 'admin', 'operator', 'transporter', 'shipper_ops', 'sales_person', 'agent'].includes(normalizedRole);
+      const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
       
       const genericPlaceholders = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person', 'shipper_ops', 'sales_person'];
       const isGenericName = genericPlaceholders.includes(userName.toLowerCase().trim());
 
-      if (!canViewAllTickets && !isGenericName) {
-        const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
-        query.$or = [
-          { assignee: new RegExp(`^${userName}$`, 'i') },
-          { assignedTo: new RegExp(`^${userName}$`, 'i') },
-          { subAssignment: new RegExp(`^${userName}$`, 'i') },
-          { assignee: new RegExp(cleanName, 'i') }
-        ];
+      // Dashboard stats should match personal assignment for operators so they only see their own metrics
+      if (!isManagerOrAdmin) {
+        if (isGenericName) {
+          query.$or = [
+            { assignee: new RegExp(`^${userName}$`, 'i') },
+            { assignedTo: new RegExp(`^${userName}$`, 'i') },
+            { subAssignment: new RegExp(`^${userName}$`, 'i') }
+          ];
+        } else {
+          const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
+          query.$or = [
+            { assignee: new RegExp(`^${userName}$`, 'i') },
+            { assignedTo: new RegExp(`^${userName}$`, 'i') },
+            { subAssignment: new RegExp(`^${userName}$`, 'i') },
+            { assignee: new RegExp(cleanName, 'i') }
+          ];
+        }
       }
     }
 
