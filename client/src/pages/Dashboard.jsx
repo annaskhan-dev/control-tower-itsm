@@ -235,7 +235,7 @@ export const Dashboard = ({ tickets: propTickets }) => {
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
 
-  // FIXED: Fetch strictly once on mount with an empty dependency array to stop the loop
+  // Component-level ref guard to ensure single invocation on mount and prevent loops
   const hasFetchedRef = useRef(false);
 
   useEffect(() => {
