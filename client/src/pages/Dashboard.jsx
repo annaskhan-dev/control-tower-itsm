@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, memo } from "react";
+import React, { useState, useEffect, useMemo, memo, useRef } from "react";
 import { Link } from "react-router-dom";
 import axiosInstance, { fetchTicketStats } from '../api/axiosInstance';
 import {
@@ -8,7 +8,7 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Layers } from "lucide-react";
 
 /**
- * Enhanced Normalization Engine: Robust source/generator field fallback mapping.
+ * Enhanced Normalization Engine with deep structural inspection for source/generator fields.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
@@ -57,33 +57,36 @@ const normalizeTicket = (t, now) => {
 
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "General").toString();
   
-  // Ultra-robust source/generator extraction check
+  // Exhaustive source / generator property exploration
   let rawSourceStr = "";
-  const possibleSourceFields = [
+  const candidateSources = [
     t.generator, t.source, t.origin, t.channel, t.createdByRole, 
-    t.creator, t.created_by, t.type, t.role, t.department
+    t.creator, t.created_by, t.type, t.role, t.department, t.sourceChannel,
+    t.ticketSource, t.sourceType
   ];
 
-  for (const field of possibleSourceFields) {
-    if (!field) continue;
-    if (typeof field === "string" && field.trim() !== "" && field !== "undefined" && field !== "null") {
-      rawSourceStr = field.trim();
+  for (const candidate of candidateSources) {
+    if (!candidate) continue;
+    if (typeof candidate === "string" && candidate.trim() !== "" && candidate !== "undefined" && candidate !== "null") {
+      rawSourceStr = candidate.trim();
       break;
     }
-    if (typeof field === "object") {
-      const extracted = field.name || field.title || field.role || field.type || field.label || field.username;
-      if (extracted && typeof extracted === "string" && extracted.trim() !== "") {
-        rawSourceStr = extracted.trim();
+    if (typeof candidate === "object") {
+      const subVal = candidate.name || candidate.title || candidate.role || candidate.type || candidate.label || candidate.username || candidate.source;
+      if (subVal && typeof subVal === "string" && subVal.trim() !== "") {
+        rawSourceStr = subVal.trim();
         break;
       }
     }
   }
 
   if (!rawSourceStr && t.metadata) {
-    const metaSource = t.metadata.source || t.metadata.generator || t.metadata.channel || t.metadata.origin;
+    const metaObj = t.metadata;
+    const metaSource = metaObj.source || metaObj.generator || metaObj.channel || metaObj.origin;
     if (metaSource) rawSourceStr = String(metaSource).trim();
   }
 
+  // Ultimate fallback if no explicit generator/source field is found
   if (!rawSourceStr) {
     rawSourceStr = t.companyId ? "Company Portal" : "Direct System";
   }
@@ -202,7 +205,7 @@ const GeneratorListCard = memo(({ title, data }) => {
             <div key={`gen-row-${idx}`} className="flex items-center justify-between py-1">
               <span className="text-sm font-medium text-slate-700 truncate pr-2">{item.name}</span>
               <span className="text-xs font-bold px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100/60 whitespace-nowrap">
-                {item.count} {item.count === 1 ? 'resolved' : 'resolved'}
+                {item.count} resolved
               </span>
             </div>
           ))
@@ -229,6 +232,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [loading, setLoading] = useState(propTickets.length === 0);
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
+  
+  // Guard ref to prevent infinite fetch loop bugs
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
     const getStatsData = async () => {
@@ -252,7 +258,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   }, [propTickets]);
 
   useEffect(() => {
-    if (!propTickets || propTickets.length === 0) {
+    if ((!propTickets || propTickets.length === 0) && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       const fetchTickets = async () => {
         const token = localStorage.getItem('access_token');
         if (!token) {
@@ -264,6 +271,11 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           const response = await axiosInstance.get('/tickets');
           const data = Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []);
           setTickets(data);
+          
+          // Debug inspector: logs raw incoming ticket keys to your console so you can inspect properties instantly
+          if (data.length > 0) {
+            console.log("Sample Raw Ticket Payload Structure:", data[0]);
+          }
         } catch (error) {
           console.error("Failed to fetch tickets:", error);
           setTickets([]);
