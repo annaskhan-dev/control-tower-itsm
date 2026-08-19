@@ -17,7 +17,6 @@ const normalizeTicket = (t, now) => {
     rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
   }
 
-  // Sub-assignee parsing matching backend rules
   let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || t.sub_assigned_to || t.subAssignee || null;
   if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
@@ -26,7 +25,6 @@ const normalizeTicket = (t, now) => {
   const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
   const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
 
-  // Robust SLA evaluation based on deadlines or explicit metadata
   let sla = t.slaStatus || t.sla_status || t.sla || "On Track";
   if (typeof sla === "string" && !t.slaDeadline) {
     const lowerSla = sla.toLowerCase();
@@ -222,6 +220,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     const getStatsData = async () => {
       try {
         const data = await fetchTicketStats();
+        console.log("Fetched Backend Stats payload:", data);
         if (data) {
           setBackendStats(data);
         }
@@ -340,20 +339,32 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
   const stats = useMemo(() => {
     let generatorMap = {};
-    const rawGenSource = backendStats?.byGenerator || backendStats?.generators || backendStats?.sourceCounts || backendStats?.bySource;
+    
+    // Robust check for various possible backend property keys for generator/source stats
+    const rawGenSource = 
+      backendStats?.byGenerator || 
+      backendStats?.generators || 
+      backendStats?.sourceCounts || 
+      backendStats?.bySource ||
+      backendStats?.data?.byGenerator ||
+      backendStats?.data?.generators;
 
     if (Array.isArray(rawGenSource)) {
       rawGenSource.forEach(item => {
-        const key = item.name || item.key || item.label || item._id || "Direct API / System";
-        const val = Number(item.count || item.total || item.value || 1);
+        const key = item.name || item.key || item.label || item._id || item.source || "Direct API / System";
+        const val = Number(item.count || item.total || item.value || item.docCount || 1);
         generatorMap[key] = (generatorMap[key] || 0) + val;
       });
     } else if (rawGenSource && typeof rawGenSource === "object") {
       Object.keys(rawGenSource).forEach(k => {
-        generatorMap[k] = Number(rawGenSource[k]) || 0;
+        const val = rawGenSource[k];
+        // Handles cases where the object property is a primitive number or an object containing a count
+        const count = typeof val === 'object' && val !== null ? Number(val.count || val.total || val.value || 0) : Number(val);
+        generatorMap[k] = isNaN(count) ? 0 : count;
       });
     }
 
+    // Fallback: If backend stats map is empty, aggregate generator/source directly from normalized tickets
     if (Object.keys(generatorMap).length === 0 || Object.values(generatorMap).reduce((a, b) => a + b, 0) === 0) {
       generatorMap = {};
       normalizedTickets.forEach(t => {
@@ -367,7 +378,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     const slaRiskCount = normalizedTickets.filter((t) => ["Breached", "At Risk"].includes(t.slaStatus)).length;
 
     return {
-      total: backendStats?.total || normalizedTickets.length,
+      total: backendStats?.total || backendStats?.count || normalizedTickets.length,
       open: openCount,
       unassigned: unassignedCount,
       slaRisk: slaRiskCount,
