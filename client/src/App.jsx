@@ -11,7 +11,6 @@ import { TicketList } from './pages/TicketList';
 import { TicketDetail } from './pages/TicketDetail';
 import { UserManagement } from './pages/UserManagement';
 import { SlaSettings } from './components/SlaSettings';
-import { Analytics } from './components/Analytics'; // <-- Imported Analytics Component
 import { CreateTicketModal } from './components/common/CreateTicketModal';
 import DriverSupportLogs from './components/DriverSupportLogs';
 import { Menu, X } from 'lucide-react';
@@ -91,13 +90,6 @@ function MainLayout() {
 
           <Route path="/tickets/:id" element={
             <ProtectedRoute> <TicketDetail /> </ProtectedRoute>
-          } />
-
-          {/* Analytics & Reports Route - Restricted to Admin/Manager */}
-          <Route path="/analytics" element={
-            isRestrictedRole ? <Navigate to="/tickets?queue=all" replace /> : (
-              <ProtectedRoute allowedRoles={['Super Admin', 'Manager','Admin']}> <Analytics /> </ProtectedRoute>
-            )
           } />
 
           {/* Role-Restricted Routes */}

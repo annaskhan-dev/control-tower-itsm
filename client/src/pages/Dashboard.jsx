@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
 } from "recharts";
-import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight } from "lucide-react";
+import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight, Calendar } from "lucide-react";
 
 /**
  * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
@@ -213,6 +213,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [now] = useState(() => new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [velocityDays, setVelocityDays] = useState(7); // Configurable velocity timeframe (up to 30 days)
 
   useEffect(() => {
     if (propTickets && propTickets.length > 0) {
@@ -263,14 +264,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       return matchesSearch && matchesStatus;
     });
   }, [normalizedTickets, searchQuery, statusFilter]);
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "—";
-    const d = new Date(dateString);
-    return isNaN(d.getTime()) 
-      ? "Invalid" 
-      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
 
   const handleExportExcel = () => {
     const currentDate = new Date();
@@ -345,13 +338,18 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   }), [normalizedTickets]);
 
   const chartData = useMemo(() => {
-    const last7Days = Array.from({ length: 7 }).map((_, i) => {
+    const timeFrameDays = Number(velocityDays) || 7;
+    const dynamicDaysArray = Array.from({ length: timeFrameDays }).map((_, i) => {
       const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return { label: d.toLocaleDateString('en-US', { weekday: 'short' }), fullDate: d.toDateString() };
+      d.setDate(d.getDate() - (timeFrameDays - 1 - i));
+      // For longer ranges (> 14 days), show short date (e.g., Aug 10), otherwise show weekday name
+      const label = timeFrameDays > 14 
+        ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+      return { label, fullDate: d.toDateString() };
     });
 
-    const trend = last7Days.map((day) => ({
+    const trend = dynamicDaysArray.map((day) => ({
       day: day.label,
       tickets: normalizedTickets.filter((t) => {
         const d = new Date(t.createdAt);
@@ -377,7 +375,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       ].filter((d) => d.value > 0),
       trend: trend,
     };
-  }, [normalizedTickets]);
+  }, [normalizedTickets, velocityDays]);
 
   if (loading) return <div className="h-96 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
 
@@ -451,14 +449,29 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
-        {/* 7-Day Velocity Trend Chart */}
+        {/* Configurable Velocity Trend Chart (Up to 30 Days) */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
-          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">7-Day Velocity</h4>
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Velocity Trend</h4>
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5">
+              <Calendar size={12} className="text-slate-400 shrink-0" />
+              <select
+                value={velocityDays}
+                onChange={(e) => setVelocityDays(Number(e.target.value))}
+                className="bg-transparent text-[10px] font-bold text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value={7}>7 Days</option>
+                <option value={14}>14 Days</option>
+                <option value={21}>21 Days</option>
+                <option value={30}>30 Days</option>
+              </select>
+            </div>
+          </div>
           <div className="h-36 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%" debounce={100}>
               <LineChart data={chartData.trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+                <XAxis dataKey="day" stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} interval={velocityDays > 14 ? 3 : 1} />
                 <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Line 
@@ -466,7 +479,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                   dataKey="tickets" 
                   stroke="#10b981" 
                   strokeWidth={3} 
-                  dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }} 
+                  dot={{ r: velocityDays > 14 ? 2 : 4, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }} 
                   activeDot={{ r: 6, fill: '#059669', strokeWidth: 2, stroke: '#ffffff' }}
                   isAnimationActive={false}
                 />
@@ -475,12 +488,12 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
           <div className="pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-500 font-medium">
             <span>Peak: {Math.max(...chartData.trend.map(d => d.tickets), 0)} tix/day</span>
-            <span>Avg: {Math.round(stats.total / 7)} tix/day</span>
+            <span>Avg: {Math.round(stats.total / Math.max(velocityDays, 1))} tix/day</span>
           </div>
         </div>
       </div>
 
-      {/* Ticket List Table Section - Restyled to Ticket List Design */}
+      {/* Ticket List Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {/* Table Toolbar Header */}
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-slate-50/40">
@@ -540,7 +553,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
               {filteredTickets.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50/60 transition-colors group">
+                <tr key={t.id} className="hover:bg-slate-50/65 transition-colors group">
                   <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
                     <span className="font-mono bg-slate-100 text-slate-700 px-2 py-1 rounded-md text-[11px]">
                       {t.ticketId}
