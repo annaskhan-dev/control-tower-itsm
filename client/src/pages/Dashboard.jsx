@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
 } from "recharts";
-import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight } from "lucide-react";
+import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight, UserPlus } from "lucide-react";
 
 /**
  * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
@@ -21,6 +21,12 @@ const normalizeTicket = (t, now) => {
   let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || t.sub_assigned_to || t.subAssignee || null;
   if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
+  }
+
+  // Creator parsing (e.g., Sales, Operator, Client, etc.)
+  let rawCreator = t.creator || t.createdBy || t.raisedBy || t.author || t.client || "System / Unspecified";
+  if (typeof rawCreator === "object" && rawCreator !== null) {
+    rawCreator = rawCreator.name || rawCreator.fullName || rawCreator.role || rawCreator.email || "System / Unspecified";
   }
 
   const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
@@ -62,6 +68,7 @@ const normalizeTicket = (t, now) => {
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
   
   const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
+  const creatorName = typeof rawCreator === "string" ? rawCreator.trim() : "System / Unspecified";
   const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
   
   const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
@@ -87,7 +94,6 @@ const normalizeTicket = (t, now) => {
     primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
   }
 
-  // Synchronized SLA active duration calculated from main assignment timestamp
   const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
   let subAssignmentTimeMs = 0;
@@ -112,6 +118,7 @@ const normalizeTicket = (t, now) => {
     ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     assigneeName,
+    creatorName,
     subAssignmentName,
     subAssignmentAt: subAssignedAtRaw,
     status: t.status || "Open",
@@ -160,7 +167,7 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * Isolated Pie Chart Component with animations disabled for buttery-smooth performance and detailed data facts.
+ * Optimized Pie Card Component
  */
 const OptimizedPieCard = memo(({ title, data }) => {
   const totalValue = useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
@@ -193,11 +200,11 @@ const OptimizedPieCard = memo(({ title, data }) => {
         </ResponsiveContainer>
       </div>
       <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-1 text-[10px] text-slate-500">
-        {data.map((item, idx) => (
+        {data.slice(0, 4).map((item, idx) => (
           <div key={`fact-${idx}`} className="flex items-center gap-1.5 truncate">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
             <span className="truncate font-medium text-slate-700">{item.name}:</span>
-            <span className="font-bold text-slate-900">{item.value} ({totalValue > 0 ? Math.round((item.value / totalValue) * 100) : 0}%)</span>
+            <span className="font-bold text-slate-900">{item.value}</span>
           </div>
         ))}
       </div>
@@ -253,6 +260,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         t.ticketId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.creatorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.category.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesStatus = 
@@ -263,14 +271,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       return matchesSearch && matchesStatus;
     });
   }, [normalizedTickets, searchQuery, statusFilter]);
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "—";
-    const d = new Date(dateString);
-    return isNaN(d.getTime()) 
-      ? "Invalid" 
-      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
 
   const handleExportExcel = () => {
     const currentDate = new Date();
@@ -290,7 +290,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
     const headers = [
       "Ticket ID", "Title", "Description", "Source", "Category", "Priority", 
-      "Ticket Status", "SLA Health", "SLA Deadline", "Assignee", "Assigned At", 
+      "Ticket Status", "SLA Health", "SLA Deadline", "Creator / Raised By", "Assignee", "Assigned At", 
       "Assignment Duration", "SLA Active Duration", "Sub-Assignee", "Sub-Assigned At", 
       "Sub-Assignment Duration", "Resolved At", "Final Resolution Duration", "Company ID", "Created At"
     ];
@@ -312,6 +312,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         `"${(t.status || "").replace(/"/g, '""')}"`,
         `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
         `"${slaDeadlineFormatted}"`,
+        `"${(t.creatorName || "").replace(/"/g, '""')}"`,
         `"${(t.assigneeName || "").replace(/"/g, '""')}"`,
         `"${assignedAtFormatted}"`,
         `"${t.assignmentTimeFormatted || "Unassigned"}"`,
@@ -359,6 +360,23 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       }).length,
     }));
 
+    // Grouping tickets by Creator / Raised By role
+    const creatorCounts = {};
+    normalizedTickets.forEach((t) => {
+      const creator = t.creatorName || "Unspecified";
+      creatorCounts[creator] = (creatorCounts[creator] || 0) + 1;
+    });
+
+    const colorPalette = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"];
+    const creatorChartData = Object.entries(creatorCounts)
+      .map(([name, value], idx) => ({
+        name,
+        value,
+        color: colorPalette[idx % colorPalette.length],
+        details: `Raised ${value} tickets`
+      }))
+      .sort((a, b) => b.value - a.value);
+
     return {
       priority: [
         { name: "Critical", count: normalizedTickets.filter((t) => t.priority === "Critical").length },
@@ -375,6 +393,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         { name: "At Risk", value: normalizedTickets.filter((t) => t.slaStatus === "At Risk").length, color: "#f59e0b", details: "Approaching deadline window" },
         { name: "Breached", value: normalizedTickets.filter((t) => t.slaStatus === "Breached").length, color: "#ef4444", details: "Deadline expired uncompleted" },
       ].filter((d) => d.value > 0),
+      creator: creatorChartData,
       trend: trend,
     };
   }, [normalizedTickets]);
@@ -447,8 +466,10 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Polished Pie Charts with Detailed Points & Facts */}
-        <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
+        {/* Tickets Raised by Creator / Role Breakdown */}
+        <OptimizedPieCard title="Tickets Raised By (Creator)" data={chartData.creator.length > 0 ? chartData.creator : [{ name: "No Data", value: 0, color: "#cbd5e1" }]} />
+
+        {/* SLA Health Distribution */}
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
         {/* 7-Day Velocity Trend Chart */}
@@ -480,9 +501,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section - Restyled to Ticket List Design */}
+      {/* Ticket List Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        {/* Table Toolbar Header */}
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-slate-50/40">
           <div>
             <div className="flex items-center gap-2">
@@ -495,19 +515,17 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {/* Search Bar */}
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
-                placeholder="Search tickets..."
+                placeholder="Search tickets or creators..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
               />
             </div>
 
-            {/* Filter Dropdown */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Filter className="text-slate-400 shrink-0" size={16} />
               <select
@@ -523,14 +541,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Table Content */}
         <div className="w-full overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider font-bold">
                 <th className="py-3 px-4">Ticket ID</th>
                 <th className="py-3 px-4">Subject / Title</th>
-                <th className="py-3 px-4">Category</th>
+                <th className="py-3 px-4">Raised By (Creator)</th>
                 <th className="py-3 px-4">Priority</th>
                 <th className="py-3 px-4">Assignee</th>
                 <th className="py-3 px-4">SLA Health</th>
@@ -546,11 +563,14 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                       {t.ticketId}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[260px] truncate">
+                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[240px] truncate">
                     {t.title}
                   </td>
-                  <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                    {t.category || "—"}
+                  <td className="py-3.5 px-4 text-slate-700 font-medium whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded-md text-[11px]">
+                      <UserPlus size={12} className="text-slate-400" />
+                      {t.creatorName}
+                    </span>
                   </td>
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
