@@ -82,7 +82,11 @@ export class TicketsController {
   @Get('stats')
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async getStats(@Req() req: AuthenticatedRequest) {
-    return await this.ticketsService.getStats(req.user.companyId);
+    const userRole = req.user.role || '';
+    const userName = req.user.name || req.user.username || req.user.sub;
+    
+    // Pass user details so getStats respects generic roles and user scoping correctly
+    return await this.ticketsService.getStats(req.user.companyId, userRole, userName);
   }
 
   @Get()
