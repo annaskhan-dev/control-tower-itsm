@@ -171,24 +171,20 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const filteredTickets = useMemo(() => {
     return ticketData.filter((t) => {
-      if (!isUserManagerOrAdmin) {
+      // If user is an operator, strictly restrict to tickets assigned specifically to them
+      if (isUserOperator && !isUserManagerOrAdmin) {
         const assigneeLower = t.assigneeName.trim().toLowerCase();
         const subAssigneeLower = t.subAssignmentName.trim().toLowerCase();
         const userName = (user?.name || user?.username || user?.fullName || "").trim().toLowerCase();
         const userEmail = (user?.email || "").split("@")[0].toLowerCase();
 
-        const isGeneralQueue = queue === "all" || queue === "all-work" || queue === "open";
-
-        const isTheirs = 
-          isGeneralQueue ||
-          assigneeLower === "unassigned" ||
-          assigneeLower === "" ||
-          !t.isAssigned ||
+        const isAssignedToThem = 
           (userName && assigneeLower.includes(userName)) ||
           (subAssigneeLower && userName && subAssigneeLower.includes(userName)) ||
           (userEmail && assigneeLower.includes(userEmail));
 
-        if (!isTheirs) return false;
+        // If the ticket is not assigned to this operator, filter it out completely
+        if (!isAssignedToThem) return false;
       }
 
       let matchesQueue = true;
@@ -203,7 +199,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const searchStr = searchTerm.toLowerCase();
       return matchesQueue && (t.title?.toLowerCase().includes(searchStr) || t.ticketId?.toLowerCase().includes(searchStr));
     });
-  }, [ticketData, queue, searchTerm, isUserManagerOrAdmin, user]);
+  }, [ticketData, queue, searchTerm, isUserOperator, isUserManagerOrAdmin, user]);
 
   return (
     <div className="flex flex-col h-full font-sans bg-slate-50 text-slate-800">
@@ -251,7 +247,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           ) : filteredTickets.length === 0 ? (
             <div className="p-16 text-center text-sm text-slate-400 italic flex flex-col items-center gap-2">
               <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7m16 0v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5m16 0h-2.586a1 1 0 0 0-.707.293l-2.414 2.414a1 1 0 0 1-.707.293h-3.172a1 1 0 0 1-.707-.293l-2.414-2.414A1 1 0 0 0 6.586 13H4"/></svg>
-              No tickets found in this view queue.
+              No tickets assigned to you found in this view queue.
             </div>
           ) : (
             <div className="overflow-x-auto">
