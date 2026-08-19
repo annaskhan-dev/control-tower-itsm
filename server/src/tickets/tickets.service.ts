@@ -319,28 +319,47 @@ export class TicketsService {
     const aggregateGeneratorStats = await this.ticketModel.aggregate([
       { $match: query },
       {
+        $addFields: {
+          resolvedGenerator: {
+            $ifNull: [
+              "$generator", 
+              { 
+                $ifNull: [
+                  "$source", 
+                  { 
+                    $cond: {
+                      if: { $and: [{ $ne: ["$createdBy", null] }, { $ne: ["$createdBy", ""] }] },
+                      then: "$createdBy",
+                      else: "Direct API / System"
+                    }
+                  }
+                ] 
+              }
+            ]
+          }
+        }
+      },
+      {
         $group: {
-          _id: {
-            $ifNull: ["$generator", { $ifNull: ["$source", "Direct API / System"] }]
-          },
+          _id: "$resolvedGenerator",
           count: { $sum: 1 }
         }
       },
       {
         $project: {
-          _id: 1,
-          name: "$_id",
-          label: "$_id",
-          key: "$_id",
+          _id: 0,
+          name: { $ifNull: ["$_id", "Direct API / System"] },
+          label: { $ifNull: ["$_id", "Direct API / System"] },
+          key: { $ifNull: ["$_id", "Direct API / System"] },
           value: "$count",
           total: "$count",
           count: 1
         }
-      }
+      },
+      { $sort: { value: -1 } }
     ]);
 
     const fallbackStats = [{ 
-      _id: 'Direct API / System', 
       name: 'Direct API / System', 
       label: 'Direct API / System', 
       key: 'Direct API / System', 
@@ -349,6 +368,10 @@ export class TicketsService {
       count: tickets.length 
     }];
 
+    const finalByGenerator = aggregateGeneratorStats.length > 0 && aggregateGeneratorStats.some(item => item.value > 0)
+      ? aggregateGeneratorStats 
+      : fallbackStats;
+
     return {
       total: tickets.length,
       open: tickets.filter((t) => (t.status || '').toLowerCase() === 'open').length,
@@ -356,7 +379,7 @@ export class TicketsService {
       resolved: tickets.filter((t) => ['resolved', 'closed', 'completed', 'done'].includes((t.status || '').toLowerCase())).length,
       critical: tickets.filter((t) => (t.priority || '').toLowerCase() === 'critical').length,
       byCategory: categoryStats,
-      byGenerator: aggregateGeneratorStats.length > 0 ? aggregateGeneratorStats : fallbackStats,
+      byGenerator: finalByGenerator,
     };
   }
 
