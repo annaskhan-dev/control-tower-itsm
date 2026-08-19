@@ -313,7 +313,7 @@ export class TicketsService {
       return acc;
     }, {});
 
-    // Compute metrics grouped dynamically using aggregation pipeline for robust generator/creator mapping
+    // Compute metrics grouped dynamically using aggregation pipeline into an array format: [{ name: '...', count: X }]
     const aggregateGeneratorStats = await this.ticketModel.aggregate([
       { $match: query },
       {
@@ -323,15 +323,15 @@ export class TicketsService {
           },
           count: { $sum: 1 }
         }
+      },
+      {
+        $project: {
+          _id: 0,
+          name: { $ifNull: ["$_id", "Unassigned"] },
+          count: 1
+        }
       }
     ]);
-
-    // Convert aggregation array back to key-value dictionary format expected by the frontend
-    const generatorStats = aggregateGeneratorStats.reduce((acc: any, curr) => {
-      const key = curr._id || 'Unassigned';
-      acc[key] = curr.count;
-      return acc;
-    }, {});
 
     return {
       total: tickets.length,
@@ -340,7 +340,7 @@ export class TicketsService {
       resolved: tickets.filter((t) => ['resolved', 'closed', 'completed', 'done'].includes((t.status || '').toLowerCase())).length,
       critical: tickets.filter((t) => (t.priority || '').toLowerCase() === 'critical').length,
       byCategory: categoryStats,
-      byGenerator: generatorStats, // <--- Correctly formatted breakdown for creator / generator telemetry
+      byGenerator: aggregateGeneratorStats, // <--- Returns array of objects matching frontend map expectations
     };
   }
 
