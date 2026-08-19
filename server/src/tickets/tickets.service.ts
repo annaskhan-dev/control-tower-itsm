@@ -207,35 +207,25 @@ export class TicketsService {
   ): Promise<Ticket[]> {
     const query: any = { companyId };
 
-    // Only Managers and Admins can see all tickets globally
     const normalizedRole = (userRole || '').replace(/\s+/g, '_').toLowerCase();
     const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
     
     const genericPlaceholders = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person', 'shipper_ops', 'sales_person'];
-    const isGenericName = !userName || genericPlaceholders.includes(userName.toLowerCase().trim());
+    const trimmedUserName = (userName || '').toLowerCase().trim();
+    const isGenericName = !userName || genericPlaceholders.includes(trimmedUserName);
 
     if (queue === 'unassigned') {
-      // Unassigned queue shows all unassigned tickets to everyone
-      query.assignee = { $in: ['Unassigned', null, ''] };
+      query.assignee = { $in: ['Unassigned', 'unassigned', null, ''] };
     } else {
-      // For operators and non-admin roles, restrict views strictly to their own assigned tickets
-      if (!isManagerOrAdmin) {
-        if (isGenericName) {
-          // If profile name is generic like "Operator", match loosely via regex containing the term
-          query.$or = [
-            { assignee: new RegExp(userName, 'i') },
-            { assignedTo: new RegExp(userName, 'i') },
-            { subAssignment: new RegExp(userName, 'i') }
-          ];
-        } else {
-          const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
-          query.$or = [
-            { assignee: new RegExp(`^${userName}$`, 'i') },
-            { assignedTo: new RegExp(`^${userName}$`, 'i') },
-            { subAssignment: new RegExp(`^${userName}$`, 'i') },
-            { assignee: new RegExp(cleanName, 'i') }
-          ];
-        }
+      // Allow Managers/Admins or generic role placeholder logins to view all tickets on the main list
+      if (!isManagerOrAdmin && !isGenericName) {
+        const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
+        query.$or = [
+          { assignee: new RegExp(`^${userName}$`, 'i') },
+          { assignedTo: new RegExp(`^${userName}$`, 'i') },
+          { subAssignment: new RegExp(`^${userName}$`, 'i') },
+          { assignee: new RegExp(cleanName, 'i') }
+        ];
       }
       
       if (queue === 'open') {
@@ -284,25 +274,17 @@ export class TicketsService {
       const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
       
       const genericPlaceholders = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person', 'shipper_ops', 'sales_person'];
-      const isGenericName = genericPlaceholders.includes(userName.toLowerCase().trim());
+      const trimmedUserName = (userName || '').toLowerCase().trim();
+      const isGenericName = genericPlaceholders.includes(trimmedUserName);
 
-      // Dashboard stats should match personal assignment for operators so they only see their own metrics
-      if (!isManagerOrAdmin) {
-        if (isGenericName) {
-          query.$or = [
-            { assignee: new RegExp(userName, 'i') },
-            { assignedTo: new RegExp(userName, 'i') },
-            { subAssignment: new RegExp(userName, 'i') }
-          ];
-        } else {
-          const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
-          query.$or = [
-            { assignee: new RegExp(`^${userName}$`, 'i') },
-            { assignedTo: new RegExp(`^${userName}$`, 'i') },
-            { subAssignment: new RegExp(`^${userName}$`, 'i') },
-            { assignee: new RegExp(cleanName, 'i') }
-          ];
-        }
+      if (!isManagerOrAdmin && !isGenericName) {
+        const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
+        query.$or = [
+          { assignee: new RegExp(`^${userName}$`, 'i') },
+          { assignedTo: new RegExp(`^${userName}$`, 'i') },
+          { subAssignment: new RegExp(`^${userName}$`, 'i') },
+          { assignee: new RegExp(cleanName, 'i') }
+        ];
       }
     }
 
