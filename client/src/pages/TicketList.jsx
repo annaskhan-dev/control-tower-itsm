@@ -153,6 +153,9 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
       const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
+      // Extracted Generator / Source Entry Info
+      const entrySource = t.generator || t.source || "System / Direct";
+
       return {
         ...t,
         assigneeName,
@@ -160,6 +163,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         subAssignmentName,
         subAssignmentAt: subAssignedAtRaw,
         slaStatus,
+        entrySource,
         assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
         slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
         subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
@@ -257,7 +261,8 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                   <tr>
                     <th className="py-3.5 px-4 font-semibold">ID</th>
-                    <th className="py-3.5 px-4 font-semibold">Entry</th>
+                    <th className="py-3.5 px-4 font-semibold">Entry Source</th>
+                    <th className="py-3.5 px-4 font-semibold">Created Date</th>
                     <th className="py-3.5 px-4 font-semibold">Title</th>
                     <th className="py-3.5 px-4 font-semibold">Category</th>
                     <th className="py-3.5 px-4 font-semibold">Assignee</th>
@@ -282,6 +287,11 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
                       >
                         <td className="py-3.5 px-4 font-semibold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">{t.ticketId}</td>
+                        <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
+                          <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[11px]">
+                            {t.entrySource}
+                          </span>
+                        </td>
                         <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
                         <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[200px] truncate" title={t.title}>{t.title}</td>
                         <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{t.category || "—"}</td>

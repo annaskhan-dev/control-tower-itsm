@@ -278,7 +278,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const generatorBreakdown = useMemo(() => {
     const map = {};
     normalizedTickets.forEach((t) => {
-      const creator = (t.creatorName || "System / Direct").trim();
+      // Look for generator, source, or fallback to System / Direct
+      const creator = (t.generator || t.source || "System / Direct").trim();
       map[creator] = (map[creator] || 0) + 1;
     });
     return Object.entries(map).map(([name, count]) => ({ name, count }));

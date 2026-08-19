@@ -22,6 +22,21 @@ export const createTicket = async (ticketData) => {
   }
 };
 
+/**
+ * Updates an existing ticket by ID
+ * @param {String} id - The MongoDB _id or ticketId
+ * @param {Object} updateData - Fields to update
+ */
+export const updateTicket = async (id, updateData) => {
+  try {
+    const response = await axiosInstance.patch(`/tickets/${id}`, updateData);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating ticket:", error.response?.status, error.response?.data);
+    throw error;
+  }
+};
+
 export const deleteTicket = async (id) => {
   try {
     const response = await axiosInstance.delete(`/tickets/${id}`);

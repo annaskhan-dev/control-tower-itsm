@@ -14,7 +14,8 @@ import {
   Trash2,
   AlertCircle,
   UserPlus,
-  UserCheck
+  UserCheck,
+  Cpu
 } from "lucide-react";
 
 export const TicketDetail = () => {
@@ -273,6 +274,7 @@ export const TicketDetail = () => {
   if (!ticket) return <div className="p-4 text-center text-slate-500 text-sm">Loading...</div>;
 
   const isOverdue = ticket.slaDeadline && new Date(ticket.slaDeadline) < new Date() && !isResolvedState;
+  const ticketGenerator = ticket.generator || ticket.source || "System / Direct";
 
   return (
     <div className="h-full bg-slate-50 overflow-y-auto p-6">
@@ -420,6 +422,16 @@ export const TicketDetail = () => {
               <h3 className="text-xs font-bold flex items-center gap-2 text-slate-700">
                 <ShieldAlert size={14} className="text-blue-600" /> Properties
               </h3>
+
+              {/* Creator / Entry Generator Info */}
+              <div className="pb-2 border-b border-slate-100">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Cpu size={10} /> Created By / Generator
+                </label>
+                <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700">
+                  {ticketGenerator}
+                </div>
+              </div>
 
               {/* Primary Assignee Panel with Manager/Admin Restriction */}
               <div>

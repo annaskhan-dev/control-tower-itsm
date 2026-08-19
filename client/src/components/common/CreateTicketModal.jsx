@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api"; // Ensure this points to your configured axios instance or fetch utility
 
 export const CreateTicketModal = ({ onClose, onSubmit }) => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [slaConfigs, setSlaConfigs] = useState([]);
   const [users, setUsers] = useState([]); // State to hold real user records
@@ -56,8 +56,19 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
     if (!formData.title.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
+
+    // Extract current logged-in user name/username for entry source tracking
+    const currentUserName = user?.name || user?.username || user?.fullName || "Operator";
+
+    // Combine form state with generator and source tracking metadata
+    const payload = {
+      ...formData,
+      generator: currentUserName,
+      source: "Control Tower UI"
+    };
+
     try {
-      await createTicket(formData, token);
+      await createTicket(payload, token);
       if (onSubmit) onSubmit();
       onClose();
     } catch (error) {
@@ -73,7 +84,7 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-4 space-y-3">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2">
           <h3 className="text-sm font-bold text-slate-800">Create New Ticket</h3>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer">
             <X size={14} />
           </button>
         </div>
@@ -147,7 +158,7 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
               >
                 <option value="">Select a category</option>
                 {slaConfigs.map((c) => (
-                  <option key={c._id} value={c.category}>
+                  <option key={c._id || c.category} value={c.category}>
                     {c.category}
                   </option>
                 ))}
