@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, memo, useRef } from "react";
+import React, { useState, useEffect, useMemo, memo } from "react";
 import { Link } from "react-router-dom";
 import { fetchTicketStats } from '../api/axiosInstance';
 import { useTickets } from "../context/TicketContext";
@@ -228,24 +228,17 @@ GeneratorListCard.displayName = "GeneratorListCard";
 export const Dashboard = ({ tickets: propTickets }) => {
   const { tickets: contextTickets, isLoading: contextLoading, fetchTickets } = useTickets();
   
-  // Use context tickets if available, otherwise fallback to prop tickets
   const tickets = (propTickets && propTickets.length > 0) ? propTickets : contextTickets;
   const loading = contextLoading && (!tickets || tickets.length === 0);
 
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
 
-  // Component-level ref guard to ensure single invocation on mount and prevent loops
-  const hasFetchedRef = useRef(false);
-
+  // Safe data fetching on mount without triggering infinite loops
   useEffect(() => {
-    if (!hasFetchedRef.current) {
-      hasFetchedRef.current = true;
-      fetchTickets('all-work');
-    }
-  }, []);
+    fetchTickets('all-work');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch ticket statistics on mount securely
   useEffect(() => {
     let isMounted = true;
     const getStatsData = async () => {
