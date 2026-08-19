@@ -61,6 +61,10 @@ const normalizeTicket = (t, now) => {
 
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
   
+  // Parse ticket source (e.g. Sales, Operator, Shipper, Ops, etc.)
+  const rawSourceStr = (t.source || t.origin || t.channel || t.raisedBy || "Direct / Other").toString().trim();
+  const sourceName = rawSourceStr !== "" ? rawSourceStr : "Direct / Other";
+  
   const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
   const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
   
@@ -118,6 +122,7 @@ const normalizeTicket = (t, now) => {
     createdAt: t.createdAt || t.created_at || new Date().toISOString(),
     priority,
     category: rawCategoryStr,
+    source: sourceName,
     slaStatus: sla,
     isResolved,
     isSubAssigned,
@@ -253,7 +258,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         t.ticketId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.category.toLowerCase().includes(searchQuery.toLowerCase());
+        t.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.source.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesStatus = 
         statusFilter === "all" ? true :
@@ -263,14 +269,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       return matchesSearch && matchesStatus;
     });
   }, [normalizedTickets, searchQuery, statusFilter]);
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "—";
-    const d = new Date(dateString);
-    return isNaN(d.getTime()) 
-      ? "Invalid" 
-      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
 
   const handleExportExcel = () => {
     const currentDate = new Date();
@@ -359,6 +357,21 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       }).length,
     }));
 
+    // Dynamically aggregate counts for all available ticket sources (Sales, Operator, Shipper, Ops, etc.)
+    const sourceCounts = {};
+    normalizedTickets.forEach((t) => {
+      const src = t.source || "Other";
+      sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+    });
+
+    const sourcePalette = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#64748b"];
+    const formattedSources = Object.keys(sourceCounts).map((srcName, idx) => ({
+      name: srcName,
+      value: sourceCounts[srcName],
+      color: sourcePalette[idx % sourcePalette.length],
+      details: `Raised by ${srcName}`
+    })).sort((a, b) => b.value - a.value);
+
     return {
       priority: [
         { name: "Critical", count: normalizedTickets.filter((t) => t.priority === "Critical").length },
@@ -370,6 +383,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         { name: "Request", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("request") || t.category.toLowerCase().includes("dispatch")).length, color: "#3b82f6", details: "Standard requests & dispatches" },
         { name: "Problem", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("problem") || t.category.toLowerCase().includes("fleet")).length, color: "#f59e0b", details: "Fleet & operational issues" },
       ].filter((d) => d.value > 0),
+      sources: formattedSources,
       sla: [
         { name: "On Track", value: normalizedTickets.filter((t) => t.slaStatus === "On Track").length, color: "#10b981", details: "Meeting target timelines" },
         { name: "At Risk", value: normalizedTickets.filter((t) => t.slaStatus === "At Risk").length, color: "#f59e0b", details: "Approaching deadline window" },
@@ -447,8 +461,10 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Polished Pie Charts with Detailed Points & Facts */}
-        <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
+        {/* Ticket Sources Breakdown Pie Chart */}
+        <OptimizedPieCard title="Ticket Sources" data={chartData.sources} />
+        
+        {/* SLA Health Pie Chart */}
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
         {/* 7-Day Velocity Trend Chart */}
@@ -480,7 +496,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section - Restyled to Ticket List Design */}
+      {/* Ticket List Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {/* Table Toolbar Header */}
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-slate-50/40">
@@ -530,6 +546,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               <tr className="bg-slate-50/70 border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider font-bold">
                 <th className="py-3 px-4">Ticket ID</th>
                 <th className="py-3 px-4">Subject / Title</th>
+                <th className="py-3 px-4">Source</th>
                 <th className="py-3 px-4">Category</th>
                 <th className="py-3 px-4">Priority</th>
                 <th className="py-3 px-4">Assignee</th>
@@ -546,8 +563,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                       {t.ticketId}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[260px] truncate">
+                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[220px] truncate">
                     {t.title}
+                  </td>
+                  <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-bold">
+                      {t.source}
+                    </span>
                   </td>
                   <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
                     {t.category || "—"}
@@ -593,7 +615,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               ))}
               {filteredTickets.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="py-16 text-center text-sm text-slate-400 italic">
+                  <td colSpan="9" className="py-16 text-center text-sm text-slate-400 italic">
                     No matching tickets found. Try adjusting your search query or filter settings.
                   </td>
                 </tr>
