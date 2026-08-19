@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, memo } from "react";
 import { Link } from "react-router-dom";
 import axiosInstance from '../api/axiosInstance';
+import { fetchTicketStats } from '../api/axiosInstance'; // 👉 Imported the stats API call
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
@@ -202,6 +203,275 @@ const OptimizedPieCard = memo(({ title, data }) => {
     </div>
   );
 });
+
+OptimizedPieCard.displayName = "OptimizedPieCard";
+
+export const Dashboard = ({ tickets: propTickets = [] }) => {
+  const [tickets, setTickets] = useState(propTickets);
+  const [loading, setLoading] = useState(propTickets.length === 0);
+  
+  // 👉 Backend stats state to handle byGenerator data
+  const [backendStats, setBackendStats] = useState({ total: 0, byGenerator: {} });
+
+  // 👉 Fetch stats from the backend on load
+  useEffect(() => {
+    const getStatsData = async () => {
+      try {
+        const data = await fetchTicketStats();
+        if (data) {
+          setBackendStats(data);
+        }
+      } catch (err) {
+        console.error("Failed to load backend stats:", err);
+      }
+    };
+    getStatsData();
+  }, []);
+
+  const [now] = useState(() => new Date());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [velocityDays, setVelocityDays] = useState(7);
+  const [priorityFilterTab, setPriorityFilterTab] = useState("all");
+
+  useEffect(() => {
+    if (propTickets && propTickets.length > 0) {
+      setTickets(propTickets);
+      setLoading(false);
+    }
+  }, [propTickets]);
+
+  useEffect(() => {
+    if (!propTickets || propTickets.length === 0) {
+      const fetchTickets = async () => {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const response = await axiosInstance.get('/tickets');
+          const data = Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []);
+          setTickets(data);
+        } catch (error) {
+          console.error("Failed to fetch tickets:", error);
+          setTickets([]);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchTickets();
+    }
+  }, [propTickets]);
+
+  const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
+
+  const statusCounts = useMemo(() => {
+    const total = normalizedTickets.length;
+    const open = normalizedTickets.filter((t) => !t.isResolved).length;
+    const closed = normalizedTickets.filter((t) => t.isResolved).length;
+    const unassigned = normalizedTickets.filter((t) => t.assigneeName.toLowerCase() === "unassigned").length;
+    return { total, open, closed, unassigned };
+  }, [normalizedTickets]);
+
+  const filteredTickets = useMemo(() => {
+    return normalizedTickets.filter((t) => {
+      const matchesSearch = 
+        t.ticketId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.category.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      let matchesStatus = true;
+      if (statusFilter === "open") matchesStatus = !t.isResolved;
+      else if (statusFilter === "closed") matchesStatus = t.isResolved;
+      else if (statusFilter === "unassigned") matchesStatus = t.assigneeName.toLowerCase() === "unassigned";
+
+      const matchesPriority = priorityFilterTab === "all" ? true : t.priority.toLowerCase() === priorityFilterTab.toLowerCase();
+
+      return matchesSearch && matchesStatus && matchesPriority;
+    });
+  }, [normalizedTickets, searchQuery, statusFilter, priorityFilterTab]);
+
+  const operatorResolutionStats = useMemo(() => {
+    const resolvedTickets = normalizedTickets.filter(t => t.isResolved);
+    const map = {};
+    resolvedTickets.forEach((t) => {
+      const assignee = (t.assigneeName || "Unassigned").trim();
+      map[assignee] = (map[assignee] || 0) + 1;
+    });
+    return {
+      totalResolved: resolvedTickets.length,
+      byOperator: Object.entries(map).map(([operator, count]) => ({ operator, count }))
+    };
+  }, [normalizedTickets]);
+
+  const priorityAnalytics = useMemo(() => {
+    const levels = ["Critical", "High", "Medium", "Low"];
+    return levels.map(level => {
+      const matching = normalizedTickets.filter(t => t.priority === level);
+      const resolved = matching.filter(t => t.isResolved).length;
+      return {
+        level,
+        total: matching.length,
+        resolved
+      };
+    });
+  }, [normalizedTickets]);
+
+  const handleExportExcel = () => {
+    const currentDate = new Date();
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(currentDate.getMonth() - 1);
+
+    const recentTickets = normalizedTickets.filter((t) => {
+      if (!t.createdAt) return true;
+      const ticketDate = new Date(t.createdAt);
+      return isNaN(ticketDate.getTime()) || ticketDate >= oneMonthAgo;
+    });
+
+    if (recentTickets.length === 0) {
+      alert("No ticket data found to export for the last month.");
+      return;
+    }
+
+    const headers = [
+      "Ticket ID", "Title", "Description", "Source", "Category", "Priority", 
+      "Ticket Status", "SLA Health", "SLA Deadline", "Assignee", "Creator / Generator", "Assigned At", 
+      "Assignment Duration", "SLA Active Duration", "Sub-Assignee", "Sub-Assigned At", 
+      "Sub-Assignment Duration", "Resolved At", "Final Resolution Duration", "Company ID", "Created At"
+    ];
+
+    const csvRows = recentTickets.map((t) => {
+      const createdAtFormatted = t.createdAt ? new Date(t.createdAt).toLocaleString() : "";
+      const assignedAtFormatted = t.assignedAt ? new Date(t.assignedAt).toLocaleString() : "";
+      const subAssignmentAtFormatted = t.subAssignmentAt ? new Date(t.subAssignmentAt).toLocaleString() : "";
+      const resolvedAtFormatted = t.resolvedAt ? new Date(t.resolvedAt).toLocaleString() : "";
+      const slaDeadlineFormatted = t.slaDeadline ? new Date(t.slaDeadline).toLocaleString() : "";
+
+      return [
+        `"${(t.ticketId || "").toString().replace(/"/g, '""')}"`,
+        `"${(t.title || "").replace(/"/g, '""')}"`,
+        `"${(t.description || "").replace(/"/g, '""')}"`,
+        `"${(t.source || "").replace(/"/g, '""')}"`,
+        `"${(t.category || "").replace(/"/g, '""')}"`,
+        `"${(t.priority || "").replace(/"/g, '""')}"`,
+        `"${(t.status || "").replace(/"/g, '""')}"`,
+        `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
+        `"${slaDeadlineFormatted}"`,
+        `"${(t.assigneeName || "").replace(/"/g, '""')}"`,
+        `"${(t.creatorName || "").replace(/"/g, '""')}"`,
+        `"${assignedAtFormatted}"`,
+        `"${t.assignmentTimeFormatted || "Unassigned"}"`,
+        `"${t.slaTimeFormatted || "N/A"}"`,
+        `"${(t.subAssignmentName || "").replace(/"/g, '""')}"`,
+        `"${subAssignmentAtFormatted}"`,
+        `"${t.subAssignmentTimeFormatted || "Not Sub-Assigned"}"`,
+        `"${resolvedAtFormatted}"`,
+        `"${t.finalResolutionTimeFormatted || "Pending"}"`,
+        `"${(t.companyId || "").toString().replace(/"/g, '""')}"`,
+        `"${createdAtFormatted}"`
+      ].join(",");
+    });
+
+    const csvContent = [headers.join(","), ...csvRows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `comprehensive_tickets_report_last_month_${currentDate.toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const stats = useMemo(() => ({
+    total: statusCounts.total,
+    open: statusCounts.open,
+    closed: statusCounts.closed,
+    unassigned: statusCounts.unassigned,
+    slaRisk: normalizedTickets.filter((t) => ["Breached", "At Risk"].includes(t.slaStatus)).length,
+    byGenerator: backendStats?.byGenerator || {}, // 👉 Feeds backend generator breakdown data here
+  }), [normalizedTickets, statusCounts, backendStats]);
+
+  const chartData = useMemo(() => {
+    const daysCount = velocityDays;
+    const dateRangeDays = Array.from({ length: daysCount }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (daysCount - 1 - i));
+      return { label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), fullDate: d.toDateString() };
+    });
+
+    const trend = dateRangeDays.map((day) => ({
+      day: day.label,
+      tickets: normalizedTickets.filter((t) => {
+        const d = new Date(t.createdAt);
+        return !isNaN(d.getTime()) && d.toDateString() === day.fullDate;
+      }).length,
+    }));
+
+    return {
+      priority: [
+        { name: "Critical", count: normalizedTickets.filter((t) => t.priority === "Critical").length },
+        { name: "High", count: normalizedTickets.filter((t) => t.priority === "High").length },
+        { name: "Medium", count: normalizedTickets.filter((t) => t.priority === "Medium").length },
+        { name: "Low", count: normalizedTickets.filter((t) => t.priority === "Low").length },
+      ],
+      type: [
+        { name: "Request", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("request") || t.category.toLowerCase().includes("dispatch")).length, color: "#3b82f6", details: "Standard requests & dispatches" },
+        { name: "Problem", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("problem") || t.category.toLowerCase().includes("fleet")).length, color: "#f59e0b", details: "Fleet & operational issues" },
+      ].filter((d) => d.value > 0),
+      sla: [
+        { name: "On Track", value: normalizedTickets.filter((t) => t.slaStatus === "On Track").length, color: "#10b981", details: "Meeting target timelines" },
+        { name: "At Risk", value: normalizedTickets.filter((t) => t.slaStatus === "At Risk").length, color: "#f59e0b", details: "Approaching deadline window" },
+        { name: "Breached", value: normalizedTickets.filter((t) => t.slaStatus === "Breached").length, color: "#ef4444", details: "Deadline expired uncompleted" },
+      ].filter((d) => d.value > 0),
+      trend: trend,
+    };
+  }, [normalizedTickets, velocityDays]);
+
+  if (loading) return <div className="h-96 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
+
+  return (
+    <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
+      <div>
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{title}</h4>
+          <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">Total: {totalValue}</span>
+        </div>
+      </div>
+      <div className="h-32 w-full mt-1">
+        <ResponsiveContainer width="100%" height="100%" debounce={100}>
+          <PieChart>
+            <Pie 
+              data={data} 
+              innerRadius="45%" 
+              outerRadius="75%" 
+              paddingAngle={6} 
+              dataKey="value"
+              isAnimationActive={false}
+            >
+              {data.map((entry, idx) => (
+                <Cell key={`cell-${idx}`} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
+              ))}
+            </Pie>
+            <Tooltip content={<CustomTooltip />} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-1 text-[10px] text-slate-500">
+        {data.map((item, idx) => (
+          <div key={`fact-${idx}`} className="flex items-center gap-1.5 truncate">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+            <span className="truncate font-medium text-slate-700">{item.name}:</span>
+            <span className="font-bold text-slate-900">{item.value} ({totalValue > 0 ? Math.round((item.value / totalValue) * 100) : 0}%)</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 OptimizedPieCard.displayName = "OptimizedPieCard";
 

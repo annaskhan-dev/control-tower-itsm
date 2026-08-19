@@ -12,6 +12,17 @@ export const fetchTickets = async (params = {}) => {
   }
 };
 
+// 👉 Added this function to fetch dashboard stats (including byGenerator)
+export const fetchTicketStats = async () => {
+  try {
+    const response = await axiosInstance.get('/tickets/stats');
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching ticket stats:", error.response?.status, error.response?.data);
+    throw error;
+  }
+};
+
 export const createTicket = async (ticketData) => {
   try {
     const response = await axiosInstance.post('/tickets', ticketData);
@@ -95,7 +106,7 @@ export const updateSlaPriority = async (id, hours) => {
  * Removes an entire SLA config rule
  * @param {String} id - The MongoDB _id of the config
  */
-export const deleteSlaCategory = async (id) => {
+export const deleteSlaCategory = async (id) =>  {
   try {
     const response = await axiosInstance.delete(`/tickets/sla-configs/${id}`);
     return response.data;
