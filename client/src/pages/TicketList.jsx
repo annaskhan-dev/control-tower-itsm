@@ -22,7 +22,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   const userRoleRaw = role || user?.role || user?.userType || user?.type || "";
   const currentRole = typeof userRoleRaw === 'string' ? userRoleRaw.replace(/\s+/g, "_").toLowerCase() : "";
   
-  const isUserOperator = currentRole.includes('operator');
   const isUserManagerOrAdmin = isAdmin || isManager || currentRole.includes('admin') || currentRole.includes('manager');
 
   const queue = searchParams.get("queue") || "all-work";
@@ -38,7 +37,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         const allUsers = response.data || [];
         const filteredOps = allUsers.filter(u => {
           const r = (u.role || u.userType || "").replace(/\s+/g, "_").toLowerCase();
-          return r.includes('operator');
+          return r.includes('operator') || r.includes('transporter') || !r.includes('admin');
         });
         setOperators(filteredOps);
       } catch (err) {
@@ -171,8 +170,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const filteredTickets = useMemo(() => {
     return ticketData.filter((t) => {
-      // If user is an operator, strictly restrict to tickets assigned specifically to them
-      if (isUserOperator && !isUserManagerOrAdmin) {
+      // If user is NOT an admin/manager, restrict view to:
+      // 1. Tickets assigned specifically to them
+      // 2. Unassigned tickets (so they can see the Unassigned queue and claim them)
+      if (!isUserManagerOrAdmin) {
         const assigneeLower = t.assigneeName.trim().toLowerCase();
         const subAssigneeLower = t.subAssignmentName.trim().toLowerCase();
         const userName = (user?.name || user?.username || user?.fullName || "").trim().toLowerCase();
@@ -183,8 +184,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           (subAssigneeLower && userName && subAssigneeLower.includes(userName)) ||
           (userEmail && assigneeLower.includes(userEmail));
 
-        // If the ticket is not assigned to this operator, filter it out completely
-        if (!isAssignedToThem) return false;
+        const isUnassigned = !t.isAssigned;
+
+        // If it's neither assigned to them nor unassigned, filter it out
+        if (!isAssignedToThem && !isUnassigned) return false;
       }
 
       let matchesQueue = true;
@@ -199,7 +202,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const searchStr = searchTerm.toLowerCase();
       return matchesQueue && (t.title?.toLowerCase().includes(searchStr) || t.ticketId?.toLowerCase().includes(searchStr));
     });
-  }, [ticketData, queue, searchTerm, isUserOperator, isUserManagerOrAdmin, user]);
+  }, [ticketData, queue, searchTerm, isUserManagerOrAdmin, user]);
 
   return (
     <div className="flex flex-col h-full font-sans bg-slate-50 text-slate-800">
@@ -247,7 +250,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           ) : filteredTickets.length === 0 ? (
             <div className="p-16 text-center text-sm text-slate-400 italic flex flex-col items-center gap-2">
               <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7m16 0v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5m16 0h-2.586a1 1 0 0 0-.707.293l-2.414 2.414a1 1 0 0 1-.707.293h-3.172a1 1 0 0 1-.707-.293l-2.414-2.414A1 1 0 0 0 6.586 13H4"/></svg>
-              No tickets assigned to you found in this view queue.
+              No tickets found in this view queue.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -284,14 +287,14 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs" onClick={(e) => e.stopPropagation()}>
                           {t.isAssigned ? (
                             <span>{t.assigneeName}</span>
-                          ) : isUserOperator ? (
+                          ) : !isUserManagerOrAdmin ? (
                             <button
                               onClick={(e) => handleAssignToMe(e, mongoId)}
                               className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded-lg font-semibold transition-all shadow-xs cursor-pointer"
                             >
                               Assign to Me
                             </button>
-                          ) : isUserManagerOrAdmin ? (
+                          ) : (
                             <select
                               defaultValue=""
                               onChange={(e) => {
@@ -311,8 +314,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                                 );
                               })}
                             </select>
-                          ) : (
-                            <span className="text-slate-400 italic">Unassigned</span>
                           )}
                         </td>
 
