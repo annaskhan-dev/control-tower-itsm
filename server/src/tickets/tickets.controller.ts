@@ -94,6 +94,8 @@ export class TicketsController {
   ) {
     const userRole = req.user.role || '';
     const userName = req.user.name || req.user.username || req.user.sub;
+    
+    // Pass user details to service layer for server-side role-based filtering
     return this.ticketsService.findAll(search, queue, req.user.companyId, userRole, userName);
   }
 

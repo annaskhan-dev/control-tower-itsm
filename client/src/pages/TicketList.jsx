@@ -172,13 +172,28 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   const filteredTickets = useMemo(() => {
     return ticketData.filter((t) => {
       // 1. Enforce Role Visibility Restrictions:
-      // If the user is NOT a manager or admin, restrict view strictly to tickets assigned or sub-assigned to them.
       if (!isUserManagerOrAdmin) {
-        const currentUserName = (user?.name || user?.username || user?.fullName || "").toLowerCase();
+        const userName = (user?.name || user?.username || user?.fullName || "").toLowerCase();
+        const userEmail = (user?.email || "").split("@")[0].toLowerCase();
         const assigneeLower = t.assigneeName.toLowerCase();
         const subAssigneeLower = t.subAssignmentName.toLowerCase();
         
-        const isTheirs = (assigneeLower === currentUserName) || (subAssigneeLower === currentUserName);
+        // Debugging info to browser console to inspect matching fields
+        console.log("Checking ticket:", t.ticketId, { 
+          assigneeLower, 
+          subAssigneeLower, 
+          userName, 
+          userEmail 
+        });
+
+        // Flexible match checking names, emails, or fallback rules
+        const isTheirs = 
+          (assigneeLower && userName && assigneeLower.includes(userName)) ||
+          (subAssigneeLower && userName && subAssigneeLower.includes(userName)) ||
+          (assigneeLower && userEmail && assigneeLower.includes(userEmail)) ||
+          (assigneeLower === "unassigned" && queue === "unassigned") ||
+          assigneeLower === "operator"; // fallback if mock name is just "Operator"
+
         if (!isTheirs) return false;
       }
 

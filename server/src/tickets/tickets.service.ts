@@ -211,19 +211,22 @@ export class TicketsService {
     const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
     const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
 
-    if (!isManagerOrAdmin) {
-      // Non-management roles only see tickets assigned/sub-assigned to them
-      query.$or = [
-        { assignee: new RegExp(`^${userName}$`, 'i') },
-        { assignedTo: new RegExp(`^${userName}$`, 'i') },
-        { subAssignment: new RegExp(`^${userName}$`, 'i') }
-      ];
-    }
-
+    // If viewing the unassigned queue, allow operators to see unassigned records regardless of personal filter
     if (queue === 'unassigned') {
       query.assignee = { $in: ['Unassigned', null, ''] };
-    } else if (queue === 'open') {
-      query.status = 'Open';
+    } else {
+      if (!isManagerOrAdmin) {
+        // Non-management roles only see tickets assigned/sub-assigned to them
+        query.$or = [
+          { assignee: new RegExp(`^${userName}$`, 'i') },
+          { assignedTo: new RegExp(`^${userName}$`, 'i') },
+          { subAssignment: new RegExp(`^${userName}$`, 'i') }
+        ];
+      }
+      
+      if (queue === 'open') {
+        query.status = 'Open';
+      }
     }
 
     if (search) {
