@@ -57,7 +57,18 @@ const normalizeTicket = (t, now) => {
   else if (rawPriorityStr.includes("med") || rawPriorityStr.includes("p3")) priority = "Medium";
 
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
-  const rawSourceStr = (t.generator || t.source || t.origin || t.channel || t.createdByRole || "Direct API / System").toString();
+  
+  // Robust source / generator extraction from various possible backend naming conventions
+  const rawSourceStr = (
+    t.generator || 
+    t.source || 
+    t.origin || 
+    t.channel || 
+    t.createdByRole || 
+    t.creator || 
+    (t.metadata && (t.metadata.source || t.metadata.generator)) || 
+    "Direct API / System"
+  ).toString();
   
   const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
   const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
@@ -213,7 +224,7 @@ OptimizedPieCard.displayName = "OptimizedPieCard";
 export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [tickets, setTickets] = useState(propTickets);
   const [loading, setLoading] = useState(propTickets.length === 0);
-  const [backendStats, setBackendStats] = useState({ total: 0, byGenerator: [] });
+  const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
 
   useEffect(() => {
@@ -362,6 +373,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       });
     }
 
+    // Fallback: Aggregate directly from normalized tickets if backend stats don't supply generator info
     if (Object.keys(generatorMap).length === 0 || Object.values(generatorMap).reduce((a, b) => a + b, 0) === 0) {
       generatorMap = {};
       normalizedTickets.forEach(t => {
