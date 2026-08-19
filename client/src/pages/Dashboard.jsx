@@ -226,18 +226,13 @@ const GeneratorListCard = memo(({ title, data }) => {
 GeneratorListCard.displayName = "GeneratorListCard";
 
 export const Dashboard = ({ tickets: propTickets }) => {
-  const { tickets: contextTickets, isLoading: contextLoading, fetchTickets } = useTickets();
+  const { tickets: contextTickets, isLoading: contextLoading } = useTickets();
   
   const tickets = (propTickets && propTickets.length > 0) ? propTickets : contextTickets;
   const loading = contextLoading && (!tickets || tickets.length === 0);
 
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
-
-  // Safe data fetching on mount without triggering infinite loops
-  useEffect(() => {
-    fetchTickets('all-work');
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let isMounted = true;
