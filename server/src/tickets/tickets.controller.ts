@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Patch,
+  Put,
   Delete,
   Param,
   Query,
@@ -92,6 +93,7 @@ export class TicketsController {
     return ticket;
   }
 
+  // Handles PATCH requests for updates
   @Patch(':id')
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async update(
@@ -99,6 +101,22 @@ export class TicketsController {
     @Param('id') id: string,
     @Body() updateTicketDto: UpdateTicketDto,
   ) {
+    return this.processTicketUpdate(req, id, updateTicketDto);
+  }
+
+  // Handles PUT requests for updates (matches the frontend axiosInstance.put call)
+  @Put(':id')
+  @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
+  async updatePut(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() updateTicketDto: UpdateTicketDto,
+  ) {
+    return this.processTicketUpdate(req, id, updateTicketDto);
+  }
+
+  // Shared validation and update workflow logic
+  private async processTicketUpdate(req: AuthenticatedRequest, id: string, updateTicketDto: UpdateTicketDto) {
     // 1. Fetch existing ticket to verify its current state
     const existingTicket = await this.ticketsService.findOne(id, req.user.companyId);
     if (!existingTicket) {
