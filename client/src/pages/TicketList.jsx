@@ -171,38 +171,29 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const filteredTickets = useMemo(() => {
     return ticketData.filter((t) => {
-      // 1. Enforce Role Visibility Restrictions:
+      // 1. Role Visibility: Admins/Managers see everything. Operators see unassigned or general queue work.
       if (!isUserManagerOrAdmin) {
-        const userName = (user?.name || user?.username || user?.fullName || "Hamza").trim().toLowerCase();
-        const userEmail = (user?.email || "").split("@")[0].toLowerCase();
         const assigneeLower = t.assigneeName.trim().toLowerCase();
         const subAssigneeLower = t.subAssignmentName.trim().toLowerCase();
-        
-        // Debugging info to browser console to inspect matching fields
-        console.log("Checking ticket:", t.ticketId, { 
-          assigneeLower, 
-          subAssigneeLower, 
-          userName, 
-          userEmail 
-        });
+        const userName = (user?.name || user?.username || user?.fullName || "").trim().toLowerCase();
+        const userEmail = (user?.email || "").split("@")[0].toLowerCase();
 
-        // Allow operators to view tickets on general workspace queues like "all-work", "all", or "open"
         const isGeneralQueue = queue === "all" || queue === "all-work" || queue === "open";
 
-        // Flexible match checking general queue, unassigned status, names, emails, or fallback rules
+        // Fix: Explicitly allow unassigned tickets or general queues for operators
         const isTheirs = 
           isGeneralQueue ||
           assigneeLower === "unassigned" ||
-          (assigneeLower && userName && assigneeLower.includes(userName)) ||
+          assigneeLower === "" ||
+          !t.isAssigned ||
+          (userName && assigneeLower.includes(userName)) ||
           (subAssigneeLower && userName && subAssigneeLower.includes(userName)) ||
-          (assigneeLower && userEmail && assigneeLower.includes(userEmail)) ||
-          assigneeLower.includes("operator") ||
-          assigneeLower.includes("hamza");
+          (userEmail && assigneeLower.includes(userEmail));
 
         if (!isTheirs) return false;
       }
 
-      // 2. Queue Filtering Logic
+      // 2. Queue Tab Filtering Logic
       let matchesQueue = true;
       if (queue === "sla-risk") {
         matchesQueue = t.status?.toLowerCase() === "open" && (t.slaStatus === "Breached" || t.slaStatus === "At Risk");
