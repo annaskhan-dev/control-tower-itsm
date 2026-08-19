@@ -170,9 +170,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const filteredTickets = useMemo(() => {
     return ticketData.filter((t) => {
-      // If user is NOT an admin/manager, restrict view to:
-      // 1. Tickets assigned specifically to them
-      // 2. Unassigned tickets (so they can see the Unassigned queue and claim them)
       if (!isUserManagerOrAdmin) {
         const assigneeLower = t.assigneeName.trim().toLowerCase();
         const subAssigneeLower = t.subAssignmentName.trim().toLowerCase();
@@ -186,7 +183,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
         const isUnassigned = !t.isAssigned;
 
-        // If it's neither assigned to them nor unassigned, filter it out
         if (!isAssignedToThem && !isUnassigned) return false;
       }
 
@@ -273,6 +269,9 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                 <tbody className="divide-y divide-slate-100">
                   {filteredTickets.map((t) => {
                     const mongoId = t._id || t.id;
+                    const isResolvedState = ["closed", "resolved", "completed", "done"].includes((t.status || "").toLowerCase());
+                    const isRestricted = !isUserManagerOrAdmin;
+
                     return (
                       <tr 
                         key={mongoId} 
@@ -295,25 +294,29 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                               Assign to Me
                             </button>
                           ) : (
-                            <select
-                              defaultValue=""
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleManagerAssign(mongoId, e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="bg-white border border-slate-300 rounded-lg text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                            >
-                              <option value="" disabled>Assign to Operator...</option>
-                              {operators.map((op) => {
-                                const opName = op.name || op.fullName || op.username;
-                                return (
-                                  <option key={op._id || op.id} value={opName}>
-                                    {opName}
-                                  </option>
-                                );
-                              })}
-                            </select>
+                            <div className="relative">
+                              <select
+                                value={t.assignee || t.assignedTo || "Unassigned"}
+                                disabled={isRestricted || isResolvedState}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleManagerAssign(mongoId, e.target.value);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed cursor-pointer"
+                              >
+                                <option value="Unassigned">Assign to Operator...</option>
+                                {operators.map((u) => {
+                                  const userName = u.name || u.fullName || u.username;
+                                  const userRole = u.role || u.userType || 'Operator';
+                                  return (
+                                    <option key={u._id || u.id} value={userName}>
+                                      {userName} ({userRole})
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
                           )}
                         </td>
 
