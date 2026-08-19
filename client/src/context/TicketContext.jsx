@@ -4,25 +4,31 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  useRef, // <-- Added missing useRef import
+  useRef,
 } from "react";
 import { useAuth } from "./AuthContext";
 import axiosInstance from "../api/axiosInstance";
 
 const TicketContext = createContext();
 
+// Global module-level session lock to prevent ANY component from looping requests
+let hasFetchedGlobal = false;
+
 export const TicketProvider = ({ children }) => {
   const [tickets, setTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   
   const { token } = useAuth(); 
-
-  // Track ongoing/fetched states
   const fetchingRef = useRef({});
 
   const fetchTickets = useCallback(async (queue = 'all-work', force = false) => {
     if (!token) {
       console.warn("No auth token found. Skipping fetch.");
+      return;
+    }
+
+    // HARD LOCK: If already fetched globally this session and not forced, completely block duplicate requests
+    if (hasFetchedGlobal && !force && tickets.length > 0) {
       return;
     }
 
@@ -39,13 +45,14 @@ export const TicketProvider = ({ children }) => {
       });
       const data = Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []);
       setTickets(data);
+      hasFetchedGlobal = true; // Mark as fetched globally
     } catch (error) {
       console.error("Error fetching tickets:", error.response?.status, error.response?.data);
     } finally {
       setIsLoading(false);
       fetchingRef.current[queue] = false;
     }
-  }, [token]);
+  }, [token, tickets.length]);
 
   const updateLocalTicket = useCallback((id, updatedFields) => {
     setTickets((prevTickets) =>
@@ -73,8 +80,6 @@ export const TicketProvider = ({ children }) => {
     }
   }, [updateLocalTicket]);
 
-  // OPTIMIZATION: Removed `tickets` and `isLoading` from useMemo dependencies 
-  // to prevent unnecessary re-renders across the entire application tree.
   const value = useMemo(() => ({
     tickets, 
     setTickets,
