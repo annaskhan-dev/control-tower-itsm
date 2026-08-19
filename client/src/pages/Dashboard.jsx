@@ -132,7 +132,7 @@ const normalizeTicket = (t, now) => {
 const CustomTooltip = memo(({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-900/95 backdrop-blur-xs text-white text-xs px-3 py-2 rounded-xl shadow-xl border border-slate-700/65">
+      <div className="bg-slate-900/95 backdrop-blur-sm text-white text-xs px-3 py-2 rounded-xl shadow-xl border border-slate-700/65">
         {label && <p className="font-bold text-slate-300 mb-1">{label}</p>}
         {payload.map((entry, index) => (
           <div key={`tooltip-${index}`} className="flex items-center gap-2">
@@ -222,7 +222,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     const getStatsData = async () => {
       try {
         const data = await fetchTicketStats();
-        console.log("Fetched Backend Stats:", data);
         if (data) {
           setBackendStats(data);
         }
@@ -355,7 +354,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       });
     }
 
-    // Fallback aggregation directly from normalized tickets if backend stats map is empty
     if (Object.keys(generatorMap).length === 0 || Object.values(generatorMap).reduce((a, b) => a + b, 0) === 0) {
       generatorMap = {};
       normalizedTickets.forEach(t => {
@@ -464,10 +462,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Tickets by Generator/Source Card */}
         <OptimizedPieCard title="Tickets by Generator / Source" data={chartData.generator} />
-
-        {/* Polished Pie Charts with Detailed Points & Facts */}
         <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
