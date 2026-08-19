@@ -189,13 +189,13 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         // Allow operators to view tickets on general workspace queues like "all-work", "all", or "open"
         const isGeneralQueue = queue === "all" || queue === "all-work" || queue === "open";
 
-        // Flexible match checking general queue, names, emails, or fallback rules
+        // Flexible match checking general queue, unassigned status, names, emails, or fallback rules
         const isTheirs = 
           isGeneralQueue ||
+          assigneeLower === "unassigned" ||
           (assigneeLower && userName && assigneeLower.includes(userName)) ||
           (subAssigneeLower && userName && subAssigneeLower.includes(userName)) ||
           (assigneeLower && userEmail && assigneeLower.includes(userEmail)) ||
-          (assigneeLower === "unassigned" && queue === "unassigned") ||
           assigneeLower.includes("operator") ||
           assigneeLower.includes("hamza");
 
