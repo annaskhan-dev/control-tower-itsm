@@ -220,7 +220,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     const getStatsData = async () => {
       try {
         const data = await fetchTicketStats();
-        console.log("Fetched Backend Stats payload:", data);
         if (data) {
           setBackendStats(data);
         }
@@ -340,7 +339,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const stats = useMemo(() => {
     let generatorMap = {};
     
-    // Un-wrap potential wrapper properties from backend response
     const rawGenSource = 
       backendStats?.byGenerator || 
       backendStats?.generators || 
@@ -364,7 +362,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       });
     }
 
-    // Fallback to computing from tickets if backend generator stats are missing
     if (Object.keys(generatorMap).length === 0 || Object.values(generatorMap).reduce((a, b) => a + b, 0) === 0) {
       generatorMap = {};
       normalizedTickets.forEach(t => {
@@ -403,7 +400,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
     const generatorColors = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#6366f1"];
     
-    // Robust generator mapping fallback ensuring chart always receives entries
     let rawGenEntries = stats.byGenerator || {};
     if (Object.keys(rawGenEntries).length === 0) {
       normalizedTickets.forEach(t => {
@@ -621,3 +617,5 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     </div>
   );
 };
+
+export default Dashboard;
