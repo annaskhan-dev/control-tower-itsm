@@ -173,10 +173,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     return ticketData.filter((t) => {
       // 1. Enforce Role Visibility Restrictions:
       if (!isUserManagerOrAdmin) {
-        const userName = (user?.name || user?.username || user?.fullName || "").toLowerCase();
+        const userName = (user?.name || user?.username || user?.fullName || "").trim().toLowerCase();
         const userEmail = (user?.email || "").split("@")[0].toLowerCase();
-        const assigneeLower = t.assigneeName.toLowerCase();
-        const subAssigneeLower = t.subAssignmentName.toLowerCase();
+        const assigneeLower = t.assigneeName.trim().toLowerCase();
+        const subAssigneeLower = t.subAssignmentName.trim().toLowerCase();
         
         // Debugging info to browser console to inspect matching fields
         console.log("Checking ticket:", t.ticketId, { 
@@ -186,13 +186,17 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           userEmail 
         });
 
-        // Flexible match checking names, emails, or fallback rules
+        // Allow operators to view tickets on general workspace queues like "all-work", "all", or "open"
+        const isGeneralQueue = queue === "all" || queue === "all-work" || queue === "open";
+
+        // Flexible match checking general queue, names, emails, or fallback rules
         const isTheirs = 
+          isGeneralQueue ||
           (assigneeLower && userName && assigneeLower.includes(userName)) ||
           (subAssigneeLower && userName && subAssigneeLower.includes(userName)) ||
           (assigneeLower && userEmail && assigneeLower.includes(userEmail)) ||
           (assigneeLower === "unassigned" && queue === "unassigned") ||
-          assigneeLower === "operator"; // fallback if mock name is just "Operator"
+          assigneeLower.includes("operator"); // fallback if mock name is just "Operator"
 
         if (!isTheirs) return false;
       }
