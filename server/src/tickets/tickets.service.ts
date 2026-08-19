@@ -210,9 +210,14 @@ export class TicketsService {
     const normalizedRole = (userRole || '').replace(/\s+/g, '_').toLowerCase();
     const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
     
+    // Expanded generic placeholders with safe substring checking
     const genericPlaceholders = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person', 'shipper_ops', 'sales_person'];
     const trimmedUserName = (userName || '').toLowerCase().trim();
-    const isGenericName = !userName || genericPlaceholders.includes(trimmedUserName);
+    
+    const isGenericRole = genericPlaceholders.some(p => normalizedRole.includes(p) || trimmedUserName.includes(p));
+    const isGenericName = !userName || genericPlaceholders.includes(trimmedUserName) || isGenericRole;
+
+    this.logger.debug(`[findAll] User: ${userName}, Role: ${userRole}, IsGeneric: ${isGenericName}, Queue: ${queue}`);
 
     // Handle Queues safely with normalization
     const normalizedQueue = (queue || 'all-work').toLowerCase().trim();
@@ -239,6 +244,7 @@ export class TicketsService {
     }
     
     const tickets = await this.ticketModel.find(query).sort({ createdAt: -1 }).exec();
+    this.logger.debug(`[findAll] Found ${tickets.length} tickets matching query.`);
 
     return tickets.map((t: any) => {
       const ticketObj = t.toObject ? t.toObject() : t;
@@ -276,7 +282,9 @@ export class TicketsService {
       
       const genericPlaceholders = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person', 'shipper_ops', 'sales_person'];
       const trimmedUserName = (userName || '').toLowerCase().trim();
-      const isGenericName = genericPlaceholders.includes(trimmedUserName);
+      
+      const isGenericRole = genericPlaceholders.some(p => normalizedRole.includes(p) || trimmedUserName.includes(p));
+      const isGenericName = genericPlaceholders.includes(trimmedUserName) || isGenericRole;
 
       if (!isManagerOrAdmin && !isGenericName) {
         const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;

@@ -12,6 +12,7 @@ import {
   BadRequestException,
   UseGuards,
   Req,
+  Logger,
 } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
@@ -35,6 +36,8 @@ interface AuthenticatedRequest extends Request {
 @Controller('tickets')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TicketsController {
+  private readonly logger = new Logger(TicketsController.name);
+
   constructor(private readonly ticketsService: TicketsService) {}
 
   @Post('sla-configs/categories')
@@ -85,7 +88,6 @@ export class TicketsController {
     const userRole = req.user.role || '';
     const userName = req.user.name || req.user.username || req.user.sub;
     
-    // Pass user details so getStats respects generic roles and user scoping correctly
     return await this.ticketsService.getStats(req.user.companyId, userRole, userName);
   }
 
@@ -99,7 +101,8 @@ export class TicketsController {
     const userRole = req.user.role || '';
     const userName = req.user.name || req.user.username || req.user.sub;
     
-    // Pass user details to service layer for server-side role-based filtering
+    this.logger.debug(`[GET /tickets] Request received from user: ${userName}, role: ${userRole}, queue: ${queue}`);
+
     return this.ticketsService.findAll(search, queue, req.user.companyId, userRole, userName);
   }
 
@@ -111,7 +114,6 @@ export class TicketsController {
     return ticket;
   }
 
-  // Handles PATCH requests for updates
   @Patch(':id')
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async update(
@@ -122,7 +124,6 @@ export class TicketsController {
     return this.processTicketUpdate(req, id, updateTicketDto);
   }
 
-  // Handles PUT requests for updates (matches the frontend axiosInstance.put call)
   @Put(':id')
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async updatePut(
@@ -133,9 +134,7 @@ export class TicketsController {
     return this.processTicketUpdate(req, id, updateTicketDto);
   }
 
-  // Shared validation and update workflow logic
   private async processTicketUpdate(req: AuthenticatedRequest, id: string, updateTicketDto: UpdateTicketDto) {
-    // 1. Fetch existing ticket to verify its current state
     const existingTicket = await this.ticketsService.findOne(id, req.user.companyId);
     if (!existingTicket) {
       throw new NotFoundException(`Ticket with ID ${id} not found`);
@@ -144,7 +143,6 @@ export class TicketsController {
     const currentStatus = (existingTicket.status || '').toLowerCase();
     const isAlreadyResolved = ['closed', 'resolved', 'completed', 'done'].includes(currentStatus);
 
-    // 2. If the ticket is already resolved/closed, block changes to category or subAssignment
     if (isAlreadyResolved) {
       const isChangingCategory = updateTicketDto.category !== undefined && updateTicketDto.category !== existingTicket.category;
       const isChangingSubAssignment = 'subAssignment' in updateTicketDto && updateTicketDto.subAssignment !== existingTicket.subAssignment;
@@ -154,7 +152,6 @@ export class TicketsController {
       }
     }
 
-    // 3. Proceed with standard update process (passing current user's name for validation)
     const currentUserName = req.user.name || req.user.username || req.user.sub;
     return this.ticketsService.update(id, updateTicketDto, req.user.companyId, req.user.role, currentUserName);
   }

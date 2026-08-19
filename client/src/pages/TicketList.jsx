@@ -171,7 +171,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const filteredTickets = useMemo(() => {
     return ticketData.filter((t) => {
-      // 1. Role Visibility: Admins/Managers see everything. Operators see unassigned or general queue work.
       if (!isUserManagerOrAdmin) {
         const assigneeLower = t.assigneeName.trim().toLowerCase();
         const subAssigneeLower = t.subAssignmentName.trim().toLowerCase();
@@ -180,7 +179,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
         const isGeneralQueue = queue === "all" || queue === "all-work" || queue === "open";
 
-        // Fix: Explicitly allow unassigned tickets or general queues for operators
         const isTheirs = 
           isGeneralQueue ||
           assigneeLower === "unassigned" ||
@@ -193,7 +191,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         if (!isTheirs) return false;
       }
 
-      // 2. Queue Tab Filtering Logic
       let matchesQueue = true;
       if (queue === "sla-risk") {
         matchesQueue = t.status?.toLowerCase() === "open" && (t.slaStatus === "Breached" || t.slaStatus === "At Risk");
