@@ -1,42 +1,42 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
-@Schema({ timestamps: true })
+@Schema({ timestamps: true, strict: true })
 export class Ticket extends Document {
-  @Prop({ required: true })
+  @Prop({ required: true, unique: true, index: true })
   ticketId!: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, trim: true })
   title!: string;
 
-  @Prop()
+  @Prop({ trim: true })
   description!: string;
 
-  @Prop()
+  @Prop({ trim: true })
   source!: string;
 
-  @Prop({ required: true, default: 'Direct API / System' })
-  generator!: string; // <--- Automatically falls back to this default if left blank
+  @Prop({ required: true, default: 'Direct API / System', index: true })
+  generator!: string; // Automatically falls back to this default if left blank
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false, index: true })
   createdBy?: Types.ObjectId;
 
-  @Prop()
+  @Prop({ index: true })
   type!: string;
 
-  @Prop()
+  @Prop({ index: true })
   priority!: string;
 
-  @Prop()
+  @Prop({ required: true, default: 'Open', index: true })
   status!: string;
 
-  @Prop()
+  @Prop({ index: true })
   assignee!: string;
 
   @Prop()
   assignedAt!: Date;
 
-  @Prop()
+  @Prop({ index: true })
   subAssignment!: string;
 
   @Prop()
@@ -45,16 +45,24 @@ export class Ticket extends Document {
   @Prop()
   resolvedAt!: Date;
 
-  @Prop({ default: 'fleet-coordination' })
+  @Prop({ default: 'fleet-coordination', index: true })
   category!: string;
 
   @Prop()
   slaDeadline!: Date;
 
-  @Prop()
+  @Prop({ required: true, index: true })
   companyId!: string;
+
+  @Prop({ type: Object, default: {} })
+  metadata?: Record<string, any>;
 }
 
 export const TicketSchema = SchemaFactory.createForClass(Ticket);
+
+// Compound indexes to accelerate dashboard queries, telemetry rollups, and queue filtering
+TicketSchema.index({ companyId: 1, status: 1 });
+TicketSchema.index({ companyId: 1, createdAt: -1 });
+TicketSchema.index({ companyId: 1, generator: 1 });
 
 export type TicketDocument = Ticket & Document;

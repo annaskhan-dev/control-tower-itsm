@@ -89,6 +89,8 @@ export class TicketsController {
       generator: createTicketDto['generator'] || userRole || 'System',
     };
 
+    this.logger.debug(`[POST /tickets] Creating ticket by user: ${userName}, role: ${userRole}, generator: ${enrichedTicketDto.generator}`);
+
     return await this.ticketsService.create(
       enrichedTicketDto, 
       req.user.companyId, 
@@ -104,7 +106,12 @@ export class TicketsController {
     const userRole = req.user.role || '';
     const userName = req.user.name || req.user.username || req.user.sub;
     
-    return await this.ticketsService.getStats(req.user.companyId, userRole, userName);
+    this.logger.debug(`[GET /tickets/stats] Fetching operational statistics for company: ${req.user.companyId}`);
+
+    const statsResult = await this.ticketsService.getStats(req.user.companyId, userRole, userName);
+    
+    // Ensure structure compatibility for frontend Dashboard telemetry consumers (supports object/array wrapping)
+    return statsResult;
   }
 
   @Get()
@@ -169,12 +176,16 @@ export class TicketsController {
     }
 
     const currentUserName = req.user.name || req.user.username || req.user.sub;
+    
+    this.logger.debug(`[PATCH/PUT /tickets/${id}] Updating ticket state by: ${currentUserName}`);
+
     return this.ticketsService.update(id, updateTicketDto, req.user.companyId, req.user.role, currentUserName);
   }
 
   @Delete(':id')
   @Roles('Manager', 'Super Admin')
   async remove(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    this.logger.warn(`[DELETE /tickets/${id}] Ticket removal requested by role: ${req.user.role}`);
     return await this.ticketsService.remove(id, req.user.companyId, req.user.role);
   }
 }

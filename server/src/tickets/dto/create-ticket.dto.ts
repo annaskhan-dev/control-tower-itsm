@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsDate, ValidateIf } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsDate, IsObject, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateTicketDto {
@@ -28,7 +28,7 @@ export class CreateTicketDto {
 
   @IsString()
   @IsOptional()
-  generator?: string; // <--- Added to validate ticket generator payload
+  generator?: string; // Validates ticket generator payload
 
   @IsString()
   @IsOptional()
@@ -49,9 +49,13 @@ export class CreateTicketDto {
   @IsDate()
   subAssignmentAt?: Date;
 
-  // companyId is usually handled by the controller via req.user, 
-  // but keeping it here as requested.
+  // companyId is usually handled by the controller via req.user
   @IsOptional()
   @IsString()
   companyId?: string; 
+
+  // Added to support dynamic telemetry and extra tracking context matching schema
+  @IsObject()
+  @IsOptional()
+  metadata?: Record<string, any>;
 }

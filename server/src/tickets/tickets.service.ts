@@ -73,7 +73,8 @@ export class TicketsService {
       const createdTicket = new this.ticketModel(ticketData);
       const savedTicket = await createdTicket.save();
 
-      this.ticketsGateway.emitTicketCreated(savedTicket);
+      // Emit event scoped to company room
+      this.ticketsGateway.emitTicketCreated(savedTicket, companyId);
       return savedTicket;
     } catch (error: any) {
       this.logger.error(`Failed to create ticket: ${error.message}`);
@@ -181,7 +182,8 @@ export class TicketsService {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
     }
 
-    this.ticketsGateway.emitTicketUpdated(updatedTicket);
+    // Emit event scoped to company room
+    this.ticketsGateway.emitTicketUpdated(updatedTicket, companyId);
     return updatedTicket;
   }
 
@@ -194,11 +196,14 @@ export class TicketsService {
       .exec();
 
     if (!deletedTicket) throw new NotFoundException(`Ticket not found`);
+    
+    // Broadcast ticket deletion
+    this.ticketsGateway.emitTicketDeleted(id, companyId);
     return deletedTicket;
   }
 
   async updateSla(id: string, hours: number, companyId: string, userRole: string): Promise<SlaConfig> {
-    this.authorize(userRole, ['Manager']);
+    this.authorize(userRole, ['Manager', 'Super Admin']);
 
     const updatedSla = await this.slaConfigModel
       .findOneAndUpdate({ _id: id, companyId }, { hours }, { new: true })
@@ -311,7 +316,6 @@ export class TicketsService {
       return acc;
     }, {});
 
-    // Multi-aliased aggregation including 'value' and 'total' properties for full frontend chart compatibility
     const aggregateGeneratorStats = await this.ticketModel.aggregate([
       { $match: query },
       {

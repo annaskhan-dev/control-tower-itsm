@@ -231,6 +231,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     const getStatsData = async () => {
       try {
         const data = await fetchTicketStats();
+        console.log("RAW BACKEND STATS RESPONSE:", data); // Diagnostic log added
         if (data) {
           setBackendStats(data);
         }
