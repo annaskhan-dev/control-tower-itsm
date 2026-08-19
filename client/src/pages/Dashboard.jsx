@@ -58,17 +58,17 @@ const normalizeTicket = (t, now) => {
 
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
   
-  // Robust source / generator extraction from various possible backend naming conventions
-  const rawSourceStr = (
-    t.generator || 
-    t.source || 
-    t.origin || 
-    t.channel || 
-    t.createdByRole || 
-    t.creator || 
-    (t.metadata && (t.metadata.source || t.metadata.generator)) || 
-    "Direct API / System"
-  ).toString();
+  // Robust source / generator extraction supporting all possible backend schemas
+  const rawSourceObj = t.generator || t.source || t.origin || t.channel || t.createdByRole || t.creator;
+  let rawSourceStr = "Direct API / System";
+  
+  if (typeof rawSourceObj === "string" && rawSourceObj.trim() !== "") {
+    rawSourceStr = rawSourceObj;
+  } else if (typeof rawSourceObj === "object" && rawSourceObj !== null) {
+    rawSourceStr = rawSourceObj.name || rawSourceObj.title || rawSourceObj.role || rawSourceObj.type || "Direct API / System";
+  } else if (t.metadata && (t.metadata.source || t.metadata.generator || t.metadata.channel)) {
+    rawSourceStr = t.metadata.source || t.metadata.generator || t.metadata.channel;
+  }
   
   const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
   const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
@@ -355,13 +355,15 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       backendStats?.generators || 
       backendStats?.sourceCounts || 
       backendStats?.bySource ||
+      backendStats?.ticketSources ||
       backendStats?.data?.byGenerator ||
       backendStats?.data?.generators ||
+      backendStats?.data?.sources ||
       (Array.isArray(backendStats) ? backendStats : null);
 
     if (Array.isArray(rawGenSource)) {
       rawGenSource.forEach(item => {
-        const key = item.name || item.key || item.label || item._id || item.source || "Direct API / System";
+        const key = item.name || item.key || item.label || item._id || item.source || item.generator || "Direct API / System";
         const val = Number(item.count || item.total || item.value || item.docCount || 1);
         generatorMap[key] = (generatorMap[key] || 0) + val;
       });
@@ -373,7 +375,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       });
     }
 
-    // Fallback: Aggregate directly from normalized tickets if backend stats don't supply generator info
+    // Fallback: Always aggregate directly from normalized tickets if backend stats don't supply populated generator info
     if (Object.keys(generatorMap).length === 0 || Object.values(generatorMap).reduce((a, b) => a + b, 0) === 0) {
       generatorMap = {};
       normalizedTickets.forEach(t => {
@@ -412,15 +414,17 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
     const generatorColors = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#6366f1"];
     
-    let rawGenEntries = stats.byGenerator || {};
-    if (Object.keys(rawGenEntries).length === 0) {
-      normalizedTickets.forEach(t => {
-        const src = t.source || "Direct API / System";
-        rawGenEntries[src] = (rawGenEntries[src] || 0) + 1;
-      });
-    }
+    // Aggregate dynamically from normalized tickets to ensure chart entries always populate
+    let derivedGeneratorMap = {};
+    normalizedTickets.forEach(t => {
+      const src = t.source || "Direct API / System";
+      derivedGeneratorMap[src] = (derivedGeneratorMap[src] || 0) + 1;
+    });
 
-    const generatorEntries = Object.entries(rawGenEntries).map(([name, value], idx) => ({
+    // Merge with stats.byGenerator if available
+    const activeGenSourceMap = Object.keys(stats.byGenerator || {}).length > 0 ? stats.byGenerator : derivedGeneratorMap;
+
+    const generatorEntries = Object.entries(activeGenSourceMap).map(([name, value], idx) => ({
       name,
       value: Number(value) || 0,
       color: generatorColors[idx % generatorColors.length],
