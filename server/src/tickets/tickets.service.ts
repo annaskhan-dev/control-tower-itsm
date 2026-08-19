@@ -52,8 +52,6 @@ export class TicketsService {
       const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
       const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
 
-      // Dynamically evaluate the generator source. 
-      // If the DTO provides a generator, use it. Otherwise, use the exact userRole (e.g., Admin, Manager, Operator) instead of a hardcoded fallback string.
       const ticketGenerator = createTicketDto.generator || createTicketDto.source || userRole || 'System';
 
       const ticketData = {
@@ -313,13 +311,22 @@ export class TicketsService {
       return acc;
     }, {});
 
-    // Compute metrics grouped dynamically using aggregation pipeline into an array format: [{ name: '...', count: X }]
+    // Robust aggregation fallback across generator, source, assignee, and createdBy fields
     const aggregateGeneratorStats = await this.ticketModel.aggregate([
       { $match: query },
       {
         $group: {
           _id: { 
-            $ifNull: ["$generator", { $ifNull: ["$assignee", "Unassigned"] }] 
+            $ifNull: [
+              "$generator", 
+              { $ifNull: [
+                "$source", 
+                { $ifNull: [
+                  "$assignee", 
+                  { $ifNull: ["$createdBy", "Direct API / System"] }
+                ]}
+              ]}
+            ] 
           },
           count: { $sum: 1 }
         }
@@ -327,7 +334,13 @@ export class TicketsService {
       {
         $project: {
           _id: 0,
-          name: { $ifNull: ["$_id", "Unassigned"] },
+          name: { 
+            $cond: {
+              if: { $in: ["$_id", ["Unassigned", "", null]] },
+              then: "Direct API / System",
+              else: "$_id"
+            }
+          },
           count: 1
         }
       }
@@ -340,7 +353,7 @@ export class TicketsService {
       resolved: tickets.filter((t) => ['resolved', 'closed', 'completed', 'done'].includes((t.status || '').toLowerCase())).length,
       critical: tickets.filter((t) => (t.priority || '').toLowerCase() === 'critical').length,
       byCategory: categoryStats,
-      byGenerator: aggregateGeneratorStats, // <--- Returns array of objects matching frontend map expectations
+      byGenerator: aggregateGeneratorStats.length > 0 ? aggregateGeneratorStats : [{ name: 'Direct API / System', count: tickets.length }],
     };
   }
 
