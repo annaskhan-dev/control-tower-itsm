@@ -243,7 +243,7 @@ export const Dashboard = ({ tickets: propTickets }) => {
       hasFetchedTicketsRef.current = true;
       fetchTickets('all-work');
     }
-  }, [fetchTickets, propTickets]);
+  }, []); // ✅ Fixed: Empty dependency array ensures this fires only once on mount
 
   useEffect(() => {
     let isMounted = true;

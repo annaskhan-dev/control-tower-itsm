@@ -4,6 +4,7 @@ import React, {
   useState, 
   useCallback, 
   useMemo, 
+  ref as _ref,
   useRef 
 } from "react";
 import { useAuth } from "./AuthContext";
@@ -44,7 +45,7 @@ export const TicketProvider = ({ children }) => {
       setIsLoading(false);
       fetchingRef.current[queue] = false;
     }
-  }, [token]); // Removed tickets.length to stabilize the function reference
+  }, [token]);
 
   const updateLocalTicket = useCallback((id, updatedFields) => {
     setTickets((prevTickets) =>
@@ -72,6 +73,7 @@ export const TicketProvider = ({ children }) => {
     }
   }, [updateLocalTicket]);
 
+  // Optimized value memoization: functions are stable, tickets/isLoading are passed directly
   const value = useMemo(() => ({
     tickets, 
     setTickets,
