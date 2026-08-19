@@ -210,7 +210,9 @@ export class TicketsService {
     // Role-based visibility check
     const normalizedRole = (userRole || '').replace(/\s+/g, '_').toLowerCase();
     const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
-    const isGenericName = !userName || ['operator', 'transporter', 'agent', 'shipper ops', 'sales person'].includes(userName.toLowerCase());
+    
+    const genericPlaceholders = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person', 'shipper_ops', 'sales_person'];
+    const isGenericName = !userName || genericPlaceholders.includes(userName.toLowerCase().trim());
 
     if (queue === 'unassigned') {
       query.assignee = { $in: ['Unassigned', null, ''] };
@@ -266,11 +268,12 @@ export class TicketsService {
   async getStats(companyId: string, userRole?: string, userName?: string) {
     const query: any = { companyId };
     
-    // Optional role restriction for stats so non-managers only see their metrics (unless name is a generic placeholder)
     if (userRole && userName) {
       const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
       const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
-      const isGenericName = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person'].includes(userName.toLowerCase());
+      
+      const genericPlaceholders = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person', 'shipper_ops', 'sales_person'];
+      const isGenericName = genericPlaceholders.includes(userName.toLowerCase().trim());
 
       if (!isManagerOrAdmin && !isGenericName) {
         const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
