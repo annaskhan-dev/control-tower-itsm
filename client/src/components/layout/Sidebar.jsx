@@ -10,6 +10,7 @@ import {
   LogOut,
   PlusCircle,
   Clock,
+  BarChart3, // Added icon for the new option
   Menu, 
   X 
 } from 'lucide-react';
@@ -37,11 +38,12 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user, mobileOpen, setMob
     if (onOpenCreateTicket) onOpenCreateTicket();
   };
 
-  // Define nav items: Dashboard & SLA Risk restricted strictly to Super Admin / Manager; Manage Tickets & Unassigned open to operators/transporters
+  // Define nav items: Added Analytics/Reports option to the navigation list
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Manager'] },
     { label: 'Manage Tickets', path: '/tickets?queue=all', icon: Inbox, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter'] },
     { label: 'Unassigned', path: '/tickets?queue=unassigned', icon: InboxIcon, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter'] },
+    { label: 'Analytics & Reports', path: '/analytics', icon: BarChart3, roles: ['Super Admin', 'Manager'] }, // <-- Newly added option
     { label: 'SLA Risk', path: '/tickets?queue=sla-risk', icon: AlertTriangle, roles: ['Super Admin', 'Manager'] },
     { label: 'SLA Settings', path: '/sla', icon: Clock, roles: ['Super Admin', 'Manager'] },
     { label: 'User Management', path: '/users', icon: Users, roles: ['Super Admin', 'Manager'] },
@@ -59,7 +61,7 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user, mobileOpen, setMob
 
   const checkIsActive = (itemPath) => {
     const currentFull = location.pathname + location.search;
-    if (itemPath === '/dashboard' || itemPath === '/users' || itemPath === '/sla') {
+    if (itemPath === '/dashboard' || itemPath === '/users' || itemPath === '/sla' || itemPath === '/analytics') {
       return location.pathname === itemPath;
     }
     return currentFull === itemPath || (itemPath === '/tickets?queue=all' && location.pathname === '/tickets' && !location.search);
