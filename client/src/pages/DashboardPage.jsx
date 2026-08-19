@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dashboard } from './Dashboard'; 
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axiosInstance';
@@ -12,7 +12,8 @@ export const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth(); 
 
-  const companyID = user?.companyID || user?.id;
+  // Use primitive stable values for dependencies
+  const companyID = user?.companyID || user?.id || user?._id;
 
   useEffect(() => {
     let isMounted = true;
@@ -22,7 +23,7 @@ export const DashboardPage = () => {
       return;
     }
 
-    // If we already fetched for this company ID in this session, skip entirely
+    // If we already fetched for this exact company ID in this session, skip entirely
     if (globalLastFetchedCompany === companyID) {
       if (isMounted) setLoading(false);
       return;
