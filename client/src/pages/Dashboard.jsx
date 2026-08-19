@@ -8,31 +8,30 @@ import {
 import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight, CheckCircle2, UserCheck, ShieldAlert } from "lucide-react";
 
 /**
- * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
- * 100% accurate primary assignment, SLA tracking, and sub-assignment telemetry.
+ * Enhanced Normalization Engine: Properly parses nested object or string formats 
+ * for assignees, sub-assignees, and creators so they display real, distinct names.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
   if (typeof rawAssignee === "object" && rawAssignee !== null) {
-    rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
+    rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.username || rawAssignee.email || "Unassigned";
   }
 
-  // Sub-assignee parsing matching backend rules
   let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || t.sub_assigned_to || t.subAssignee || null;
   if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
-    rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
+    rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.username || rawSubAssignee.email || null;
   }
 
-  // Ticket Creator parsing for creator visibility feature
-  let rawCreator = t.creator || t.createdBy || t.created_by || t.author || t.client || t.role || "Operator";
+  // Improved Creator parsing to extract real user names, roles, or emails instead of falling back blindly
+  let rawCreator = t.creator || t.createdBy || t.created_by || t.author || t.client || t.role;
   if (typeof rawCreator === "object" && rawCreator !== null) {
-    rawCreator = rawCreator.name || rawCreator.role || rawCreator.email || "Operator";
+    rawCreator = rawCreator.name || rawCreator.fullName || rawCreator.username || rawCreator.role || rawCreator.email;
   }
+  const creatorName = (typeof rawCreator === "string" && rawCreator.trim() !== "") ? rawCreator.trim() : (t.role || "Operator");
 
   const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
   const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
 
-  // Robust SLA evaluation based on deadlines or explicit metadata
   let sla = t.slaStatus || t.sla_status || t.sla || "On Track";
   if (typeof sla === "string" && !t.slaDeadline) {
     const lowerSla = sla.toLowerCase();
@@ -41,7 +40,6 @@ const normalizeTicket = (t, now) => {
     else sla = "On Track";
   }
   
-  // Real-time SLA deadline validation against current timestamp or resolution time
   const deadlineRaw = t.slaDeadline || t.sla_deadline || t.dueDate || t.due_date;
   if (deadlineRaw) {
     const deadline = new Date(deadlineRaw);
@@ -67,13 +65,12 @@ const normalizeTicket = (t, now) => {
 
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
   
-  const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
+  const assigneeName = typeof rawAssignee === "string" && rawAssignee.trim() !== "" ? rawAssignee.trim() : "Unassigned";
   const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
   
   const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
   const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned";
 
-  // Timestamps matching backend fallback behaviors
   const createdAtTime = new Date(t.createdAt || t.created_at || t.timestamp || now).getTime();
   const assignedAtRaw = t.assignedAt || t.assigned_at || t.assignmentTime;
   const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
@@ -86,14 +83,12 @@ const normalizeTicket = (t, now) => {
   
   const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-  // Timelapses in ms
   let primaryAssignmentMs = 0;
   if (isAssigned) {
     const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
     primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
   }
 
-  // Synchronized SLA active duration calculated from main assignment timestamp
   const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
   let subAssignmentTimeMs = 0;
@@ -118,7 +113,7 @@ const normalizeTicket = (t, now) => {
     ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     assigneeName,
-    creatorName: typeof rawCreator === "string" ? rawCreator : "Operator",
+    creatorName,
     subAssignmentName,
     subAssignmentAt: subAssignedAtRaw,
     status: t.status || "Open",
@@ -135,9 +130,6 @@ const normalizeTicket = (t, now) => {
   };
 };
 
-/**
- * Custom Styled Tooltip Component for Charts
- */
 const CustomTooltip = memo(({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
@@ -153,11 +145,6 @@ const CustomTooltip = memo(({ active, payload, label }) => {
             )}
           </div>
         ))}
-        {payload[0]?.payload?.details && (
-          <p className="text-[10px] text-slate-400 mt-1 italic border-t border-slate-700 pt-1">
-            {payload[0].payload.details}
-          </p>
-        )}
       </div>
     );
   }
@@ -166,9 +153,6 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 
 CustomTooltip.displayName = "CustomTooltip";
 
-/**
- * Isolated Pie Chart Component with animations disabled for buttery-smooth performance and detailed data facts.
- */
 const OptimizedPieCard = memo(({ title, data }) => {
   const totalValue = useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
 
@@ -220,7 +204,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [now] = useState(() => new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [velocityDays, setVelocityDays] = useState(7); // Option for up to 30 days
+  const [velocityDays, setVelocityDays] = useState(7);
   const [priorityFilterTab, setPriorityFilterTab] = useState("all");
 
   useEffect(() => {
@@ -256,7 +240,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
-  // Accurate Status counts matching totals exactly
   const statusCounts = useMemo(() => {
     const total = normalizedTickets.length;
     const open = normalizedTickets.filter((t) => !t.isResolved).length;
@@ -284,7 +267,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     });
   }, [normalizedTickets, searchQuery, statusFilter, priorityFilterTab]);
 
-  // Generator breakdown visibility (Sales, Manager, Operators, etc.)
+  // Distinct generator grouping ensuring real names/roles don't falsely collapse
   const generatorBreakdown = useMemo(() => {
     const map = {};
     normalizedTickets.forEach((t) => {
@@ -294,12 +277,12 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     return Object.entries(map).map(([name, count]) => ({ name, count }));
   }, [normalizedTickets]);
 
-  // Operator Resolution Analytics
+  // Distinct operator resolution mapping using real assignees
   const operatorResolutionStats = useMemo(() => {
     const resolvedTickets = normalizedTickets.filter(t => t.isResolved);
     const map = {};
     resolvedTickets.forEach((t) => {
-      const assignee = t.assigneeName || "Unassigned";
+      const assignee = (t.assigneeName || "Unassigned").trim();
       map[assignee] = (map[assignee] || 0) + 1;
     });
     return {
@@ -308,7 +291,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     };
   }, [normalizedTickets]);
 
-  // Priority counts and resolution counts
   const priorityAnalytics = useMemo(() => {
     const levels = ["Critical", "High", "Medium", "Low"];
     return levels.map(level => {
@@ -396,7 +378,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     slaRisk: normalizedTickets.filter((t) => ["Breached", "At Risk"].includes(t.slaStatus)).length,
   }), [normalizedTickets, statusCounts]);
 
-  // Velocity chart data based on dynamic selected range (up to 30 days)
   const chartData = useMemo(() => {
     const daysCount = velocityDays;
     const dateRangeDays = Array.from({ length: daysCount }).map((_, i) => {
@@ -474,7 +455,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         ))}
       </div>
 
-      {/* NEW: Visibility Cards Section for Generators & Operator Resolutions & Priorities */}
+      {/* Visibility Cards Section with Real Distinct Data */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Tickets Generator Breakdown */}
         <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-xs flex flex-col justify-between">
@@ -484,11 +465,11 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             </h4>
             <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">Total: {stats.total}</span>
           </div>
-          <div className="py-3 flex flex-col gap-2">
+          <div className="py-3 flex flex-col gap-2 max-h-40 overflow-y-auto">
             {generatorBreakdown.map((gen, idx) => (
               <div key={`gen-${idx}`} className="flex items-center justify-between text-xs">
-                <span className="font-medium text-slate-600 capitalize">{gen.name}</span>
-                <span className="font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full">{gen.count} tickets</span>
+                <span className="font-medium text-slate-600 truncate max-w-[170px]">{gen.name}</span>
+                <span className="font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full shrink-0">{gen.count} tickets</span>
               </div>
             ))}
             {generatorBreakdown.length === 0 && (
@@ -496,7 +477,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             )}
           </div>
           <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-100 italic">
-            Reflecting creation telemetry across Sales, Managers, and Operators.
+            Reflecting creation telemetry across distinct creators and roles.
           </div>
         </div>
 
@@ -508,11 +489,11 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             </h4>
             <span className="text-xs font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md">Resolved: {operatorResolutionStats.totalResolved}</span>
           </div>
-          <div className="py-3 flex flex-col gap-2 max-h-32 overflow-y-auto">
+          <div className="py-3 flex flex-col gap-2 max-h-40 overflow-y-auto">
             {operatorResolutionStats.byOperator.map((op, idx) => (
               <div key={`op-${idx}`} className="flex items-center justify-between text-xs">
                 <span className="font-medium text-slate-600 truncate max-w-[150px]">{op.operator}</span>
-                <span className="font-bold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full">{op.count} resolved</span>
+                <span className="font-bold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full shrink-0">{op.count} resolved</span>
               </div>
             ))}
             {operatorResolutionStats.byOperator.length === 0 && (
@@ -520,7 +501,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             )}
           </div>
           <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-100 italic">
-            Total tickets resolved mapped per operator assignee.
+            Total tickets resolved mapped per individual operator assignee.
           </div>
         </div>
 
@@ -551,7 +532,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Priority Distribution Chart */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Priority Distribution</h4>
           <div className="h-36 w-full mt-1">
@@ -561,12 +541,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
                 <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar 
-                  dataKey="count" 
-                  fill="#3b82f6" 
-                  radius={[6, 6, 0, 0]} 
-                  isAnimationActive={false}
-                />
+                <Bar dataKey="count" fill="#3b82f6" radius={[6, 6, 0, 0]} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -576,11 +551,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Polished Pie Charts with Detailed Points & Facts */}
         <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
-        {/* Dynamic Velocity Trend Chart (Up to 30 Days Selection) */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Velocity Trend</h4>
@@ -621,9 +594,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section - Keeping exact table structure and adding status tabs & priority filters */}
+      {/* Ticket List Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        {/* Table Toolbar Header with Status Tabs and Priority Filters */}
         <div className="p-5 border-b border-slate-100 flex flex-col gap-4 bg-slate-50/40">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <div>
@@ -637,7 +609,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-3">
-              {/* Search Bar */}
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input
@@ -651,9 +622,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             </div>
           </div>
 
-          {/* Status Tabs & Priority Level Filters */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-slate-200/60 text-xs">
-            {/* Status Tabs */}
             <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
               {[
                 { id: "all", label: "All Tickets", count: statusCounts.total },
@@ -678,7 +647,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               ))}
             </div>
 
-            {/* Priority Filter Bar */}
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Priority:</span>
               <select
@@ -696,7 +664,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Table Content - Structure Unchanged */}
         <div className="w-full overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
