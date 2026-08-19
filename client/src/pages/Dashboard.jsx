@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
 } from "recharts";
-import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight } from "lucide-react";
+import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight, CheckCircle2, UserCheck, ShieldAlert } from "lucide-react";
 
 /**
  * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
@@ -21,6 +21,12 @@ const normalizeTicket = (t, now) => {
   let rawSubAssignee = t.subAssignment || t.sub_assignment || t.subAssignedTo || t.sub_assigned_to || t.subAssignee || null;
   if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
+  }
+
+  // Ticket Creator parsing for creator visibility feature
+  let rawCreator = t.creator || t.createdBy || t.created_by || t.author || t.client || t.role || "Operator";
+  if (typeof rawCreator === "object" && rawCreator !== null) {
+    rawCreator = rawCreator.name || rawCreator.role || rawCreator.email || "Operator";
   }
 
   const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
@@ -112,6 +118,7 @@ const normalizeTicket = (t, now) => {
     ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     assigneeName,
+    creatorName: typeof rawCreator === "string" ? rawCreator : "Operator",
     subAssignmentName,
     subAssignmentAt: subAssignedAtRaw,
     status: t.status || "Open",
@@ -213,6 +220,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [now] = useState(() => new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [velocityDays, setVelocityDays] = useState(7); // Option for up to 30 days
+  const [priorityFilterTab, setPriorityFilterTab] = useState("all");
 
   useEffect(() => {
     if (propTickets && propTickets.length > 0) {
@@ -247,6 +256,15 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
+  // Accurate Status counts matching totals exactly
+  const statusCounts = useMemo(() => {
+    const total = normalizedTickets.length;
+    const open = normalizedTickets.filter((t) => !t.isResolved).length;
+    const closed = normalizedTickets.filter((t) => t.isResolved).length;
+    const unassigned = normalizedTickets.filter((t) => t.assigneeName.toLowerCase() === "unassigned").length;
+    return { total, open, closed, unassigned };
+  }, [normalizedTickets]);
+
   const filteredTickets = useMemo(() => {
     return normalizedTickets.filter((t) => {
       const matchesSearch = 
@@ -255,22 +273,54 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.category.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesStatus = 
-        statusFilter === "all" ? true :
-        statusFilter === "resolved" ? t.isResolved :
-        statusFilter === "open" ? !t.isResolved : true;
+      let matchesStatus = true;
+      if (statusFilter === "open") matchesStatus = !t.isResolved;
+      else if (statusFilter === "closed") matchesStatus = t.isResolved;
+      else if (statusFilter === "unassigned") matchesStatus = t.assigneeName.toLowerCase() === "unassigned";
 
-      return matchesSearch && matchesStatus;
+      const matchesPriority = priorityFilterTab === "all" ? true : t.priority.toLowerCase() === priorityFilterTab.toLowerCase();
+
+      return matchesSearch && matchesStatus && matchesPriority;
     });
-  }, [normalizedTickets, searchQuery, statusFilter]);
+  }, [normalizedTickets, searchQuery, statusFilter, priorityFilterTab]);
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "—";
-    const d = new Date(dateString);
-    return isNaN(d.getTime()) 
-      ? "Invalid" 
-      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
+  // Generator breakdown visibility (Sales, Manager, Operators, etc.)
+  const generatorBreakdown = useMemo(() => {
+    const map = {};
+    normalizedTickets.forEach((t) => {
+      const creator = (t.creatorName || "Operator").trim();
+      map[creator] = (map[creator] || 0) + 1;
+    });
+    return Object.entries(map).map(([name, count]) => ({ name, count }));
+  }, [normalizedTickets]);
+
+  // Operator Resolution Analytics
+  const operatorResolutionStats = useMemo(() => {
+    const resolvedTickets = normalizedTickets.filter(t => t.isResolved);
+    const map = {};
+    resolvedTickets.forEach((t) => {
+      const assignee = t.assigneeName || "Unassigned";
+      map[assignee] = (map[assignee] || 0) + 1;
+    });
+    return {
+      totalResolved: resolvedTickets.length,
+      byOperator: Object.entries(map).map(([operator, count]) => ({ operator, count }))
+    };
+  }, [normalizedTickets]);
+
+  // Priority counts and resolution counts
+  const priorityAnalytics = useMemo(() => {
+    const levels = ["Critical", "High", "Medium", "Low"];
+    return levels.map(level => {
+      const matching = normalizedTickets.filter(t => t.priority === level);
+      const resolved = matching.filter(t => t.isResolved).length;
+      return {
+        level,
+        total: matching.length,
+        resolved
+      };
+    });
+  }, [normalizedTickets]);
 
   const handleExportExcel = () => {
     const currentDate = new Date();
@@ -290,7 +340,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
     const headers = [
       "Ticket ID", "Title", "Description", "Source", "Category", "Priority", 
-      "Ticket Status", "SLA Health", "SLA Deadline", "Assignee", "Assigned At", 
+      "Ticket Status", "SLA Health", "SLA Deadline", "Assignee", "Creator", "Assigned At", 
       "Assignment Duration", "SLA Active Duration", "Sub-Assignee", "Sub-Assigned At", 
       "Sub-Assignment Duration", "Resolved At", "Final Resolution Duration", "Company ID", "Created At"
     ];
@@ -313,6 +363,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
         `"${slaDeadlineFormatted}"`,
         `"${(t.assigneeName || "").replace(/"/g, '""')}"`,
+        `"${(t.creatorName || "").replace(/"/g, '""')}"`,
         `"${assignedAtFormatted}"`,
         `"${t.assignmentTimeFormatted || "Unassigned"}"`,
         `"${t.slaTimeFormatted || "N/A"}"`,
@@ -338,20 +389,23 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   };
 
   const stats = useMemo(() => ({
-    total: normalizedTickets.length,
-    open: normalizedTickets.filter((t) => !t.isResolved).length,
-    unassigned: normalizedTickets.filter((t) => t.assigneeName.toLowerCase() === "unassigned").length,
+    total: statusCounts.total,
+    open: statusCounts.open,
+    closed: statusCounts.closed,
+    unassigned: statusCounts.unassigned,
     slaRisk: normalizedTickets.filter((t) => ["Breached", "At Risk"].includes(t.slaStatus)).length,
-  }), [normalizedTickets]);
+  }), [normalizedTickets, statusCounts]);
 
+  // Velocity chart data based on dynamic selected range (up to 30 days)
   const chartData = useMemo(() => {
-    const last7Days = Array.from({ length: 7 }).map((_, i) => {
+    const daysCount = velocityDays;
+    const dateRangeDays = Array.from({ length: daysCount }).map((_, i) => {
       const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return { label: d.toLocaleDateString('en-US', { weekday: 'short' }), fullDate: d.toDateString() };
+      d.setDate(d.getDate() - (daysCount - 1 - i));
+      return { label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), fullDate: d.toDateString() };
     });
 
-    const trend = last7Days.map((day) => ({
+    const trend = dateRangeDays.map((day) => ({
       day: day.label,
       tickets: normalizedTickets.filter((t) => {
         const d = new Date(t.createdAt);
@@ -377,7 +431,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       ].filter((d) => d.value > 0),
       trend: trend,
     };
-  }, [normalizedTickets]);
+  }, [normalizedTickets, velocityDays]);
 
   if (loading) return <div className="h-96 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
 
@@ -402,7 +456,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         {[
           { label: "Total Tickets", val: stats.total, icon: Ticket, color: "blue" },
           { label: "Open Work", val: stats.open, icon: Clock, color: "indigo" },
-          { label: "Unassigned", val: stats.unassigned, icon: UserX, color: "amber" },
+          { label: "Closed / Resolved", val: stats.closed, icon: CheckCircle2, color: "emerald" },
           { label: "SLA Risk", val: stats.slaRisk, icon: AlertTriangle, color: "rose" },
         ].map((item) => (
           <div 
@@ -411,13 +465,88 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           >
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
-              <h3 className={`text-2xl font-bold ${item.color === 'rose' ? 'text-rose-600' : 'text-slate-900'} mt-1`}>{item.val}</h3>
+              <h3 className={`text-2xl font-bold ${item.color === 'rose' ? 'text-rose-600' : item.color === 'emerald' ? 'text-emerald-600' : 'text-slate-900'} mt-1`}>{item.val}</h3>
             </div>
             <div className="p-3 bg-slate-50 text-slate-600 rounded-xl">
               <item.icon size={22} />
             </div>
           </div>
         ))}
+      </div>
+
+      {/* NEW: Visibility Cards Section for Generators & Operator Resolutions & Priorities */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Tickets Generator Breakdown */}
+        <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <UserCheck size={16} className="text-blue-600" /> Tickets by Generator / Role
+            </h4>
+            <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">Total: {stats.total}</span>
+          </div>
+          <div className="py-3 flex flex-col gap-2">
+            {generatorBreakdown.map((gen, idx) => (
+              <div key={`gen-${idx}`} className="flex items-center justify-between text-xs">
+                <span className="font-medium text-slate-600 capitalize">{gen.name}</span>
+                <span className="font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full">{gen.count} tickets</span>
+              </div>
+            ))}
+            {generatorBreakdown.length === 0 && (
+              <p className="text-xs text-slate-400 italic text-center py-2">No generator data available</p>
+            )}
+          </div>
+          <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-100 italic">
+            Reflecting creation telemetry across Sales, Managers, and Operators.
+          </div>
+        </div>
+
+        {/* Operator Resolution Analytics */}
+        <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-600" /> Operator Resolutions
+            </h4>
+            <span className="text-xs font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md">Resolved: {operatorResolutionStats.totalResolved}</span>
+          </div>
+          <div className="py-3 flex flex-col gap-2 max-h-32 overflow-y-auto">
+            {operatorResolutionStats.byOperator.map((op, idx) => (
+              <div key={`op-${idx}`} className="flex items-center justify-between text-xs">
+                <span className="font-medium text-slate-600 truncate max-w-[150px]">{op.operator}</span>
+                <span className="font-bold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full">{op.count} resolved</span>
+              </div>
+            ))}
+            {operatorResolutionStats.byOperator.length === 0 && (
+              <p className="text-xs text-slate-400 italic text-center py-2">No resolved tickets by operators yet</p>
+            )}
+          </div>
+          <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-100 italic">
+            Total tickets resolved mapped per operator assignee.
+          </div>
+        </div>
+
+        {/* Priority-Based Breakdown & Resolution Metrics */}
+        <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <ShieldAlert size={16} className="text-amber-600" /> Priority & Resolution
+            </h4>
+            <span className="text-xs font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md">Active Tracking</span>
+          </div>
+          <div className="py-3 flex flex-col gap-2">
+            {priorityAnalytics.map((p, idx) => (
+              <div key={`p-metric-${idx}`} className="flex items-center justify-between text-xs">
+                <span className="font-medium text-slate-700">{p.level}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-semibold">{p.total} total</span>
+                  <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">{p.resolved} resolved</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-100 italic">
+            Breakdown showing closed vs total items per priority level.
+          </div>
+        </div>
       </div>
 
       {/* Charts Grid */}
@@ -451,23 +580,35 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         <OptimizedPieCard title="Ticket Type Split" data={chartData.type} />
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
-        {/* 7-Day Velocity Trend Chart */}
+        {/* Dynamic Velocity Trend Chart (Up to 30 Days Selection) */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
-          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">7-Day Velocity</h4>
-          <div className="h-36 w-full mt-1">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Velocity Trend</h4>
+            <select
+              value={velocityDays}
+              onChange={(e) => setVelocityDays(Number(e.target.value))}
+              className="text-[10px] bg-slate-100 border border-slate-200 rounded-md px-1.5 py-0.5 font-bold text-slate-700 focus:outline-none cursor-pointer"
+            >
+              <option value={7}>Last 7 Days</option>
+              <option value={14}>Last 14 Days</option>
+              <option value={21}>Last 21 Days</option>
+              <option value={30}>Last 30 Days</option>
+            </select>
+          </div>
+          <div className="h-32 w-full mt-1">
             <ResponsiveContainer width="100%" height="100%" debounce={100}>
               <LineChart data={chartData.trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
-                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+                <XAxis dataKey="day" stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+                <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Line 
                   type="monotone" 
                   dataKey="tickets" 
                   stroke="#10b981" 
                   strokeWidth={3} 
-                  dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }} 
-                  activeDot={{ r: 6, fill: '#059669', strokeWidth: 2, stroke: '#ffffff' }}
+                  dot={{ r: 3, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }} 
+                  activeDot={{ r: 5, fill: '#059669', strokeWidth: 2, stroke: '#ffffff' }}
                   isAnimationActive={false}
                 />
               </LineChart>
@@ -475,55 +616,87 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
           <div className="pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-500 font-medium">
             <span>Peak: {Math.max(...chartData.trend.map(d => d.tickets), 0)} tix/day</span>
-            <span>Avg: {Math.round(stats.total / 7)} tix/day</span>
+            <span>Range: {velocityDays} Days</span>
           </div>
         </div>
       </div>
 
-      {/* Ticket List Table Section - Restyled to Ticket List Design */}
+      {/* Ticket List Table Section - Keeping exact table structure and adding status tabs & priority filters */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        {/* Table Toolbar Header */}
-        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-slate-50/40">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Tickets Directory</h3>
-              <span className="px-2 py-0.5 text-xs font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
-                {filteredTickets.length}
-              </span>
+        {/* Table Toolbar Header with Status Tabs and Priority Filters */}
+        <div className="p-5 border-b border-slate-100 flex flex-col gap-4 bg-slate-50/40">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Tickets Directory</h3>
+                <span className="px-2 py-0.5 text-xs font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
+                  {filteredTickets.length}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">Manage, track, and filter operational support records</p>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">Manage, track, and filter operational support records</p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              {/* Search Bar */}
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search tickets..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            {/* Search Bar */}
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                type="text"
-                placeholder="Search tickets..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
-              />
+          {/* Status Tabs & Priority Level Filters */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-slate-200/60 text-xs">
+            {/* Status Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+              {[
+                { id: "all", label: "All Tickets", count: statusCounts.total },
+                { id: "open", label: "Open", count: statusCounts.open },
+                { id: "closed", label: "Closed / Resolved", count: statusCounts.closed },
+                { id: "unassigned", label: "Unassigned", count: statusCounts.unassigned },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={`px-3 py-1.5 rounded-xl font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                    statusFilter === tab.id 
+                      ? "bg-slate-900 text-white shadow-xs" 
+                      : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${statusFilter === tab.id ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
             </div>
 
-            {/* Filter Dropdown */}
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Filter className="text-slate-400 shrink-0" size={16} />
+            {/* Priority Filter Bar */}
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Priority:</span>
               <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 cursor-pointer w-full sm:w-auto"
+                value={priorityFilterTab}
+                onChange={(e) => setPriorityFilterTab(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
               >
-                <option value="all">All Statuses</option>
-                <option value="open">Open / Active</option>
-                <option value="resolved">Resolved / Closed</option>
+                <option value="all">All Priorities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Table Content */}
+        {/* Table Content - Structure Unchanged */}
         <div className="w-full overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
