@@ -235,15 +235,15 @@ export const Dashboard = ({ tickets: propTickets }) => {
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
 
-  // Component-level ref guard to ensure single invocation on mount
+  // FIXED: Fetch strictly once on mount with an empty dependency array to stop the loop
   const hasFetchedRef = useRef(false);
 
   useEffect(() => {
-    if (!hasFetchedRef.current && ((!propTickets || propTickets.length === 0) && contextTickets.length === 0)) {
+    if (!hasFetchedRef.current) {
       hasFetchedRef.current = true;
       fetchTickets('all-work');
     }
-  }, [fetchTickets, propTickets, contextTickets.length]);
+  }, []);
 
   // Fetch ticket statistics on mount securely
   useEffect(() => {
