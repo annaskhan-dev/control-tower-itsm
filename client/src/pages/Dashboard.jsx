@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
 } from "recharts";
-import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download } from "lucide-react";
+import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight } from "lucide-react";
 
 /**
  * Unified Normalization Engine: Synchronized with backend schema logic to ensure 
@@ -178,7 +178,7 @@ const OptimizedPieCard = memo(({ title, data }) => {
           <PieChart>
             <Pie 
               data={data} 
-              innerRadius="45% " 
+              innerRadius="45%" 
               outerRadius="75%" 
               paddingAngle={6} 
               dataKey="value"
@@ -192,7 +192,6 @@ const OptimizedPieCard = memo(({ title, data }) => {
           </PieChart>
         </ResponsiveContainer>
       </div>
-      {/* Detail / Facts points section added without altering original layout style */}
       <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-1 text-[10px] text-slate-500">
         {data.map((item, idx) => (
           <div key={`fact-${idx}`} className="flex items-center gap-1.5 truncate">
@@ -212,6 +211,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [tickets, setTickets] = useState(propTickets);
   const [loading, setLoading] = useState(propTickets.length === 0);
   const [now] = useState(() => new Date());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     if (propTickets && propTickets.length > 0) {
@@ -246,6 +247,23 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
+  const filteredTickets = useMemo(() => {
+    return normalizedTickets.filter((t) => {
+      const matchesSearch = 
+        t.ticketId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.category.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesStatus = 
+        statusFilter === "all" ? true :
+        statusFilter === "resolved" ? t.isResolved :
+        statusFilter === "open" ? !t.isResolved : true;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [normalizedTickets, searchQuery, statusFilter]);
+
   const formatDate = (dateString) => {
     if (!dateString) return "—";
     const d = new Date(dateString);
@@ -270,28 +288,11 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       return;
     }
 
-    // Comprehensive headers covering every property and metric
     const headers = [
-      "Ticket ID",
-      "Title",
-      "Description",
-      "Source",
-      "Category",
-      "Priority",
-      "Ticket Status",
-      "SLA Health",
-      "SLA Deadline",
-      "Assignee",
-      "Assigned At",
-      "Assignment Duration",
-      "SLA Active Duration",
-      "Sub-Assignee",
-      "Sub-Assigned At",
-      "Sub-Assignment Duration",
-      "Resolved At",
-      "Final Resolution Duration",
-      "Company ID",
-      "Created At"
+      "Ticket ID", "Title", "Description", "Source", "Category", "Priority", 
+      "Ticket Status", "SLA Health", "SLA Deadline", "Assignee", "Assigned At", 
+      "Assignment Duration", "SLA Active Duration", "Sub-Assignee", "Sub-Assigned At", 
+      "Sub-Assignment Duration", "Resolved At", "Final Resolution Duration", "Company ID", "Created At"
     ];
 
     const csvRows = recentTickets.map((t) => {
@@ -326,7 +327,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     });
 
     const csvContent = [headers.join(","), ...csvRows].join("\n");
-
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -480,78 +480,93 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section */}
+      {/* Ticket List Table Section - Restyled to Ticket List Design */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/40">
+        {/* Table Toolbar Header */}
+        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-slate-50/40">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Tickets List & Lifecycle Matrix</h3>
-              <span className="px-2.5 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
-                {normalizedTickets.length} Records
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Tickets Directory</h3>
+              <span className="px-2 py-0.5 text-xs font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
+                {filteredTickets.length}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1">Real-time telemetry tracking category, assignee, execution intervals, and SLA health.</p>
+            <p className="text-xs text-slate-500 mt-0.5">Manage, track, and filter operational support records</p>
           </div>
-          <Link to="/tickets" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1.5 transition-colors">
-            View All Work <ArrowRight size={14} />
-          </Link>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            {/* Search Bar */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="text"
+                placeholder="Search tickets..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+
+            {/* Filter Dropdown */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Filter className="text-slate-400 shrink-0" size={16} />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500 cursor-pointer w-full sm:w-auto"
+              >
+                <option value="all">All Statuses</option>
+                <option value="open">Open / Active</option>
+                <option value="resolved">Resolved / Closed</option>
+              </select>
+            </div>
+          </div>
         </div>
 
+        {/* Table Content */}
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600 border-collapse min-w-[1100px]">
-            <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
-              <tr>
-                <th className="p-4">ID</th>
-                <th className="p-4">Entry</th>
-                <th className="p-4">Title</th>
-                <th className="p-4">Category</th>
-                <th className="p-4">Assignee</th>
-                <th className="p-4">Assignment Time</th>
-                <th className="p-4">SLA Active Time</th>
-                <th className="p-4">Sub-Assignment</th>
-                <th className="p-4">Sub-Assignee Time</th>
-                <th className="p-4">SLA Health</th>
-                <th className="p-4">Status & Resolution</th>
+          <table className="w-full text-left border-collapse min-w-[1000px]">
+            <thead>
+              <tr className="bg-slate-50/70 border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider font-bold">
+                <th className="py-3 px-4">Ticket ID</th>
+                <th className="py-3 px-4">Subject / Title</th>
+                <th className="py-3 px-4">Category</th>
+                <th className="py-3 px-4">Priority</th>
+                <th className="py-3 px-4">Assignee</th>
+                <th className="py-3 px-4">SLA Health</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {normalizedTickets.map((t) => (
-                <tr 
-                  key={t.id} 
-                  className="hover:bg-slate-50/60 transition-colors"
-                >
-                  <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{t.ticketId}</td>
-                  <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
-                  <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
-                  <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
-                  <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs">{t.assigneeName}</td>
-                  <td className="p-4 whitespace-nowrap">
-                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                      t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
+            <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
+              {filteredTickets.map((t) => (
+                <tr key={t.id} className="hover:bg-slate-50/60 transition-colors group">
+                  <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+                    <span className="font-mono bg-slate-100 text-slate-700 px-2 py-1 rounded-md text-[11px]">
+                      {t.ticketId}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[260px] truncate">
+                    {t.title}
+                  </td>
+                  <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                    {t.category || "—"}
+                  </td>
+                  <td className="py-3.5 px-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      t.priority === "Critical" ? "bg-rose-100 text-rose-700 border border-rose-200" :
+                      t.priority === "High" ? "bg-amber-100 text-amber-700 border border-amber-200" :
+                      t.priority === "Medium" ? "bg-blue-100 text-blue-700 border border-blue-100" :
+                      "bg-slate-100 text-slate-600 border border-slate-200"
                     }`}>
-                      {t.assignmentTimeFormatted}
+                      {t.priority}
                     </span>
                   </td>
-                  <td className="p-4 whitespace-nowrap">
-                    <span className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg text-xs font-semibold">
-                      {t.slaTimeFormatted}
-                    </span>
+                  <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
+                    {t.assigneeName}
                   </td>
-                  <td className="p-4 text-xs whitespace-nowrap">
-                    <div className="font-semibold text-slate-700">{t.subAssignmentName || "—"}</div>
-                    {t.subAssignmentAt && (
-                      <div className="text-[10px] text-slate-400 mt-0.5">{formatDate(t.subAssignmentAt)}</div>
-                    )}
-                  </td>
-                  <td className="p-4 whitespace-nowrap">
-                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                      t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? "bg-purple-50 text-purple-700 border border-purple-100" : "bg-slate-50 text-slate-400 italic"
-                    }`}>
-                      {t.subAssignmentTimeFormatted}
-                    </span>
-                  </td>
-                  <td className="p-4 whitespace-nowrap">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                  <td className="py-3.5 px-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                       t.slaStatus === "Breached" ? "bg-rose-100 text-rose-700 border border-rose-200" : 
                       t.slaStatus === "At Risk" ? "bg-amber-100 text-amber-700 border border-amber-200" : 
                       "bg-emerald-100 text-emerald-700 border border-emerald-200"
@@ -559,25 +574,27 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                       {t.slaStatus}
                     </span>
                   </td>
-                  <td className="p-4 whitespace-nowrap">
-                    <div className="flex flex-col gap-1 items-start">
-                      <span className={`px-3 py-1 font-bold uppercase rounded-full text-[10px] tracking-wider shadow-2xs ${
-                        t.status.toLowerCase() === "resolved" || t.status.toLowerCase() === "closed" ? "bg-emerald-600 text-white" :
-                        "bg-blue-600 text-white"
-                      }`}>
-                        {t.status || "Open"}
-                      </span>
-                      <span className={`text-[11px] font-medium ${t.isResolved ? "text-emerald-700 font-bold" : "text-slate-400 italic"}`}>
-                        Total: {t.finalResolutionTimeFormatted}
-                      </span>
-                    </div>
+                  <td className="py-3.5 px-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                      t.isResolved ? "bg-emerald-600 text-white" : "bg-blue-600 text-white"
+                    }`}>
+                      {t.status}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                    <Link 
+                      to={`/tickets/${t.id}`}
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-semibold rounded-lg transition-colors"
+                    >
+                      View <ChevronRight size={14} />
+                    </Link>
                   </td>
                 </tr>
               ))}
-              {normalizedTickets.length === 0 && (
+              {filteredTickets.length === 0 && (
                 <tr>
-                  <td colSpan="11" className="p-16 text-center text-sm text-slate-400 italic">
-                    No active tickets available to display within the current matrix parameters.
+                  <td colSpan="8" className="py-16 text-center text-sm text-slate-400 italic">
+                    No matching tickets found. Try adjusting your search query or filter settings.
                   </td>
                 </tr>
               )}
