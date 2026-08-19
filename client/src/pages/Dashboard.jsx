@@ -340,7 +340,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const stats = useMemo(() => {
     let generatorMap = {};
     
-    // Robust check for various possible backend property keys for generator/source stats
     const rawGenSource = 
       backendStats?.byGenerator || 
       backendStats?.generators || 
@@ -358,13 +357,11 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     } else if (rawGenSource && typeof rawGenSource === "object") {
       Object.keys(rawGenSource).forEach(k => {
         const val = rawGenSource[k];
-        // Handles cases where the object property is a primitive number or an object containing a count
         const count = typeof val === 'object' && val !== null ? Number(val.count || val.total || val.value || 0) : Number(val);
         generatorMap[k] = isNaN(count) ? 0 : count;
       });
     }
 
-    // Fallback: If backend stats map is empty, aggregate generator/source directly from normalized tickets
     if (Object.keys(generatorMap).length === 0 || Object.values(generatorMap).reduce((a, b) => a + b, 0) === 0) {
       generatorMap = {};
       normalizedTickets.forEach(t => {
@@ -402,7 +399,17 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     }));
 
     const generatorColors = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#6366f1"];
-    const generatorEntries = Object.entries(stats.byGenerator || {}).map(([name, value], idx) => ({
+    
+    // Robust generator mapping fallback ensuring chart always receives entries
+    let rawGenEntries = stats.byGenerator || {};
+    if (Object.keys(rawGenEntries).length === 0) {
+      normalizedTickets.forEach(t => {
+        const src = t.source || "Direct API / System";
+        rawGenEntries[src] = (rawGenEntries[src] || 0) + 1;
+      });
+    }
+
+    const generatorEntries = Object.entries(rawGenEntries).map(([name, value], idx) => ({
       name,
       value: Number(value) || 0,
       color: generatorColors[idx % generatorColors.length],
