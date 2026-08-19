@@ -4,12 +4,10 @@ import axios from 'axios';
 const apiBaseUrl = import.meta.env?.VITE_API_URL || process.env?.REACT_APP_API_URL || 'https://control-tower-itsm-production.up.railway.app';
 
 const axiosInstance = axios.create({
-  // We append /api here
   baseURL: `${apiBaseUrl}/api`,
   timeout: 10000,
 });
 
-// DEBUGGING: This will print the actual URL your app is using to your browser console
 console.log("Axios Base URL is set to:", axiosInstance.defaults.baseURL);
 
 // Request Interceptor
@@ -36,7 +34,7 @@ axiosInstance.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
-// Response Interceptor
+// Response Interceptor (Safely handles 401 without forcing hard page reloads that cause loops)
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -49,11 +47,11 @@ axiosInstance.interceptors.response.use(
       if (!isLoginRequest) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
+        // Note: Let your React Router components handle navigation safely via state/context 
+        // instead of forcing a hard reload window.location.href assignment here.
       }
     }
+    
     return Promise.reject(error);
   }
 );
