@@ -171,6 +171,18 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const filteredTickets = useMemo(() => {
     return ticketData.filter((t) => {
+      // 1. Enforce Role Visibility Restrictions:
+      // If the user is NOT a manager or admin, restrict view strictly to tickets assigned or sub-assigned to them.
+      if (!isUserManagerOrAdmin) {
+        const currentUserName = (user?.name || user?.username || user?.fullName || "").toLowerCase();
+        const assigneeLower = t.assigneeName.toLowerCase();
+        const subAssigneeLower = t.subAssignmentName.toLowerCase();
+        
+        const isTheirs = (assigneeLower === currentUserName) || (subAssigneeLower === currentUserName);
+        if (!isTheirs) return false;
+      }
+
+      // 2. Queue Filtering Logic
       let matchesQueue = true;
       if (queue === "sla-risk") {
         matchesQueue = t.status?.toLowerCase() === "open" && (t.slaStatus === "Breached" || t.slaStatus === "At Risk");
@@ -183,7 +195,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const searchStr = searchTerm.toLowerCase();
       return matchesQueue && (t.title?.toLowerCase().includes(searchStr) || t.ticketId?.toLowerCase().includes(searchStr));
     });
-  }, [ticketData, queue, searchTerm]);
+  }, [ticketData, queue, searchTerm, isUserManagerOrAdmin, user]);
 
   return (
     <div className="flex flex-col h-full font-sans bg-slate-50 text-slate-800">
