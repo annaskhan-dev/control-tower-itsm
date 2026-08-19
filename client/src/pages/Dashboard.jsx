@@ -59,7 +59,7 @@ const normalizeTicket = (t, now) => {
   else if (rawPriorityStr.includes("med") || rawPriorityStr.includes("p3")) priority = "Medium";
 
   const rawCategoryStr = (t.category || t.type || t.ticketType || t.kind || "—").toString();
-  const rawSourceStr = (t.source || t.generator || t.origin || t.channel || t.createdByRole || "Manual / System").toString();
+  const rawSourceStr = (t.generator || t.source || t.origin || t.channel || t.createdByRole || "Direct API / System").toString();
   
   const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
   const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
@@ -215,14 +215,14 @@ OptimizedPieCard.displayName = "OptimizedPieCard";
 export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [tickets, setTickets] = useState(propTickets);
   const [loading, setLoading] = useState(propTickets.length === 0);
-  const [backendStats, setBackendStats] = useState({ total: 0, byGenerator: {} });
+  const [backendStats, setBackendStats] = useState({ total: 0, byGenerator: [] });
   const [now] = useState(() => new Date());
 
   useEffect(() => {
     const getStatsData = async () => {
       try {
         const data = await fetchTicketStats();
-        console.log("Fetched Backend Stats:", data); // Debug log to inspect structure in browser console
+        console.log("Fetched Backend Stats:", data);
         if (data) {
           setBackendStats(data);
         }
@@ -345,9 +345,9 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
     if (Array.isArray(rawGenSource)) {
       rawGenSource.forEach(item => {
-        const key = item._id || item.name || item.generator || item.source || "Unknown";
+        const key = item.name || item.key || item.label || item._id || "Direct API / System";
         const val = Number(item.count || item.total || item.value || 1);
-        generatorMap[key] = val;
+        generatorMap[key] = (generatorMap[key] || 0) + val;
       });
     } else if (rawGenSource && typeof rawGenSource === "object") {
       Object.keys(rawGenSource).forEach(k => {
@@ -355,11 +355,11 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       });
     }
 
-    // Always aggregate directly from normalized tickets as primary or fallback to guarantee chart rendering
+    // Fallback aggregation directly from normalized tickets if backend stats map is empty
     if (Object.keys(generatorMap).length === 0 || Object.values(generatorMap).reduce((a, b) => a + b, 0) === 0) {
       generatorMap = {};
       normalizedTickets.forEach(t => {
-        const src = t.source || "Manual / System";
+        const src = t.source || "Direct API / System";
         generatorMap[src] = (generatorMap[src] || 0) + 1;
       });
     }
