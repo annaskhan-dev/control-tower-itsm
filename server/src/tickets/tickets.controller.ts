@@ -23,7 +23,13 @@ import { Roles } from '../auth/roles.decorator';
 import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
-  user: { sub: string; companyId: string; role: string };
+  user: { 
+    sub: string; 
+    companyId: string; 
+    role: string; 
+    name?: string; 
+    username?: string; 
+  };
 }
 
 @Controller('tickets')
@@ -81,8 +87,14 @@ export class TicketsController {
 
   @Get()
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
-  async findAll(@Req() req: AuthenticatedRequest, @Query('search') search: string, @Query('queue') queue: string) {
-    return this.ticketsService.findAll(search, queue, req.user.companyId);
+  async findAll(
+    @Req() req: AuthenticatedRequest, 
+    @Query('search') search: string, 
+    @Query('queue') queue: string
+  ) {
+    const userRole = req.user.role || '';
+    const userName = req.user.name || req.user.username || req.user.sub;
+    return this.ticketsService.findAll(search, queue, req.user.companyId, userRole, userName);
   }
 
   @Get(':id')
@@ -136,8 +148,9 @@ export class TicketsController {
       }
     }
 
-    // 3. Proceed with standard update process
-    return this.ticketsService.update(id, updateTicketDto, req.user.companyId, req.user.role);
+    // 3. Proceed with standard update process (passing current user's name for validation)
+    const currentUserName = req.user.name || req.user.username || req.user.sub;
+    return this.ticketsService.update(id, updateTicketDto, req.user.companyId, req.user.role, currentUserName);
   }
 
   @Delete(':id')

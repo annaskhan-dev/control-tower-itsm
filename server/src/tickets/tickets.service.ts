@@ -91,7 +91,7 @@ export class TicketsService {
     updateTicketDto: UpdateTicketDto, 
     companyId: string, 
     userRole: string, 
-    currentUserName?: string // Added parameter to verify self-assignment for operators
+    currentUserName?: string
   ): Promise<Ticket> {
     const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
     const restrictedUpdateRoles = ['operator', 'transporter', 'shipper_ops', 'sales_person'];
@@ -101,7 +101,6 @@ export class TicketsService {
         throw new ForbiddenException('You are not allowed to update Category.');
       }
       
-      // Allow operators to update assignee ONLY if they are assigning it to themselves
       if (updateTicketDto.assignee !== undefined) {
         if (normalizedRole === 'operator') {
           if (currentUserName && updateTicketDto.assignee !== currentUserName) {
@@ -117,7 +116,6 @@ export class TicketsService {
     const existingTicket = await this.ticketModel.findOne({ ...baseQuery, companyId });
     if (!existingTicket) throw new NotFoundException(`Ticket with ID ${id} not found`);
 
-    // Check if the existing ticket is already resolved or closed
     const currentStatus = (existingTicket.status || '').toLowerCase();
     const isAlreadyResolved = ['closed', 'resolved', 'completed', 'done'].includes(currentStatus);
 
@@ -131,11 +129,8 @@ export class TicketsService {
     }
 
     const updateData: any = { ...updateTicketDto };
-
-    // Prevent SLA Deadline from ever being altered or recalculated during regular updates/sub-assignments
     delete updateData.slaDeadline;
 
-    // Handle Assignee and assignedAt logic safely
     if (updateData.assignee !== undefined) {
       const isActuallyAssigned = updateData.assignee !== 'Unassigned' && updateData.assignee !== '';
       if (isActuallyAssigned) {
@@ -145,7 +140,6 @@ export class TicketsService {
       }
     }
 
-    // Handle Sub-Assignment and subAssignmentAt logic robustly (fixes legacy records missing timestamps)
     if (updateData.subAssignment !== undefined) {
       const isActuallySubAssigned = updateData.subAssignment !== 'Unassigned' && updateData.subAssignment !== '' && updateData.subAssignment !== null;
       
@@ -160,7 +154,6 @@ export class TicketsService {
       }
     }
 
-    // Automatically handle resolvedAt timestamp when status changes
     if (updateData.status !== undefined && updateData.status !== existingTicket.status) {
       const isNewResolved = ['closed', 'resolved', 'completed', 'done'].includes(updateData.status.toLowerCase());
       if (isNewResolved) {
@@ -205,20 +198,40 @@ export class TicketsService {
     return updatedSla;
   }
 
-  async findAll(search: string | undefined, queue: string | undefined, companyId: string): Promise<Ticket[]> {
+  async findAll(
+    search: string | undefined, 
+    queue: string | undefined, 
+    companyId: string, 
+    userRole: string, 
+    userName: string
+  ): Promise<Ticket[]> {
     const query: any = { companyId };
+
+    // Role-based visibility check
+    const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
+    const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
+
+    if (!isManagerOrAdmin) {
+      // Non-management roles only see tickets assigned/sub-assigned to them
+      query.$or = [
+        { assignee: new RegExp(`^${userName}$`, 'i') },
+        { assignedTo: new RegExp(`^${userName}$`, 'i') },
+        { subAssignment: new RegExp(`^${userName}$`, 'i') }
+      ];
+    }
+
     if (queue === 'unassigned') {
       query.assignee = { $in: ['Unassigned', null, ''] };
     } else if (queue === 'open') {
       query.status = 'Open';
     }
+
     if (search) {
       query.title = { $regex: search, $options: 'i' };
     }
     
     const tickets = await this.ticketModel.find(query).sort({ createdAt: -1 }).exec();
 
-    // Auto-patch legacy documents on the fly during retrieval to prevent null time anchors
     return tickets.map((t: any) => {
       const ticketObj = t.toObject ? t.toObject() : t;
       const hasSubAssignment = ticketObj.subAssignment && ticketObj.subAssignment !== 'Unassigned' && ticketObj.subAssignment !== '';
