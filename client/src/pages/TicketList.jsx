@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
@@ -26,10 +26,14 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const queue = searchParams.get("queue") || "all-work";
 
-  // Permanent Fix: fetchTickets is now stable, so including it and `queue` here 
-  // runs the effect safely only when the queue parameter changes.
+  // Permanent Fix: Use a ref guard to track the last fetched queue and prevent infinite loops
+  const lastFetchedQueueRef = useRef(null);
+
   useEffect(() => {
-    fetchTickets(queue);
+    if (lastFetchedQueueRef.current !== queue) {
+      lastFetchedQueueRef.current = queue;
+      fetchTickets(queue);
+    }
   }, [queue, fetchTickets]);
 
   useEffect(() => {
