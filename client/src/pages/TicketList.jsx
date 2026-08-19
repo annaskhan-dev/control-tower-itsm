@@ -53,7 +53,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   const handleAssignToMe = async (e, mongoId) => {
     e.stopPropagation();
     try {
-      const currentUserName = user?.name || user?.fullName || user?.username || "Operator";
+      const currentUserName = user?.name || user?.username || user?.fullName || "Operator";
       await updateTicket(mongoId, { assignee: currentUserName });
       fetchTickets(queue);
     } catch (err) {
