@@ -313,6 +313,13 @@ export class TicketsService {
       return acc;
     }, {});
 
+    // Compute metrics grouped by the actual generator/role
+    const generatorStats = tickets.reduce((acc: any, ticket) => {
+      const gen = ticket.generator || 'Operator';
+      acc[gen] = (acc[gen] || 0) + 1;
+      return acc;
+    }, {});
+
     return {
       total: tickets.length,
       open: tickets.filter((t) => (t.status || '').toLowerCase() === 'open').length,
@@ -320,6 +327,7 @@ export class TicketsService {
       resolved: tickets.filter((t) => ['resolved', 'closed', 'completed', 'done'].includes((t.status || '').toLowerCase())).length,
       critical: tickets.filter((t) => (t.priority || '').toLowerCase() === 'critical').length,
       byCategory: categoryStats,
+      byGenerator: generatorStats, // <--- Added to populate dashboard generator/source breakdowns
     };
   }
 

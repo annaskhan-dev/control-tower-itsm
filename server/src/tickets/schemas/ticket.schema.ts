@@ -15,8 +15,8 @@ export class Ticket extends Document {
   @Prop()
   source!: string;
 
-  @Prop({ default: 'Operator' })
-  generator!: string; // <--- Tracks the name or role of the ticket generator
+  @Prop({ required: true })
+  generator!: string; // <--- Stores the dynamic user role/name without falling back to a hardcoded default
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: false })
   createdBy?: Types.ObjectId; // <--- Links to the specific user model who created it
