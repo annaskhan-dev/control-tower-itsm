@@ -313,10 +313,23 @@ export class TicketsService {
       return acc;
     }, {});
 
-    // Compute metrics grouped by the actual generator/role
-    const generatorStats = tickets.reduce((acc: any, ticket) => {
-      const gen = ticket.generator || 'Operator';
-      acc[gen] = (acc[gen] || 0) + 1;
+    // Compute metrics grouped dynamically using aggregation pipeline for robust generator/creator mapping
+    const aggregateGeneratorStats = await this.ticketModel.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: { 
+            $ifNull: ["$generator", { $ifNull: ["$assignee", "Unassigned"] }] 
+          },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Convert aggregation array back to key-value dictionary format expected by the frontend
+    const generatorStats = aggregateGeneratorStats.reduce((acc: any, curr) => {
+      const key = curr._id || 'Unassigned';
+      acc[key] = curr.count;
       return acc;
     }, {});
 
@@ -327,7 +340,7 @@ export class TicketsService {
       resolved: tickets.filter((t) => ['resolved', 'closed', 'completed', 'done'].includes((t.status || '').toLowerCase())).length,
       critical: tickets.filter((t) => (t.priority || '').toLowerCase() === 'critical').length,
       byCategory: categoryStats,
-      byGenerator: generatorStats, // <--- Added to populate dashboard generator/source breakdowns
+      byGenerator: generatorStats, // <--- Correctly formatted breakdown for creator / generator telemetry
     };
   }
 
