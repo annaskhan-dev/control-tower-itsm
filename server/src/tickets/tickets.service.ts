@@ -221,11 +221,11 @@ export class TicketsService {
       // For operators and non-admin roles, restrict views strictly to their own assigned tickets
       if (!isManagerOrAdmin) {
         if (isGenericName) {
-          // If a generic user name placeholder is passed, make sure it matches their exact role name or query safely
+          // If profile name is generic like "Operator", match loosely via regex containing the term
           query.$or = [
-            { assignee: new RegExp(`^${userName}$`, 'i') },
-            { assignedTo: new RegExp(`^${userName}$`, 'i') },
-            { subAssignment: new RegExp(`^${userName}$`, 'i') }
+            { assignee: new RegExp(userName, 'i') },
+            { assignedTo: new RegExp(userName, 'i') },
+            { subAssignment: new RegExp(userName, 'i') }
           ];
         } else {
           const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
@@ -290,9 +290,9 @@ export class TicketsService {
       if (!isManagerOrAdmin) {
         if (isGenericName) {
           query.$or = [
-            { assignee: new RegExp(`^${userName}$`, 'i') },
-            { assignedTo: new RegExp(`^${userName}$`, 'i') },
-            { subAssignment: new RegExp(`^${userName}$`, 'i') }
+            { assignee: new RegExp(userName, 'i') },
+            { assignedTo: new RegExp(userName, 'i') },
+            { subAssignment: new RegExp(userName, 'i') }
           ];
         } else {
           const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
