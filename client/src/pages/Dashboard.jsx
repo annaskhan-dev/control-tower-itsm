@@ -111,6 +111,7 @@ const normalizeTicket = (t, now) => {
     id: t._id || t.id || t.ticketId || t.code || "N/A",
     ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
+    source: t.source || t.generator || t.origin || t.channel || "Manual",
     assigneeName,
     subAssignmentName,
     subAssignmentAt: subAssignedAtRaw,
@@ -198,7 +199,7 @@ const OptimizedPieCard = memo(({ title, data }) => {
           </div>
         )}
       </div>
-      {/* Detail / Facts points section added without altering original layout style */}
+      {/* Detail / Facts points section */}
       <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-1 text-[10px] text-slate-500">
         {data.length > 0 ? (
           data.map((item, idx) => (
@@ -296,28 +297,11 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       return;
     }
 
-    // Comprehensive headers covering every property and metric
     const headers = [
-      "Ticket ID",
-      "Title",
-      "Description",
-      "Source",
-      "Category",
-      "Priority",
-      "Ticket Status",
-      "SLA Health",
-      "SLA Deadline",
-      "Assignee",
-      "Assigned At",
-      "Assignment Duration",
-      "SLA Active Duration",
-      "Sub-Assignee",
-      "Sub-Assigned At",
-      "Sub-Assignment Duration",
-      "Resolved At",
-      "Final Resolution Duration",
-      "Company ID",
-      "Created At"
+      "Ticket ID", "Title", "Description", "Source", "Category", "Priority", 
+      "Ticket Status", "SLA Health", "SLA Deadline", "Assignee", "Assigned At", 
+      "Assignment Duration", "SLA Active Duration", "Sub-Assignee", "Sub-Assigned At", 
+      "Sub-Assignment Duration", "Resolved At", "Final Resolution Duration", "Company ID", "Created At"
     ];
 
     const csvRows = recentTickets.map((t) => {
@@ -352,7 +336,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     });
 
     const csvContent = [headers.join(","), ...csvRows].join("\n");
-
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -364,14 +347,26 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   };
 
   const stats = useMemo(() => {
-    let generatorData = backendStats?.byGenerator || backendStats?.generators || {};
-    
-    if (Array.isArray(generatorData)) {
-      generatorData = generatorData.reduce((acc, curr) => {
-        const key = curr._id || curr.name || curr.generator || "Unknown";
-        acc[key] = curr.count || curr.total || curr.value || 1;
-        return acc;
-      }, {});
+    // Robust extraction supporting multiple backend response formats
+    let generatorMap = {};
+    const rawGenSource = backendStats?.byGenerator || backendStats?.generators || backendStats?.sourceCounts;
+
+    if (Array.isArray(rawGenSource)) {
+      rawGenSource.forEach(item => {
+        const key = item._id || item.name || item.generator || item.source || "Unknown";
+        const val = item.count || item.total || item.value || 1;
+        generatorMap[key] = val;
+      });
+    } else if (rawGenSource && typeof rawGenSource === "object") {
+      generatorMap = { ...rawGenSource };
+    }
+
+    // Fallback: If backendStats doesn't provide generator counts, aggregate directly from normalized tickets
+    if (Object.keys(generatorMap).length === 0 && normalizedTickets.length > 0) {
+      normalizedTickets.forEach(t => {
+        const src = t.source || "Manual";
+        generatorMap[src] = (generatorMap[src] || 0) + 1;
+      });
     }
 
     const openCount = normalizedTickets.filter((t) => !t.isResolved).length;
@@ -383,7 +378,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       open: openCount,
       unassigned: unassignedCount,
       slaRisk: slaRiskCount,
-      byGenerator: generatorData,
+      byGenerator: generatorMap,
     };
   }, [normalizedTickets, backendStats]);
 
@@ -546,10 +541,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {normalizedTickets.map((t) => (
-                <tr 
-                  key={t.id} 
-                  className="hover:bg-slate-50/60 transition-colors"
-                >
+                <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
                   <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{t.ticketId}</td>
                   <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
                   <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
