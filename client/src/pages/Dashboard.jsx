@@ -274,7 +274,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     });
   }, [normalizedTickets, searchQuery, statusFilter, priorityFilterTab]);
 
- const generatorBreakdown = useMemo(() => {
+const generatorBreakdown = useMemo(() => {
   return Object.entries(stats?.byGenerator || {}).map(([name, count]) => ({
     name,
     count,
