@@ -6,9 +6,13 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // Updated CORS configuration to include 'x-company-id'
+  // Updated CORS configuration to allow local and production frontend URLs
   app.enableCors({
-    origin: 'https://control-tower-itsm.netlify.app', 
+    origin: [
+      'https://control-tower-itsm.netlify.app',
+      'http://localhost:3000',
+      'http://localhost:5173'
+    ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization, x-company-id', 
     credentials: true,
