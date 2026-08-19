@@ -214,23 +214,24 @@ export class TicketsService {
     const trimmedUserName = (userName || '').toLowerCase().trim();
     const isGenericName = !userName || genericPlaceholders.includes(trimmedUserName);
 
-    if (queue === 'unassigned') {
+    // Handle Queues safely with normalization
+    const normalizedQueue = (queue || 'all-work').toLowerCase().trim();
+
+    if (normalizedQueue === 'unassigned') {
       query.assignee = { $in: ['Unassigned', 'unassigned', null, ''] };
-    } else {
-      // Allow Managers/Admins or generic role placeholder logins to view all tickets on the main list
-      if (!isManagerOrAdmin && !isGenericName) {
-        const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
-        query.$or = [
-          { assignee: new RegExp(`^${userName}$`, 'i') },
-          { assignedTo: new RegExp(`^${userName}$`, 'i') },
-          { subAssignment: new RegExp(`^${userName}$`, 'i') },
-          { assignee: new RegExp(cleanName, 'i') }
-        ];
-      }
-      
-      if (queue === 'open') {
-        query.status = 'Open';
-      }
+    } else if (normalizedQueue === 'open') {
+      query.status = { $regex: /^open$/i };
+    }
+
+    // Allow Managers/Admins or generic role placeholder logins to view all tickets on the main list
+    if (!isManagerOrAdmin && !isGenericName) {
+      const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
+      query.$or = [
+        { assignee: new RegExp(`^${userName}$`, 'i') },
+        { assignedTo: new RegExp(`^${userName}$`, 'i') },
+        { subAssignment: new RegExp(`^${userName}$`, 'i') },
+        { assignee: new RegExp(cleanName, 'i') }
+      ];
     }
 
     if (search) {

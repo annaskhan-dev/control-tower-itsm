@@ -146,7 +146,7 @@ export class TicketsController {
 
     // 2. If the ticket is already resolved/closed, block changes to category or subAssignment
     if (isAlreadyResolved) {
-      const isChangingCategory = updateTicketDto.category && updateTicketDto.category !== existingTicket.category;
+      const isChangingCategory = updateTicketDto.category !== undefined && updateTicketDto.category !== existingTicket.category;
       const isChangingSubAssignment = 'subAssignment' in updateTicketDto && updateTicketDto.subAssignment !== existingTicket.subAssignment;
 
       if (isChangingCategory || isChangingSubAssignment) {
