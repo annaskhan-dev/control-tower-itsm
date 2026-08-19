@@ -21,7 +21,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   
   const userRoleRaw = role || user?.role || user?.userType || user?.type || "";
   const currentRole = typeof userRoleRaw === 'string' ? userRoleRaw.replace(/\s+/g, "_").toLowerCase() : "";
-  
   const isUserManagerOrAdmin = isAdmin || isManager || currentRole.includes('admin') || currentRole.includes('manager');
 
   const queue = searchParams.get("queue") || "all-work";
@@ -77,15 +76,15 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     const d = new Date(dateString);
     return isNaN(d.getTime()) 
       ? "Invalid" 
-      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   const formatDuration = (ms) => {
     if (ms === null || ms === undefined || isNaN(ms)) return "—";
-    if (ms < 60000) return "Just now"; 
+    if (ms < 60000) return "< 1m"; 
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours === 0 && mins === 0) return "Just now";
+    if (hours === 0 && mins === 0) return "< 1m";
     return `${hours}h ${mins}m`;
   };
 
@@ -201,69 +200,69 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   }, [ticketData, queue, searchTerm, isUserManagerOrAdmin, user]);
 
   return (
-    <div className="flex flex-col h-full font-sans bg-slate-50 text-slate-800">
-      <div className="flex justify-between items-center px-8 py-5 bg-white border-b border-slate-200 shadow-xs">
+    <div className="flex flex-col h-full font-sans bg-slate-50/50 text-slate-800">
+      {/* Header Bar */}
+      <div className="flex justify-between items-center px-8 py-5 bg-white border-b border-slate-200">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Support Tickets</h1>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-            Queue: <span className="text-blue-600 font-bold">{queue.replace("-", " ")}</span>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Support Tickets</h1>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mt-0.5">
+            Active Queue: <span className="text-blue-600 font-semibold capitalize">{queue.replace("-", " ")}</span>
           </p>
         </div>
         <button 
           onClick={onOpenCreateTicket} 
-          className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all shadow-md shadow-blue-500/20 flex items-center gap-2 cursor-pointer"
+          className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-          Add Ticket
+          New Ticket
         </button>
       </div>
       
-      <div className="px-8 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-        <div className="relative w-full max-w-md">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+      {/* Search & Counters Bar */}
+      <div className="px-8 py-3.5 bg-white border-b border-slate-200 flex items-center justify-between gap-4">
+        <div className="relative w-full max-w-sm">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           </span>
           <input
             type="text"
-            placeholder="Search by Ticket ID or Title..."
-            className="w-full pl-10 pr-4 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-2xs"
+            placeholder="Search by ID or title..."
+            className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="text-xs font-medium text-slate-500">
-          Showing <span className="font-bold text-slate-700">{filteredTickets.length}</span> tickets
+          Showing <span className="font-semibold text-slate-800">{filteredTickets.length}</span> entries
         </div>
       </div>
 
+      {/* Content Body */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
           {isLoading ? (
-            <div className="p-16 text-center text-sm font-medium text-slate-400 animate-pulse flex flex-col items-center gap-3">
-              <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="p-16 text-center text-xs font-medium text-slate-400 animate-pulse flex flex-col items-center gap-3">
+              <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
               Loading tickets database...
             </div>
           ) : filteredTickets.length === 0 ? (
-            <div className="p-16 text-center text-sm text-slate-400 italic flex flex-col items-center gap-2">
-              <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7m16 0v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5m16 0h-2.586a1 1 0 0 0-.707.293l-2.414 2.414a1 1 0 0 1-.707.293h-3.172a1 1 0 0 1-.707-.293l-2.414-2.414A1 1 0 0 0 6.586 13H4"/></svg>
-              No tickets found in this view queue.
+            <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
+              <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7m16 0v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5m16 0h-2.586a1 1 0 0 0-.707.293l-2.414 2.414a1 1 0 0 1-.707.293h-3.172a1 1 0 0 1-.707-.293l-2.414-2.414A1 1 0 0 0 6.586 13H4"/></svg>
+              No tickets found in this queue.
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600 border-collapse min-w-[1100px]">
-                <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
+              <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1050px]">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider font-semibold">
                   <tr>
-                    <th className="p-4">ID</th>
-                    <th className="p-4">Entry</th>
-                    <th className="p-4">Title</th>
-                    <th className="p-4">Category</th>
-                    <th className="p-4">Assignee</th>
-                    <th className="p-4">Assignment Time</th>
-                    <th className="p-4">SLA Active Time</th>
-                    <th className="p-4">Sub-Assignment</th>
-                    <th className="p-4">Sub-Assignee Time</th>
-                    <th className="p-4">SLA Health</th>
-                    <th className="p-4">Status & Resolution</th>
+                    <th className="py-3 px-4">Ticket Info</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Assignee</th>
+                    <th className="py-3 px-4">Assignment Time</th>
+                    <th className="py-3 px-4">SLA Active</th>
+                    <th className="py-3 px-4">Sub-Assignment</th>
+                    <th className="py-3 px-4">SLA Health</th>
+                    <th className="py-3 px-4 text-right">Status / Resolution</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -276,95 +275,104 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                       <tr 
                         key={mongoId} 
                         onClick={() => navigate(`/tickets/${t.ticketId}`)} 
-                        className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
+                        className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
                       >
-                        <td className="p-4 font-bold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">{t.ticketId}</td>
-                        <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
-                        <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
-                        <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
+                        {/* ID & Title */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-blue-600 group-hover:underline">{t.ticketId}</div>
+                          <div className="text-slate-900 font-medium max-w-[220px] truncate mt-0.5">{t.title}</div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">{formatDate(t.createdAt)}</div>
+                        </td>
+
+                        {/* Category */}
+                        <td className="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap">
+                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px]">
+                            {t.category || "General"}
+                          </span>
+                        </td>
                         
-                        <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs" onClick={(e) => e.stopPropagation()}>
+                        {/* Assignee */}
+                        <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {t.isAssigned ? (
-                            <span>{t.assigneeName}</span>
+                            <div className="font-medium text-slate-700 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                              {t.assigneeName}
+                            </div>
                           ) : !isUserManagerOrAdmin ? (
                             <button
                               onClick={(e) => handleAssignToMe(e, mongoId)}
-                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded-lg font-semibold transition-all shadow-xs cursor-pointer"
+                              className="bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs px-2.5 py-1 rounded font-medium transition-all border border-blue-200 cursor-pointer"
                             >
                               Assign to Me
                             </button>
                           ) : (
-                            <div className="relative">
-                              <select
-                                value={t.assignee || t.assignedTo || "Unassigned"}
-                                disabled={isRestricted || isResolvedState}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  handleManagerAssign(mongoId, e.target.value);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed cursor-pointer"
-                              >
-                                <option value="Unassigned">Assign to Operator...</option>
-                                {operators.map((u) => {
-                                  const userName = u.name || u.fullName || u.username;
-                                  const userRole = u.role || u.userType || 'Operator';
-                                  return (
-                                    <option key={u._id || u.id} value={userName}>
-                                      {userName} ({userRole})
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                            </div>
+                            <select
+                              value={t.assignee || t.assignedTo || "Unassigned"}
+                              disabled={isRestricted || isResolvedState}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleManagerAssign(mongoId, e.target.value);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1.5 border border-slate-200 rounded text-xs bg-white text-slate-700 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer"
+                            >
+                              <option value="Unassigned">Assign operator...</option>
+                              {operators.map((u) => {
+                                const userName = u.name || u.fullName || u.username;
+                                const userRole = u.role || u.userType || 'Operator';
+                                return (
+                                  <option key={u._id || u.id} value={userName}>
+                                    {userName} ({userRole})
+                                  </option>
+                                );
+                              })}
+                            </select>
                           )}
                         </td>
 
-                        <td className="p-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                            t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
-                          }`}>
-                            {t.assignmentTimeFormatted}
-                          </span>
+                        {/* Assignment Time */}
+                        <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
+                          <span className="font-mono text-[11px] text-slate-600">{t.assignmentTimeFormatted}</span>
                         </td>
-                        <td className="p-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                            t.slaTimeFormatted !== "N/A" ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-slate-50 text-slate-400 italic"
-                          }`}>
-                            {t.slaTimeFormatted}
-                          </span>
+
+                        {/* SLA Active Time */}
+                        <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
+                          <span className="font-mono text-[11px] text-blue-600 font-medium">{t.slaTimeFormatted}</span>
                         </td>
-                        <td className="p-4 text-xs whitespace-nowrap">
-                          <div className="font-semibold text-slate-700">{t.subAssignmentName || "—"}</div>
-                          {t.subAssignmentAt && (
-                            <div className="text-[10px] text-slate-400 mt-0.5">{formatDate(t.subAssignmentAt)}</div>
+
+                        {/* Sub-Assignment */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="font-medium text-slate-700">{t.subAssignmentName || "—"}</div>
+                          {t.subAssignmentTimeFormatted !== "Not Sub-Assigned" && (
+                            <div className="font-mono text-[10px] text-purple-600 mt-0.5">{t.subAssignmentTimeFormatted}</div>
                           )}
                         </td>
-                        <td className="p-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                            t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? "bg-purple-50 text-purple-700 border border-purple-100" : "bg-slate-50 text-slate-400 italic"
+
+                        {/* SLA Health */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                            t.slaStatus === "Breached" ? "bg-rose-50 text-rose-700 border border-rose-200/60" : 
+                            t.slaStatus === "At Risk" ? "bg-amber-50 text-amber-700 border border-amber-200/60" : 
+                            "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
                           }`}>
-                            {t.subAssignmentTimeFormatted}
-                          </span>
-                        </td>
-                        <td className="p-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                            t.slaStatus === "Breached" ? "bg-rose-100 text-rose-700 border border-rose-200" : 
-                            t.slaStatus === "At Risk" ? "bg-amber-100 text-amber-700 border border-amber-200" : 
-                            "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              t.slaStatus === "Breached" ? "bg-rose-500" : 
+                              t.slaStatus === "At Risk" ? "bg-amber-500" : 
+                              "bg-emerald-500"
+                            }`}></span>
                             {t.slaStatus}
                           </span>
                         </td>
-                        <td className="p-4 whitespace-nowrap">
-                          <div className="flex flex-col gap-1 items-start">
-                            <span className={`px-3 py-1 font-bold uppercase rounded-full text-[10px] tracking-wider shadow-2xs ${
-                              t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "bg-emerald-600 text-white" :
-                              "bg-blue-600 text-white"
+
+                        {/* Status & Resolution */}
+                        <td className="py-3.5 px-4 whitespace-nowrap text-right">
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={`px-2 py-0.5 font-semibold uppercase rounded text-[10px] tracking-wide ${
+                              isResolvedState ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
                             }`}>
                               {t.status || "Open"}
                             </span>
-                            <span className={`text-[11px] font-medium ${t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "text-emerald-700 font-bold" : "text-slate-400 italic"}`}>
+                            <span className="text-[10px] text-slate-400 font-mono">
                               Total: {t.finalResolutionTimeFormatted}
                             </span>
                           </div>
