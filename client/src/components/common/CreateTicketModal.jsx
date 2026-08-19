@@ -57,13 +57,13 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
 
     setIsSubmitting(true);
 
-    // Extract current logged-in user name/username for entry source tracking
-    const currentUserName = user?.name || user?.username || user?.fullName || "Operator";
+    // Prioritize user's role for the generator grouping, falling back to name/username or "Operator"
+    const ticketGenerator = user?.role || user?.name || user?.username || "Operator";
 
     // Combine form state with generator and source tracking metadata
     const payload = {
       ...formData,
-      generator: currentUserName,
+      generator: ticketGenerator,
       source: "Control Tower UI"
     };
 

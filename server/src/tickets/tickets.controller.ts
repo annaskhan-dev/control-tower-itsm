@@ -83,8 +83,14 @@ export class TicketsController {
     const userName = req.user.name || req.user.username;
     const userId = req.user.sub; // Mapping sub token claim to userId
 
+    // Dynamically assign the generator/source based on the user's role or input payload
+    const enrichedTicketDto = {
+      ...createTicketDto,
+      generator: createTicketDto['generator'] || userRole || 'System',
+    };
+
     return await this.ticketsService.create(
-      createTicketDto, 
+      enrichedTicketDto, 
       req.user.companyId, 
       userRole, 
       userName, 

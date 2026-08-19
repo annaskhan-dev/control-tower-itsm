@@ -52,8 +52,9 @@ export class TicketsService {
       const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
       const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
 
-      // Determine generator identity (falling back to user name/role if not specified)
-      const ticketGenerator = createTicketDto.generator || createTicketDto.source || userName || userRole || 'Operator';
+      // Dynamically evaluate the generator source. 
+      // If the DTO provides a generator, use it. Otherwise, use the exact userRole (e.g., Admin, Manager, Operator) instead of a hardcoded fallback string.
+      const ticketGenerator = createTicketDto.generator || createTicketDto.source || userRole || 'System';
 
       const ticketData = {
         ...createTicketDto,
