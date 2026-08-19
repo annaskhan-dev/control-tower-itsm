@@ -340,13 +340,15 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const stats = useMemo(() => {
     let generatorMap = {};
     
+    // Un-wrap potential wrapper properties from backend response
     const rawGenSource = 
       backendStats?.byGenerator || 
       backendStats?.generators || 
       backendStats?.sourceCounts || 
       backendStats?.bySource ||
       backendStats?.data?.byGenerator ||
-      backendStats?.data?.generators;
+      backendStats?.data?.generators ||
+      (Array.isArray(backendStats) ? backendStats : null);
 
     if (Array.isArray(rawGenSource)) {
       rawGenSource.forEach(item => {
@@ -362,6 +364,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       });
     }
 
+    // Fallback to computing from tickets if backend generator stats are missing
     if (Object.keys(generatorMap).length === 0 || Object.values(generatorMap).reduce((a, b) => a + b, 0) === 0) {
       generatorMap = {};
       normalizedTickets.forEach(t => {
