@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
@@ -26,8 +26,14 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const queue = searchParams.get("queue") || "all-work";
 
+  // Prevent infinite loops by tracking the last fetched queue via a ref guard
+  const lastFetchedQueueRef = useRef(null);
+
   useEffect(() => {
-    fetchTickets(queue);
+    if (lastFetchedQueueRef.current !== queue) {
+      lastFetchedQueueRef.current = queue;
+      fetchTickets(queue);
+    }
   }, [queue, fetchTickets]);
 
   useEffect(() => {
