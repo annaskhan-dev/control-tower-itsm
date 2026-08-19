@@ -76,7 +76,7 @@ export const TicketProvider = ({ children }) => {
     }
   }, [updateLocalTicket]);
 
-  // FIXED: Removed volatile `tickets` and `isLoading` dependencies to stabilize context reference
+  // FIXED: Removed `tickets` and `isLoading` from dependency array so the context reference remains stable.
   const value = useMemo(() => ({
     tickets, 
     setTickets,

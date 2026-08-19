@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Dashboard } from './Dashboard'; 
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axiosInstance';
@@ -9,17 +9,27 @@ export const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth(); 
 
-  // FIXED: Depend on `user?.companyID` instead of the whole `user` object reference to prevent loops
-  useEffect(() => {
-    const fetchTickets = async () => {
-      if (!user?.companyID) {
-        setLoading(false);
-        return;
-      }
+  // Use a ref to track the last fetched companyID to completely block duplicate loops
+  const lastFetchedCompanyRef = useRef(null);
 
+  useEffect(() => {
+    const companyID = user?.companyID;
+
+    if (!companyID) {
+      setLoading(false);
+      return;
+    }
+
+    // Prevent refetching if we already fetched for this exact companyID during this session/mount
+    if (lastFetchedCompanyRef.current === companyID) {
+      return;
+    }
+
+    const fetchTickets = async () => {
+      lastFetchedCompanyRef.current = companyID; // Lock it immediately
       try {
         const response = await axiosInstance.get('/tickets', {
-          params: { companyID: user.companyID }
+          params: { companyID }
         });
         setTickets(response.data);
       } catch (error) {
