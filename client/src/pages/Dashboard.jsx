@@ -23,7 +23,7 @@ const normalizeTicket = (t, now) => {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || null;
   }
 
-  // Ticket source parsing (Step 1)
+  // Ticket source/origin department parsing
   const rawSource = (t.source || t.origin || t.channel || t.department || "Direct / Other").toString().trim();
   const source = rawSource.charAt(0).toUpperCase() + rawSource.slice(1).toLowerCase();
 
@@ -91,7 +91,6 @@ const normalizeTicket = (t, now) => {
     primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
   }
 
-  // Synchronized SLA active duration calculated from main assignment timestamp
   const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
   let subAssignmentTimeMs = 0;
@@ -167,7 +166,7 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * Isolated Pie Chart Component with animations disabled for buttery-smooth performance and detailed data facts.
+ * Isolated Pie Chart Component with animations disabled for high performance.
  */
 const OptimizedPieCard = memo(({ title, data }) => {
   const totalValue = useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
@@ -219,8 +218,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
   const [loading, setLoading] = useState(propTickets.length === 0);
   const [now] = useState(() => new Date());
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // Supports: all, open, in_progress, closed, resolved
-  const [priorityFilter, setPriorityFilter] = useState("all"); // Step 5: Priority-based filtering
+  const [statusFilter, setStatusFilter] = useState("all"); 
+  const [priorityFilter, setPriorityFilter] = useState("all"); 
   const [velocityDays, setVelocityDays] = useState(7); 
 
   useEffect(() => {
@@ -256,7 +255,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
   const normalizedTickets = useMemo(() => tickets.map((t) => normalizeTicket(t, now)), [tickets, now]);
 
-  // Step 3 & Step 5: Strict Status and Priority Filter Matching with exact count parity validation
   const filteredTickets = useMemo(() => {
     return normalizedTickets.filter((t) => {
       const matchesSearch = 
@@ -298,7 +296,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     }
 
     const headers = [
-      "Ticket ID", "Title", "Description", "Source", "Category", "Priority", 
+      "Ticket ID", "Title", "Description", "Source / Department", "Category", "Priority", 
       "Ticket Status", "SLA Health", "SLA Deadline", "Assignee", "Assigned At", 
       "Assignment Duration", "SLA Active Duration", "Sub-Assignee", "Sub-Assigned At", 
       "Sub-Assignment Duration", "Resolved At", "Final Resolution Duration", "Company ID", "Created At"
@@ -346,7 +344,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     document.body.removeChild(link);
   };
 
-  // Stats ensuring 100% numerical parity check across statuses (Step 3)
   const stats = useMemo(() => {
     const total = normalizedTickets.length;
     const openCount = normalizedTickets.filter((t) => !t.isResolved && t.status.toLowerCase() !== "in progress").length;
@@ -359,7 +356,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     return { total, open: openCount, inProgress: inProgressCount, closed: closedCount, unassigned, slaRisk, resolvedTotal };
   }, [normalizedTickets]);
 
-  // Step 4: Operator Resolution Leaderboard calculations
   const operatorResolutionMetrics = useMemo(() => {
     const operatorMap = {};
     normalizedTickets.forEach((t) => {
@@ -387,7 +383,6 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     }).sort((a, b) => b.resolvedCount - a.resolvedCount);
   }, [normalizedTickets]);
 
-  // Step 5: Priority resolution breakdowns
   const priorityBreakdown = useMemo(() => {
     const levels = ["Critical", "High", "Medium", "Low"];
     return levels.map((lvl) => {
@@ -421,25 +416,27 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
       }).length,
     }));
 
-    // Step 1: Ticket Source breakdown metrics for pie display
+    // Detailed Source Breakdown metrics showing exact numbers of tickets raised by Sales vs Other teams/departments
     const salesCount = normalizedTickets.filter((t) => t.source.toLowerCase().includes("sale")).length;
-    const otherSourceCount = normalizedTickets.length - salesCount;
+    const supportCount = normalizedTickets.filter((t) => t.source.toLowerCase().includes("support")).length;
+    const operationsCount = normalizedTickets.filter((t) => t.source.toLowerCase().includes("op") || t.source.toLowerCase().includes("dispatch")).length;
+    const otherSourceCount = Math.max(0, normalizedTickets.length - (salesCount + supportCount + operationsCount));
+
+    const sourceDataList = [
+      { name: "Sales", value: salesCount, color: "#8b5cf6", details: "Tickets raised by Sales team" },
+      { name: "Support", value: supportCount, color: "#0ea5e9", details: "Tickets raised via Support channel" },
+      { name: "Operations", value: operationsCount, color: "#f59e0b", details: "Tickets raised by Field/Ops" },
+      { name: "Other / Direct", value: otherSourceCount, color: "#64748b", details: "General inquiries or direct channels" },
+    ].filter((d) => d.value > 0);
 
     return {
-      source: [
-        { name: "Sales", value: salesCount, color: "#8b5cf6", details: "Tickets raised by Sales department" },
-        { name: "Other Teams", value: otherSourceCount, color: "#0ea5e9", details: "Support, Operations & Direct channels" },
-      ].filter((d) => d.value > 0),
+      source: sourceDataList,
       priorityBar: [
         { name: "Critical", count: normalizedTickets.filter((t) => t.priority === "Critical").length },
         { name: "High", count: normalizedTickets.filter((t) => t.priority === "High").length },
         { name: "Medium", count: normalizedTickets.filter((t) => t.priority === "Medium").length },
         { name: "Low", count: normalizedTickets.filter((t) => t.priority === "Low").length },
       ],
-      type: [
-        { name: "Request", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("request") || t.category.toLowerCase().includes("dispatch")).length, color: "#3b82f6", details: "Standard requests & dispatches" },
-        { name: "Problem", value: normalizedTickets.filter((t) => t.category.toLowerCase().includes("problem") || t.category.toLowerCase().includes("fleet")).length, color: "#f59e0b", details: "Fleet & operational issues" },
-      ].filter((d) => d.value > 0),
       sla: [
         { name: "On Track", value: normalizedTickets.filter((t) => t.slaStatus === "On Track").length, color: "#10b981", details: "Meeting target timelines" },
         { name: "At Risk", value: normalizedTickets.filter((t) => t.slaStatus === "At Risk").length, color: "#f59e0b", details: "Approaching deadline window" },
@@ -467,7 +464,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </button>
       </div>
 
-      {/* Top Metric Cards (Ensuring Status Parity Sum: Open + In Progress + Closed = Total) */}
+      {/* Top Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-shadow duration-200">
           <div>
@@ -499,7 +496,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Step 1 & Step 5 Analytics Charts Grid */}
+      {/* Analytics Charts Grid including Tickets by Source breakdown */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Priority Distribution Chart */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
@@ -521,13 +518,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Step 1: Tickets by Source Breakdown Card */}
-        <OptimizedPieCard title="Tickets by Source" data={chartData.source} />
+        {/* Tickets Raised by Source / Department Card */}
+        <OptimizedPieCard title="Tickets Raised by Source" data={chartData.source} />
 
         {/* SLA Health Pie Chart */}
         <OptimizedPieCard title="SLA Health" data={chartData.sla} />
 
-        {/* Velocity Trend Chart (Up to 30 Days) */}
+        {/* Velocity Trend Chart */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-64">
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Velocity Trend</h4>
@@ -563,7 +560,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Step 4 & Step 5: Advanced Operational Insight Cards (Operator Resolution Breakdown & Priority Resolution Counts) */}
+      {/* Advanced Operational Insight Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Operator Resolution Breakdown */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
@@ -594,7 +591,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Step 5: Priority-Based Resolution Counts Panel */}
+        {/* Priority-Based Resolution Counts Panel */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs lg:col-span-2 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
@@ -633,7 +630,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section with Step 3 & Step 5 Filters */}
+      {/* Ticket List Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {/* Table Toolbar Header */}
         <div className="p-5 border-b border-slate-100 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-slate-50/40">
@@ -660,7 +657,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               />
             </div>
 
-            {/* Step 3: Status Filter Tabs / Dropdown with exact parity counts */}
+            {/* Status Filter Dropdown */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Filter className="text-slate-400 shrink-0" size={16} />
               <select
@@ -675,7 +672,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               </select>
             </div>
 
-            {/* Step 5: Priority-based Filter */}
+            {/* Priority Filter */}
             <div className="w-full sm:w-auto">
               <select
                 value={priorityFilter}
@@ -692,14 +689,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
           </div>
         </div>
 
-        {/* Table Content */}
+        {/* Table Content (Clean layout without redundant source columns) */}
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1050px]">
+          <table className="w-full text-left border-collapse min-w-[950px]">
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider font-bold">
                 <th className="py-3 px-4">Ticket ID</th>
                 <th className="py-3 px-4">Subject / Title</th>
-                <th className="py-3 px-4">Source</th>
                 <th className="py-3 px-4">Category</th>
                 <th className="py-3 px-4">Priority</th>
                 <th className="py-3 px-4">Assignee</th>
@@ -716,13 +712,8 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
                       {t.ticketId}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[240px] truncate">
+                  <td className="py-3.5 px-4 font-semibold text-slate-800 max-w-[260px] truncate">
                     {t.title}
-                  </td>
-                  <td className="py-3.5 px-4 whitespace-nowrap">
-                    <span className="font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[10px]">
-                      {t.source}
-                    </span>
                   </td>
                   <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
                     {t.category || "—"}
@@ -768,7 +759,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
               ))}
               {filteredTickets.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="py-16 text-center text-sm text-slate-400 italic">
+                  <td colSpan="8" className="py-16 text-center text-sm text-slate-400 italic">
                     No matching tickets found. Try adjusting your search query or filter settings.
                   </td>
                 </tr>
