@@ -34,7 +34,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       lastFetchedQueueRef.current = queue;
       fetchTickets(queue);
     }
-  }, [queue, fetchTickets]);
+  }, [queue]); // Removed `fetchTickets` from dependency array to prevent reference loop re-triggers
 
   useEffect(() => {
     const fetchOperators = async () => {
