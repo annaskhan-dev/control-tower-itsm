@@ -5,11 +5,11 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid,
 } from "recharts";
-import { Ticket, AlertTriangle, UserX, Clock, ArrowRight, Loader2, Download, Search, Filter, ChevronRight, CheckCircle2, UserCheck, ShieldAlert } from "lucide-react";
+import { Ticket, AlertTriangle, Clock, Loader2, Download, Search, ChevronRight, CheckCircle2, UserCheck, ShieldAlert } from "lucide-react";
 
 /**
- * Enhanced Normalization Engine: Properly parses nested object or string formats 
- * for assignees, sub-assignees, and creators so they display real, distinct names.
+ * Enhanced Normalization Engine: Deeply inspects payload properties to isolate 
+ * true creator/generator sources and distinct assignees.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee = t.assignee || t.assignedTo || t.assigned_to || t.assignedUser || "Unassigned";
@@ -22,12 +22,19 @@ const normalizeTicket = (t, now) => {
     rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.username || rawSubAssignee.email || null;
   }
 
-  // Improved Creator parsing to extract real user names, roles, or emails instead of falling back blindly
-  let rawCreator = t.creator || t.createdBy || t.created_by || t.author || t.client || t.role;
+  // Expanded search across all possible creator/generator fields
+  let rawCreator = 
+    t.creator || t.createdBy || t.created_by || 
+    t.generator || t.generatedBy || t.generated_by || 
+    t.source || t.origin || t.author || t.client || t.role;
+
   if (typeof rawCreator === "object" && rawCreator !== null) {
     rawCreator = rawCreator.name || rawCreator.fullName || rawCreator.username || rawCreator.role || rawCreator.email;
   }
-  const creatorName = (typeof rawCreator === "string" && rawCreator.trim() !== "") ? rawCreator.trim() : (t.role || "Operator");
+  
+  const creatorName = (typeof rawCreator === "string" && rawCreator.trim() !== "" && rawCreator.toLowerCase() !== "operator") 
+    ? rawCreator.trim() 
+    : (t.source || t.role || t.origin || "System / Direct");
 
   const status = (t.status || t.ticketStatus || t.state || "open").toString().toLowerCase();
   const isResolved = ["closed", "resolved", "completed", "done"].includes(status);
@@ -267,17 +274,16 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
     });
   }, [normalizedTickets, searchQuery, statusFilter, priorityFilterTab]);
 
-  // Distinct generator grouping ensuring real names/roles don't falsely collapse
+  // Distinct generator grouping using the newly expanded source properties
   const generatorBreakdown = useMemo(() => {
     const map = {};
     normalizedTickets.forEach((t) => {
-      const creator = (t.creatorName || "Operator").trim();
+      const creator = (t.creatorName || "System / Direct").trim();
       map[creator] = (map[creator] || 0) + 1;
     });
     return Object.entries(map).map(([name, count]) => ({ name, count }));
   }, [normalizedTickets]);
 
-  // Distinct operator resolution mapping using real assignees
   const operatorResolutionStats = useMemo(() => {
     const resolvedTickets = normalizedTickets.filter(t => t.isResolved);
     const map = {};
@@ -322,7 +328,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
 
     const headers = [
       "Ticket ID", "Title", "Description", "Source", "Category", "Priority", 
-      "Ticket Status", "SLA Health", "SLA Deadline", "Assignee", "Creator", "Assigned At", 
+      "Ticket Status", "SLA Health", "SLA Deadline", "Assignee", "Creator / Generator", "Assigned At", 
       "Assignment Duration", "SLA Active Duration", "Sub-Assignee", "Sub-Assigned At", 
       "Sub-Assignment Duration", "Resolved At", "Final Resolution Duration", "Company ID", "Created At"
     ];
@@ -455,13 +461,13 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
         ))}
       </div>
 
-      {/* Visibility Cards Section with Real Distinct Data */}
+      {/* Visibility Cards Section with True Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Tickets Generator Breakdown */}
         <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-              <UserCheck size={16} className="text-blue-600" /> Tickets by Generator / Role
+              <UserCheck size={16} className="text-blue-600" /> Tickets by Generator / Source
             </h4>
             <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">Total: {stats.total}</span>
           </div>
@@ -477,7 +483,7 @@ export const Dashboard = ({ tickets: propTickets = [] }) => {
             )}
           </div>
           <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-100 italic">
-            Reflecting creation telemetry across distinct creators and roles.
+            Reflecting creation telemetry across distinct creators and sources.
           </div>
         </div>
 

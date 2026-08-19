@@ -28,6 +28,10 @@ export class CreateTicketDto {
 
   @IsString()
   @IsOptional()
+  generator?: string; // <--- Added to validate ticket generator payload
+
+  @IsString()
+  @IsOptional()
   status?: string;
 
   @IsString()

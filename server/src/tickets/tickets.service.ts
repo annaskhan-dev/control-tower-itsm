@@ -37,7 +37,13 @@ export class TicketsService {
     }
   }
 
-  async create(createTicketDto: CreateTicketDto, companyId: string, userRole: string): Promise<Ticket> {
+  async create(
+    createTicketDto: CreateTicketDto, 
+    companyId: string, 
+    userRole: string, 
+    userName?: string, 
+    userId?: string
+  ): Promise<Ticket> {
     try {
       const category = createTicketDto.category || 'fleet-coordination';
       const slaConfig = await this.slaConfigModel.findOne({ category, companyId }).exec();
@@ -45,6 +51,9 @@ export class TicketsService {
       const deadline = new Date(Date.now() + hoursAllowed * 60 * 60 * 1000);
       const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
       const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
+
+      // Determine generator identity (falling back to user name/role if not specified)
+      const ticketGenerator = createTicketDto.generator || createTicketDto.source || userName || userRole || 'Operator';
 
       const ticketData = {
         ...createTicketDto,
@@ -58,6 +67,8 @@ export class TicketsService {
         subAssignmentAt: isSubAssigned ? new Date() : null,
         resolvedAt: null,
         companyId: companyId,
+        generator: ticketGenerator,
+        createdBy: userId || null,
       };
 
       const createdTicket = new this.ticketModel(ticketData);
@@ -210,7 +221,6 @@ export class TicketsService {
     const normalizedRole = (userRole || '').replace(/\s+/g, '_').toLowerCase();
     const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].includes(normalizedRole);
     
-    // Expanded generic placeholders with safe substring checking
     const genericPlaceholders = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person', 'shipper_ops', 'sales_person'];
     const trimmedUserName = (userName || '').toLowerCase().trim();
     
@@ -219,7 +229,6 @@ export class TicketsService {
 
     this.logger.debug(`[findAll] User: ${userName}, Role: ${userRole}, IsGeneric: ${isGenericName}, Queue: ${queue}`);
 
-    // Handle Queues safely with normalization
     const normalizedQueue = (queue || 'all-work').toLowerCase().trim();
 
     if (normalizedQueue === 'unassigned') {
@@ -228,7 +237,6 @@ export class TicketsService {
       query.status = { $regex: /^open$/i };
     }
 
-    // Allow Managers/Admins or generic role placeholder logins to view all tickets on the main list
     if (!isManagerOrAdmin && !isGenericName) {
       const cleanName = userName.includes('@') ? userName.split('@')[0] : userName;
       query.$or = [

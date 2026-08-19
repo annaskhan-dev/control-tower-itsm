@@ -79,7 +79,17 @@ export class TicketsController {
   @Post()
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async create(@Req() req: AuthenticatedRequest, @Body() createTicketDto: CreateTicketDto) {
-    return await this.ticketsService.create(createTicketDto, req.user.companyId, req.user.role);
+    const userRole = req.user.role;
+    const userName = req.user.name || req.user.username;
+    const userId = req.user.sub; // Mapping sub token claim to userId
+
+    return await this.ticketsService.create(
+      createTicketDto, 
+      req.user.companyId, 
+      userRole, 
+      userName, 
+      userId
+    );
   }
 
   @Get('stats')
