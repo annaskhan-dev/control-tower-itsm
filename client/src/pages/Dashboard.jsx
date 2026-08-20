@@ -178,7 +178,7 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * List-based Card matching the target design
+ * List-based Card matching the target screenshot design
  */
 const GeneratorListCard = memo(({ title, data }) => {
   const totalValue = useMemo(() => data.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0), [data]);
@@ -234,22 +234,19 @@ export const Dashboard = ({ tickets: propTickets }) => {
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
 
+  // Use ref guards to prevent infinite fetch loop executions on render
   const hasFetchedTicketsRef = useRef(false);
   const hasFetchedStatsRef = useRef(false);
-  const fetchTicketsRef = useRef(fetchTickets);
 
   useEffect(() => {
-    fetchTicketsRef.current = fetchTickets;
-  }, [fetchTickets]);
+    if (!propTickets && fetchTickets && !hasFetchedTicketsRef.current) {
+      hasFetchedTicketsRef.current = true;
+      fetchTickets('all-work');
+    }
+  }, []); // ✅ Fixed: Empty dependency array ensures this fires only once on mount
 
   useEffect(() => {
     let isMounted = true;
-
-    if (!propTickets && fetchTicketsRef.current && !hasFetchedTicketsRef.current) {
-      hasFetchedTicketsRef.current = true;
-      fetchTicketsRef.current('all-work');
-    }
-
     const getStatsData = async () => {
       if (hasFetchedStatsRef.current) return;
       hasFetchedStatsRef.current = true;
@@ -263,13 +260,11 @@ export const Dashboard = ({ tickets: propTickets }) => {
         console.error("Failed to load backend stats:", err);
       }
     };
-    
     getStatsData();
-
     return () => {
       isMounted = false;
     };
-  }, [propTickets]);
+  }, []);
 
   const normalizedTickets = useMemo(() => (Array.isArray(tickets) ? tickets : []).map((t) => normalizeTicket(t, now)), [tickets, now]);
 
