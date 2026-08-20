@@ -149,6 +149,7 @@ const normalizeTicket = (t, now) => {
     slaStatus: sla,
     isResolved,
     isSubAssigned,
+    isAssigned,
     assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
     slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
     subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
@@ -427,7 +428,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       generatorMap[src] = (generatorMap[src] || 0) + 1;
 
       const isClosed = t.isResolved || ["closed", "resolved", "completed", "done"].includes(t.status.toLowerCase());
-      const isAssigned = t.assigneeName.toLowerCase() !== "unassigned" && t.assigneeName !== "";
+      const isAssigned = t.isAssigned;
 
       if (isClosed) {
         closedCount++;
@@ -534,11 +535,13 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       }
 
       const isClosed = t.isResolved || ["closed", "resolved", "completed", "done"].includes(t.status.toLowerCase());
-      const isAssigned = t.assigneeName.toLowerCase() !== "unassigned" && t.assigneeName !== "";
+      const isAssigned = t.isAssigned;
 
       if (selectedTab === "open" && isClosed) return false;
       if (selectedTab === "assigned" && !isAssigned) return false;
       if (selectedTab === "closed" && !isClosed) return false;
+      if (selectedTab === "unassigned" && isAssigned) return false;
+      if (selectedTab === "sla-risk" && (isClosed || (t.slaStatus !== "Breached" && t.slaStatus !== "At Risk"))) return false;
 
       if (selectedPriorityFilter !== "all" && t.priority.toLowerCase() !== selectedPriorityFilter.toLowerCase()) {
         return false;
@@ -590,10 +593,10 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       {/* Top Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Tickets", val: stats.total, icon: Ticket, color: "blue", tab: "all" },
-          { label: "Open Work", val: stats.open, icon: Clock, color: "indigo", tab: "open" },
-          { label: "Assigned", val: stats.assigned, icon: CheckCircle2, color: "emerald", tab: "assigned" },
-          { label: "Closed Tickets", val: stats.closed, icon: CheckCircle2, color: "purple", tab: "closed" },
+          { label: "Total Tickets", val: stats.total, icon: Ticket, tab: "all" },
+          { label: "Unassigned", val: stats.unassigned, icon: UserX, tab: "unassigned" },
+          { label: "Open Work", val: stats.open, icon: Clock, tab: "open" },
+          { label: "SLA Risks", val: stats.slaRisk, icon: AlertTriangle, tab: "sla-risk" },
         ].map((item) => (
           <div 
             key={item.label} 
@@ -742,12 +745,14 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
         
         {/* Status Tab Filters */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto justify-center">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto justify-center flex-wrap">
           {[
             { key: "all", label: "All Work" },
+            { key: "unassigned", label: "Unassigned" },
             { key: "open", label: "Open" },
             { key: "assigned", label: "Assigned" },
-            { key: "closed", label: "Closed" }
+            { key: "closed", label: "Closed" },
+            { key: "sla-risk", label: "SLA Risks" }
           ].map((tab) => (
             <button
               key={tab.key}
