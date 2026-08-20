@@ -1,19 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dashboard } from './Dashboard'; 
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axiosInstance';
 import { Download } from 'lucide-react';
-
-// Module-level guard: survives component unmounts/remounts during route navigation
-let globalLastFetchedCompany = null;
 
 export const DashboardPage = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth(); 
 
-  // Use primitive stable values for dependencies
   const companyID = user?.companyID || user?.id || user?._id;
+  
+  // Use a ref to lock fetches strictly per component lifecycle instance
+  const fetchedRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -23,20 +22,20 @@ export const DashboardPage = () => {
       return;
     }
 
-    // If we already fetched for this exact company ID in this session, skip entirely
-    if (globalLastFetchedCompany === companyID) {
+    if (fetchedRef.current === companyID) {
       if (isMounted) setLoading(false);
       return;
     }
 
     const fetchTickets = async () => {
-      globalLastFetchedCompany = companyID; // Lock globally
+      fetchedRef.current = companyID;
       try {
         const response = await axiosInstance.get('/tickets', {
           params: { companyID }
         });
         if (isMounted) {
-          setTickets(response.data);
+          const data = Array.isArray(response.data) ? response.data : (response.data?.tickets || response.data?.data || []);
+          setTickets(data);
         }
       } catch (error) {
         console.error("Failed to fetch tickets:", error);
@@ -64,7 +63,6 @@ export const DashboardPage = () => {
       const dateValue = t.createdAt || t.created_at;
       if (!dateValue) return false;
       const ticketDate = new Date(dateValue);
-      // Normalized check to include everything up to the end of the current day
       return ticketDate >= oneMonthAgo && ticketDate <= new Date(currentDate.setHours(23, 59, 59, 999));
     });
 
