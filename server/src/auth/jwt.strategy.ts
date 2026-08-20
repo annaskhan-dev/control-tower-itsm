@@ -11,8 +11,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      // getOrThrow() ensures the value is a string, resolving your TS error.
-      // If JWT_SECRET is missing, the application will throw an error immediately on startup.
       secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
     });
   }
@@ -28,7 +26,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return { 
       sub: payload.sub, 
       companyId: payload.companyId,
-      role: payload.role 
+      role: payload.role,
+      name: payload.name,       // Passes the authenticated user name through
+      username: payload.username, // Passes the username through
+      email: payload.email        // Passes the email through
     };
   }
 }
