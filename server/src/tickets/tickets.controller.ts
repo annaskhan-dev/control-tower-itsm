@@ -31,6 +31,7 @@ interface AuthenticatedRequest extends Request {
     name?: string; 
     username?: string; 
     email?: string;
+    fullName?: string;
   };
 }
 
@@ -81,15 +82,16 @@ export class TicketsController {
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async create(@Req() req: AuthenticatedRequest, @Body() createTicketDto: CreateTicketDto) {
     const userRole = req.user.role || 'User';
-    const userName = req.user.name || req.user.username || (req.user.email ? req.user.email.split('@')[0] : 'User');
+    
+    // Checks all possible name fields and falls back to 'Ali' instead of 'User'
+    const userName = req.user.name || req.user.username || req.user.fullName || (req.user.email ? req.user.email.split('@')[0] : null) || 'Ali';
     const userId = req.user.sub;
 
-    // Forces generator to combine the username and role (e.g., "Ali (Operator)")
     const formattedSource = `${userName} (${userRole})`;
 
     const enrichedTicketDto = {
       ...createTicketDto,
-      generator: formattedSource, // Overrides the frontend payload value directly
+      generator: formattedSource,
     };
 
     this.logger.debug(`[POST /tickets] Creating ticket by user: ${userName}, role: ${userRole}, generator: ${enrichedTicketDto.generator}`);
@@ -107,7 +109,7 @@ export class TicketsController {
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async getStats(@Req() req: AuthenticatedRequest) {
     const userRole = req.user.role || '';
-    const userName = req.user.name || req.user.username || (req.user.email ? req.user.email.split('@')[0] : 'Operator');
+    const userName = req.user.name || req.user.username || req.user.fullName || (req.user.email ? req.user.email.split('@')[0] : null) || 'Ali';
     
     this.logger.debug(`[GET /tickets/stats] Fetching operational statistics for company: ${req.user.companyId}`);
 
@@ -123,7 +125,7 @@ export class TicketsController {
     @Query('queue') queue: string
   ) {
     const userRole = req.user.role || '';
-    const userName = req.user.name || req.user.username || (req.user.email ? req.user.email.split('@')[0] : 'Operator');
+    const userName = req.user.name || req.user.username || req.user.fullName || (req.user.email ? req.user.email.split('@')[0] : null) || 'Ali';
     
     this.logger.debug(`[GET /tickets] Request received from user: ${userName}, role: ${userRole}, queue: ${queue}`);
 
@@ -176,10 +178,9 @@ export class TicketsController {
       }
     }
 
-    const currentUserName = req.user.name || req.user.username || (req.user.email ? req.user.email.split('@')[0] : 'Ali');
+    const currentUserName = req.user.name || req.user.username || req.user.fullName || (req.user.email ? req.user.email.split('@')[0] : null) || 'Ali';
     const userRole = req.user.role;
 
-    // Automatically enforce and lock assignee to current user's name for Operators
     if (userRole === 'Operator' && updateTicketDto.assignee !== undefined) {
       updateTicketDto.assignee = currentUserName;
     }
