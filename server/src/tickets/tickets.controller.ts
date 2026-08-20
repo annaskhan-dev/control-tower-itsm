@@ -80,13 +80,16 @@ export class TicketsController {
   @Post()
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async create(@Req() req: AuthenticatedRequest, @Body() createTicketDto: CreateTicketDto) {
-    const userRole = req.user.role;
-    const userName = req.user.name || req.user.username || (req.user.email ? req.user.email.split('@')[0] : 'Operator');
+    const userRole = req.user.role || 'User';
+    const userName = req.user.name || req.user.username || (req.user.email ? req.user.email.split('@')[0] : 'User');
     const userId = req.user.sub;
+
+    // Formats the entry source as "Ali (Operator)" instead of just the role string
+    const formattedSource = `${userName} (${userRole})`;
 
     const enrichedTicketDto = {
       ...createTicketDto,
-      generator: createTicketDto['generator'] || userRole || 'System',
+      generator: createTicketDto['generator'] || formattedSource,
     };
 
     this.logger.debug(`[POST /tickets] Creating ticket by user: ${userName}, role: ${userRole}, generator: ${enrichedTicketDto.generator}`);
@@ -173,7 +176,6 @@ export class TicketsController {
       }
     }
 
-    // Resolve name cleanly, avoiding MongoDB ID hex strings entirely
     const currentUserName = req.user.name || req.user.username || (req.user.email ? req.user.email.split('@')[0] : 'Ali');
     const userRole = req.user.role;
 
