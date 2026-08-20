@@ -42,12 +42,12 @@ export class TicketsController {
 
   constructor(private readonly ticketsService: TicketsService) {}
 
-  // Helper method to dynamically extract and format the user's name
+  // Helper method updated to prioritize exact user name / full name / username first
   private extractUserName(user: AuthenticatedRequest['user']): string {
-    if (user.name) return user.name;
-    if (user.username) return user.username;
-    if (user.fullName) return user.fullName;
-    if (user.email) {
+    if (user?.name) return user.name;
+    if (user?.fullName) return user.fullName;
+    if (user?.username) return user.username;
+    if (user?.email) {
       const prefix = user.email.split('@')[0];
       return prefix.charAt(0).toUpperCase() + prefix.slice(1);
     }
@@ -101,8 +101,8 @@ export class TicketsController {
 
     const enrichedTicketDto = {
       ...createTicketDto,
-      generator: formattedSource, // Forces override to prevent frontend placeholder overwrite
-      source: formattedSource,    // Ensures compatibility if source field is mapped elsewhere
+      generator: formattedSource, // Forces correct format: "Hamza (Operator)"
+      source: formattedSource,    // Synchronizes source field mapping
     };
 
     this.logger.debug(`[POST /tickets] Creating ticket by user: ${userName}, role: ${userRole}, generator: ${enrichedTicketDto.generator}`);

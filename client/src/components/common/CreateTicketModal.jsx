@@ -78,16 +78,10 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
 
     setIsSubmitting(true);
 
-    // FIXED: Prioritize name/username/fullName over role so it correctly picks up "Hamza"
-    const userName = user?.name || user?.username || user?.fullName || (user?.email ? user.email.split('@')[0] : 'User');
-    const userRole = user?.role || 'Operator';
-    const ticketGenerator = `${userName} (${userRole})`;
-
-    // Build clean payload
+    // Build clean payload without hardcoded generator/source.
+    // The NestJS backend will automatically inject the authenticated user identity and role.
     const payload = {
       ...formData,
-      generator: ticketGenerator,
-      source: "Control Tower UI"
     };
 
     // Remove UI-only fields that the backend doesn't expect
