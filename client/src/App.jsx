@@ -12,7 +12,6 @@ import { TicketDetail } from './pages/TicketDetail';
 import { UserManagement } from './pages/UserManagement';
 import { SlaSettings } from './components/SlaSettings';
 import { CreateTicketModal } from './components/common/CreateTicketModal';
-import DriverSupportLogs from './components/DriverSupportLogs';
 import { Menu, X } from 'lucide-react';
 
 // Dedicated helper component to safely redirect users based on role upon login/root hit
@@ -106,9 +105,6 @@ function MainLayout() {
           <Route path="*" element={<Navigate to={defaultHomeRoute} replace />} />
         </Routes>
       </main>
-
-      {/* DriverSupportLogs placed safely inside authenticated layout boundary */}
-      {user && <DriverSupportLogs />}
 
       {user && isTicketModalOpen && (
         <CreateTicketModal onClose={() => setIsTicketModalOpen(false)} />
