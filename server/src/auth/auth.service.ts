@@ -73,6 +73,8 @@ export class AuthService {
       sub: user._id.toString(),
       companyId: user.companyId.toString(),
       role: user.role,
+      name: user.name,         // Included so token carries the user's name
+      username: user.username, // Included for username mapping support
     };
 
     const { password: userPassword, ...result } = user;
