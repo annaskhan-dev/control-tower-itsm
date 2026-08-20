@@ -165,6 +165,8 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
       const entrySource = t.generator || t.source || "System / Direct";
       const priority = (t.priority || "medium").toLowerCase();
+      
+      // Explicitly pull issueType. If missing, fallback to category or 'General'
       const issueType = t.issueType || t.type || t.category || "General";
 
       return {
@@ -176,7 +178,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         slaStatus,
         entrySource,
         priority,
-        issueType,
+        issueType, // Passed to return object
         isResolved,
         assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
         slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
@@ -416,7 +418,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                     <th className="py-3.5 px-4 font-semibold">Entry Source</th>
                     <th className="py-3.5 px-4 font-semibold">Created Date</th>
                     <th className="py-3.5 px-4 font-semibold">Title</th>
-                    <th className="py-3.5 px-4 font-semibold">Issue Type</th>
+                    <th className="py-3.5 px-4 font-semibold">Issue Type</th> {/* Displaying explicit Issue Type */}
                     <th className="py-3.5 px-4 font-semibold">Priority</th>
                     <th className="py-3.5 px-4 font-semibold">Assignee</th>
                     <th className="py-3.5 px-4 font-semibold">Assignment Time</th>
@@ -447,11 +449,14 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         </td>
                         <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
                         <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[200px] truncate" title={t.title}>{t.title}</td>
+                        
+                        {/* Rendered Issue Type from our mapped data */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-[11px] font-medium">
+                          <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-100 rounded-md text-[11px] font-medium uppercase tracking-wider">
                             {t.issueType}
                           </span>
                         </td>
+
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                             t.priority === "critical" || t.priority === "urgent" ? "bg-rose-100 text-rose-700" :
