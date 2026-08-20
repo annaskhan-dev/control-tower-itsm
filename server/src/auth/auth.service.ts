@@ -26,8 +26,6 @@ export class AuthService {
   ) {
     if (!pass) throw new BadRequestException('Password is required');
 
-    // SECURITY WARNING: In a production app, do not allow public
-    // registration of 'Super Admin' roles.
     const validRoles = [
       'Operator', 
       'Manager', 
@@ -50,14 +48,13 @@ export class AuthService {
       name,
       email,
       password: hashedPassword,
-      companyId, // Crucial: Associates this user with a specific tenant
+      companyId,
       role,
     });
 
     return await newUser.save();
   }
 
-  // Updated the parameter name from 'pass' to 'password'
   async login(email: string, password: string) {
     if (!password) throw new BadRequestException('Password is required');
 
@@ -65,16 +62,21 @@ export class AuthService {
 
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
-    // Updated the usage here as well
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) throw new UnauthorizedException('Invalid credentials');
+
+    // Bulletproof name evaluation: checks name, username, or falls back to email prefix
+    const extractedName = 
+      user.name?.trim() || 
+      user.username?.trim() || 
+      user.fullName?.trim() || 
+      (email ? email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1) : 'User');
 
     const payload = {
       sub: user._id.toString(),
       companyId: user.companyId.toString(),
       role: user.role,
-      name: user.name,         // Included so token carries the user's name
-      username: user.username, // Included for username mapping support
+      name: extractedName, // Guaranteed to contain a valid name string
     };
 
     const { password: userPassword, ...result } = user;
