@@ -5,16 +5,16 @@ import { Layout } from "../components/layout/Layout";
 
 // Import Pages
 import { Login } from "../pages/Login";
-import { Register } from "../pages/Register"; // Added Register
+import { Register } from "../pages/Register";
 import { DashboardPage } from "../pages/DashboardPage";
 import { TicketList } from "../pages/TicketList";
 import { TicketDetail } from "../pages/TicketDetail";
 import { CreateTicket } from "../pages/CreateTicket";
 import { UserManagement } from "../pages/UserManagement";
-import SlaSettings from "../pages/SlaSettings"; // Adjust path if necessary based on your file tree
+import SlaSettings from "../pages/SlaSettings";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isAuthenticated, isLoading, user } = useAuth(); // Ensure user is available from AuthContext
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return <div className="p-8 text-slate-500">Loading session...</div>;
@@ -33,7 +33,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     );
 
     if (!isAuthorized) {
-      // Redirect unauthorized roles back to dashboard/tickets instead of looping or blocking
+      // Redirect unauthorized roles back to tickets instead of looping or blocking
       return <Navigate to="/tickets" replace />;
     }
   }
@@ -56,7 +56,10 @@ export const AppRoutes = () => {
         path="/login"
         element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
       />
-      <Route path="/register" element={<Register />} />
+      <Route
+        path="/register"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />}
+      />
 
       {/* Protected Routes with Role Guards */}
       <Route path="/dashboard" element={<ProtectedRoute allowedRoles={allRoles}><DashboardPage /></ProtectedRoute>} />

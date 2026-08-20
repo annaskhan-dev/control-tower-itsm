@@ -416,9 +416,7 @@ export const TicketDetail = () => {
 
           {/* Right Column: Properties & Live Durations */}
           <div className="space-y-4">
-            <div 
-              className="bg-white border border-slate-200 rounded-xl shadow-xs p-5 space-y-4"
-            >
+            <div className="bg-white border border-slate-200 rounded-xl shadow-xs p-5 space-y-4">
               <h3 className="text-xs font-bold flex items-center gap-2 text-slate-700">
                 <ShieldAlert size={14} className="text-blue-600" /> Properties
               </h3>
@@ -568,3 +566,5 @@ export const TicketDetail = () => {
     </div>
   );
 };
+
+export default TicketDetail;

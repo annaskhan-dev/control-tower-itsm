@@ -20,9 +20,14 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   const { user, isAdmin, isManager, role } = useAuth();
   
   const userRoleRaw = role || user?.role || user?.userType || user?.type || "";
-  const currentRole = typeof userRoleRaw === 'string' ? userRoleRaw.replace(/\s+/g, "_").toLowerCase() : "";
   
-  const isUserManagerOrAdmin = isAdmin || isManager || currentRole.includes('admin') || currentRole.includes('manager');
+  const currentRole = useMemo(() => {
+    return typeof userRoleRaw === 'string' ? userRoleRaw.replace(/\s+/g, "_").toLowerCase() : "";
+  }, [userRoleRaw]);
+  
+  const isUserManagerOrAdmin = useMemo(() => {
+    return isAdmin || isManager || currentRole.includes('admin') || currentRole.includes('manager');
+  }, [isAdmin, isManager, currentRole]);
 
   const queue = searchParams.get("queue") || "all-work";
 

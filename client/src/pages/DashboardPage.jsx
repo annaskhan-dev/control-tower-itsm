@@ -64,7 +64,8 @@ export const DashboardPage = () => {
       const dateValue = t.createdAt || t.created_at;
       if (!dateValue) return false;
       const ticketDate = new Date(dateValue);
-      return ticketDate >= oneMonthAgo && ticketDate <= currentDate;
+      // Normalized check to include everything up to the end of the current day
+      return ticketDate >= oneMonthAgo && ticketDate <= new Date(currentDate.setHours(23, 59, 59, 999));
     });
 
     if (recentTickets.length === 0) {
@@ -92,8 +93,8 @@ export const DashboardPage = () => {
       if (t.slaDeadline) {
         const deadline = new Date(t.slaDeadline);
         if (!isNaN(deadline.getTime())) {
-          if (deadline < currentDate) sla = "Breached";
-          else if (deadline < new Date(currentDate.getTime() + 2 * 60 * 60 * 1000)) sla = "Due Soon";
+          if (deadline < new Date()) sla = "Breached";
+          else if (deadline < new Date(Date.now() + 2 * 60 * 60 * 1000)) sla = "Due Soon";
         }
       }
       const slaField = `"${sla}"`;
@@ -109,13 +110,13 @@ export const DashboardPage = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `tickets_last_1_month_${currentDate.toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `tickets_last_1_month_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  if (loading) return <div className="p-8">Loading dashboard data...</div>;
+  if (loading) return <div className="p-8 text-xs text-slate-500 font-medium">Loading dashboard data...</div>;
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
