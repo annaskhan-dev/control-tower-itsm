@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, memo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, memo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { fetchTicketStats } from '../api/axiosInstance';
 import { useTickets } from "../context/TicketContext";
@@ -178,7 +178,7 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * List-based Card matching the target screenshot design
+ * List-based Card matching the target design
  */
 const GeneratorListCard = memo(({ title, data }) => {
   const totalValue = useMemo(() => data.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0), [data]);
@@ -234,7 +234,6 @@ export const Dashboard = ({ tickets: propTickets }) => {
   const [backendStats, setBackendStats] = useState(null);
   const [now] = useState(() => new Date());
 
-  // Use ref guards & stable function references to prevent infinite loops
   const hasFetchedTicketsRef = useRef(false);
   const hasFetchedStatsRef = useRef(false);
   const fetchTicketsRef = useRef(fetchTickets);
