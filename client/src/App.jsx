@@ -25,7 +25,7 @@ function RootRedirect() {
     r => userRole.includes(r)
   );
 
-  return <Navigate to={isRestrictedRole ? "/tickets?queue=all" : "/dashboard"} replace />;
+  return <Navigate to={isRestrictedRole ? "/tickets?queue=all-work" : "/dashboard"} replace />;
 }
 
 function MainLayout() {
@@ -37,7 +37,7 @@ function MainLayout() {
   const isRestrictedRole = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person'].some(
     r => userRole.includes(r)
   );
-  const defaultHomeRoute = isRestrictedRole ? "/tickets?queue=all" : "/dashboard";
+  const defaultHomeRoute = isRestrictedRole ? "/tickets?queue=all-work" : "/dashboard";
 
   return (
     <div className="flex h-screen bg-slate-100 relative overflow-x-hidden">
@@ -79,7 +79,7 @@ function MainLayout() {
 
           {/* Protected Routes - Dashboard restricted to Super Admin / Manager */}
           <Route path="/dashboard" element={
-            isRestrictedRole ? <Navigate to="/tickets?queue=all" replace /> : (
+            isRestrictedRole ? <Navigate to="/tickets?queue=all-work" replace /> : (
               <ProtectedRoute allowedRoles={['Super Admin', 'Manager']}> <Dashboard /> </ProtectedRoute>
             )
           } />
