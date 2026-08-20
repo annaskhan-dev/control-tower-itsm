@@ -52,11 +52,13 @@ export class TicketsService {
       const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
       const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
 
-      const ticketGenerator = createTicketDto.generator || createTicketDto.source || userRole || 'System';
+      // Fallback cleanly to the provided userName, avoiding generic fallback terms if possible
+      const resolvedUserName = userName && userName !== 'User' ? userName : 'Ali';
+      const ticketGenerator = createTicketDto.generator || `${resolvedUserName} (${userRole})`;
 
       const ticketData = {
         ...createTicketDto,
-        issueType: createTicketDto.issueType, // Explicitly mapping for clarity, though spread handles it
+        issueType: createTicketDto.issueType,
         category,
         status: 'Open',
         assignee: isAssigned ? createTicketDto.assignee : 'Unassigned',
@@ -83,9 +85,6 @@ export class TicketsService {
     }
   }
 
-  // ... rest of your existing methods (createSlaCategory, update, remove, etc.)
-  // remain unchanged and are fully compatible with the new field.
-
   async createSlaCategory(
     companyId: string, 
     category: string, 
@@ -108,9 +107,6 @@ export class TicketsService {
     userRole: string, 
     currentUserName?: string
   ): Promise<Ticket> {
-    // ... (Your existing update logic)
-    // Note: If you want users to be able to edit issueType, ensure 
-    // updateTicketDto is updated in the dto folder as well.
     const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
     const restrictedUpdateRoles = ['operator', 'transporter', 'shipper_ops', 'sales_person'];
 
@@ -193,7 +189,6 @@ export class TicketsService {
     return updatedTicket;
   }
 
-  // ... (Keep existing remove, updateSla, findAll, findOne, getStats, findAllSla, removeSlaConfig)
   async remove(id: string, companyId: string, userRole: string): Promise<Ticket> {
     this.authorize(userRole, ['Manager', 'Super Admin']);
     const baseQuery = id.startsWith('INC-') ? { ticketId: id } : { _id: id };
@@ -264,7 +259,6 @@ export class TicketsService {
   }
 
   async getStats(companyId: string, userRole?: string, userName?: string) {
-    // ... (Keep existing stats logic)
     const query: any = { companyId };
     if (userRole && userName) {
       const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
@@ -290,7 +284,6 @@ export class TicketsService {
       return acc;
     }, {});
     
-    // ... (Rest of aggregate generator stats logic remains the same)
     return {
       total: tickets.length,
       open: tickets.filter((t) => (t.status || '').toLowerCase() === 'open').length,
