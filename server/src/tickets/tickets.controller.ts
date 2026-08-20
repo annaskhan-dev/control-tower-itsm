@@ -10,6 +10,7 @@ import {
   Query,
   NotFoundException,
   BadRequestException,
+  ForbiddenException, // Added for enforcement
   UseGuards,
   Req,
   Logger,
@@ -81,9 +82,8 @@ export class TicketsController {
   async create(@Req() req: AuthenticatedRequest, @Body() createTicketDto: CreateTicketDto) {
     const userRole = req.user.role;
     const userName = req.user.name || req.user.username;
-    const userId = req.user.sub; // Mapping sub token claim to userId
+    const userId = req.user.sub;
 
-    // Dynamically assign the generator/source based on the user's role or input payload
     const enrichedTicketDto = {
       ...createTicketDto,
       generator: createTicketDto['generator'] || userRole || 'System',
@@ -109,8 +109,6 @@ export class TicketsController {
     this.logger.debug(`[GET /tickets/stats] Fetching operational statistics for company: ${req.user.companyId}`);
 
     const statsResult = await this.ticketsService.getStats(req.user.companyId, userRole, userName);
-    
-    // Ensure structure compatibility for frontend Dashboard telemetry consumers (supports object/array wrapping)
     return statsResult;
   }
 
@@ -176,10 +174,18 @@ export class TicketsController {
     }
 
     const currentUserName = req.user.name || req.user.username || req.user.sub;
+    const userRole = req.user.role;
+
+    // Enforce rule: Operators can only assign tickets to themselves
+    if (userRole === 'Operator' && updateTicketDto.assignee !== undefined) {
+      if (updateTicketDto.assignee !== currentUserName) {
+        throw new ForbiddenException('Operators can only assign tickets to themselves.');
+      }
+    }
     
     this.logger.debug(`[PATCH/PUT /tickets/${id}] Updating ticket state by: ${currentUserName}`);
 
-    return this.ticketsService.update(id, updateTicketDto, req.user.companyId, req.user.role, currentUserName);
+    return this.ticketsService.update(id, updateTicketDto, req.user.companyId, userRole, currentUserName);
   }
 
   @Delete(':id')
