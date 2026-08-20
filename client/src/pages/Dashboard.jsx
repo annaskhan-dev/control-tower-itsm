@@ -517,38 +517,6 @@ export const Dashboard = ({ tickets: propTickets }) => {
         ))}
       </div>
 
-      {/* Priority Summary & Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <ShieldAlert size={18} className="text-amber-500" />
-          <span className="text-xs font-bold uppercase text-slate-700 tracking-wider">Priority Breakdown & Filters:</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {[
-            { key: "all", label: "All Priorities", count: stats.total },
-            { key: "critical", label: "Critical", count: stats.byPriority["Critical"], resolved: stats.byPriorityResolved["Critical"], color: "rose" },
-            { key: "high", label: "High", count: stats.byPriority["High"], resolved: stats.byPriorityResolved["High"], color: "amber" },
-            { key: "medium", label: "Medium", count: stats.byPriority["Medium"], resolved: stats.byPriorityResolved["Medium"], color: "blue" },
-            { key: "low", label: "Low", count: stats.byPriority["Low"], resolved: stats.byPriorityResolved["Low"], color: "slate" },
-          ].map(p => (
-            <button
-              key={p.key}
-              onClick={() => setSelectedPriorityFilter(p.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition border flex items-center gap-1.5 cursor-pointer ${
-                selectedPriorityFilter === p.key 
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm' 
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              <span>{p.label}</span>
-              <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${selectedPriorityFilter === p.key ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>
-                {p.count || 0} {p.resolved !== undefined ? `(${p.resolved} res)` : ''}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Widgets Grid: Generators, Operators, and SLA Donut */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Creators / Generators Breakdown */}
@@ -592,7 +560,7 @@ export const Dashboard = ({ tickets: propTickets }) => {
         </div>
       </div>
 
-      {/* Velocity Trend Chart with Days Selector */}
+      {/* Velocity Trend Chart with Days Selector (Height decreased to h-32) */}
       <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Ticket Intake Velocity Trend</h4>
@@ -610,7 +578,7 @@ export const Dashboard = ({ tickets: propTickets }) => {
             </select>
           </div>
         </div>
-        <div className="h-48 w-full mt-3">
+        <div className="h-32 w-full mt-3">
           <ResponsiveContainer width="100%" height="100%" debounce={100}>
             <LineChart data={chartData.trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -631,6 +599,38 @@ export const Dashboard = ({ tickets: propTickets }) => {
         </div>
         <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-400 italic">
           Daily volume intake pattern over the selected {velocityDays}-day window.
+        </div>
+      </div>
+
+      {/* Priority Summary & Filter Bar placed right above the table */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <ShieldAlert size={18} className="text-amber-500" />
+          <span className="text-xs font-bold uppercase text-slate-700 tracking-wider">Priority Breakdown & Filters:</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { key: "all", label: "All Priorities", count: stats.total },
+            { key: "critical", label: "Critical", count: stats.byPriority["Critical"], resolved: stats.byPriorityResolved["Critical"], color: "rose" },
+            { key: "high", label: "High", count: stats.byPriority["High"], resolved: stats.byPriorityResolved["High"], color: "amber" },
+            { key: "medium", label: "Medium", count: stats.byPriority["Medium"], resolved: stats.byPriorityResolved["Medium"], color: "blue" },
+            { key: "low", label: "Low", count: stats.byPriority["Low"], resolved: stats.byPriorityResolved["Low"], color: "slate" },
+          ].map(p => (
+            <button
+              key={p.key}
+              onClick={() => setSelectedPriorityFilter(p.key)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition border flex items-center gap-1.5 cursor-pointer ${
+                selectedPriorityFilter === p.key 
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm' 
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <span>{p.label}</span>
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${selectedPriorityFilter === p.key ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>
+                {p.count || 0} {p.resolved !== undefined ? `(${p.resolved} res)` : ''}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
