@@ -160,19 +160,6 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
             </div>
 
             <div>
-              <label className="block text-slate-600 font-semibold mb-0.5">Priority</label>
-              <input
-                type="text"
-                disabled
-                value={formData.priority}
-                className="w-full px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl outline-none text-slate-500 cursor-not-allowed"
-              />
-              <div className="mt-0.5 pt-0.5 border-t border-red-500 text-red-500 font-medium text-[10px]">
-                SLA: {formData.slaDeadline || "---"}
-              </div>
-            </div>
-
-            <div>
               <label className="block text-slate-600 font-semibold mb-0.5">Assignee</label>
               <select
                 value={formData.assignee}
@@ -208,6 +195,19 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-600 font-semibold mb-0.5">Priority</label>
+              <input
+                type="text"
+                disabled
+                value={formData.priority}
+                className="w-full px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl outline-none text-slate-500 cursor-not-allowed"
+              />
+              <div className="mt-0.5 pt-0.5 border-t border-red-500 text-red-500 font-medium text-[10px]">
+                SLA: {formData.slaDeadline || "---"}
+              </div>
             </div>
           </div>
 
