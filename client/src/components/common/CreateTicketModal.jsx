@@ -120,6 +120,7 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
+            {/* Row 1: Type & Issue Type */}
             <div>
               <label className="block text-slate-600 font-semibold mb-0.5">Type</label>
               <select
@@ -131,6 +132,22 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
               </select>
             </div>
 
+            <div>
+              <label className="block text-slate-600 font-semibold mb-0.5">Issue Type</label>
+              <select
+                value={formData.issueType}
+                onChange={(e) => setFormData({ ...formData, issueType: e.target.value })}
+                required
+                className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
+              >
+                <option value="">Select issue type...</option>
+                {ISSUE_TYPES.map((it) => (
+                  <option key={it} value={it}>{it}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Row 2: Category & Priority */}
             <div>
               <label className="block text-slate-600 font-semibold mb-0.5">Category</label>
               <select
@@ -158,21 +175,7 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-slate-600 font-semibold mb-0.5">Issue Type</label>
-              <select
-                value={formData.issueType}
-                onChange={(e) => setFormData({ ...formData, issueType: e.target.value })}
-                required
-                className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
-              >
-                <option value="">Select issue type...</option>
-                {ISSUE_TYPES.map((it) => (
-                  <option key={it} value={it}>{it}</option>
-                ))}
-              </select>
-            </div>
-
+            {/* Row 3: Assignee spanning full width */}
             <div className="col-span-2">
               <label className="block text-slate-600 font-semibold mb-0.5">Assignee</label>
               <select
