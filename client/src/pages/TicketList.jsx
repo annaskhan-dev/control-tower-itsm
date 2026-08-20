@@ -32,7 +32,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const queue = searchParams.get("queue") || "all-work";
 
-  // Bulletproof fetch guard: Prevents infinite loops by locking fetch to queue changes only
   const fetchedRef = useRef(null);
 
   useEffect(() => {
@@ -166,6 +165,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
       const entrySource = t.generator || t.source || "System / Direct";
       const priority = (t.priority || "medium").toLowerCase();
+      const issueType = t.issueType || t.type || t.category || "General";
 
       return {
         ...t,
@@ -176,6 +176,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         slaStatus,
         entrySource,
         priority,
+        issueType,
         isResolved,
         assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
         slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
@@ -185,7 +186,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     });
   }, [tickets, now]);
 
-  // Calculate counts for priority metrics based on current queue/role context
   const priorityCounts = useMemo(() => {
     const base = ticketData.filter((t) => {
       if (!isUserManagerOrAdmin) {
@@ -275,7 +275,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   return (
     <div className="flex flex-col h-full font-sans bg-slate-50 text-slate-900 antialiased selection:bg-blue-600 selection:text-white">
-      {/* Header Bar */}
       <div className="flex justify-between items-center px-8 py-5 bg-white border-b border-slate-200 shadow-2xs">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Support Tickets</h1>
@@ -292,7 +291,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         </button>
       </div>
 
-      {/* Priority Breakdown & Filters Bar */}
       <div className="px-8 py-3 bg-white border-b border-slate-200 flex items-center gap-3 overflow-x-auto">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-700 tracking-wider whitespace-nowrap mr-2">
           <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
@@ -356,7 +354,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         </div>
       </div>
       
-      {/* Search and Queue Tabs Toolbar */}
       <div className="px-8 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-4">
         <div className="relative w-full max-w-sm">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -371,7 +368,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           />
         </div>
 
-        {/* Queue Navigation Tabs */}
         <div className="flex items-center bg-slate-200/60 p-1 rounded-lg border border-slate-200">
           {[
             { key: "all-work", label: "All Work" },
@@ -399,7 +395,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Main Content Area / Table */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           {isLoading ? (
@@ -414,13 +409,14 @@ export const TicketList = ({ onOpenCreateTicket }) => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1100px]">
+              <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1200px]">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                   <tr>
                     <th className="py-3.5 px-4 font-semibold">ID</th>
                     <th className="py-3.5 px-4 font-semibold">Entry Source</th>
                     <th className="py-3.5 px-4 font-semibold">Created Date</th>
                     <th className="py-3.5 px-4 font-semibold">Title</th>
+                    <th className="py-3.5 px-4 font-semibold">Issue Type</th>
                     <th className="py-3.5 px-4 font-semibold">Priority</th>
                     <th className="py-3.5 px-4 font-semibold">Assignee</th>
                     <th className="py-3.5 px-4 font-semibold">Assignment Time</th>
@@ -451,6 +447,11 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         </td>
                         <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
                         <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[200px] truncate" title={t.title}>{t.title}</td>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-[11px] font-medium">
+                            {t.issueType}
+                          </span>
+                        </td>
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                             t.priority === "critical" || t.priority === "urgent" ? "bg-rose-100 text-rose-700" :
