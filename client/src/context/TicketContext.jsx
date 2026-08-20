@@ -4,7 +4,7 @@ import React, {
   useState, 
   useCallback, 
   useMemo, 
-  useRef 
+   useRef 
 } from "react";
 import { useAuth } from "./AuthContext";
 import axiosInstance from "../api/axiosInstance";
@@ -71,7 +71,6 @@ export const TicketProvider = ({ children }) => {
     }
   }, [updateLocalTicket]);
 
-  // ✅ Fixed: Removed `tickets` and `isLoading` from dependency array to stabilize context reference
   const value = useMemo(() => ({
     tickets, 
     setTickets,
@@ -81,7 +80,7 @@ export const TicketProvider = ({ children }) => {
     addLocalTicket,
     isLoading,
     setIsLoading
-  }), [fetchTickets, updateTicket, updateLocalTicket, addLocalTicket]);
+  }), [tickets, fetchTickets, updateTicket, updateLocalTicket, addLocalTicket, isLoading]);
 
   return (
     <TicketContext.Provider value={value}>
@@ -91,3 +90,5 @@ export const TicketProvider = ({ children }) => {
 };
 
 export const useTickets = () => useContext(TicketContext);
+
+export default TicketContext;
