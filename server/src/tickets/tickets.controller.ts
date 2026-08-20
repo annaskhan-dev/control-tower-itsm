@@ -10,7 +10,6 @@ import {
   Query,
   NotFoundException,
   BadRequestException,
-  ForbiddenException, // Added for enforcement
   UseGuards,
   Req,
   Logger,
@@ -176,11 +175,9 @@ export class TicketsController {
     const currentUserName = req.user.name || req.user.username || req.user.sub;
     const userRole = req.user.role;
 
-    // Enforce rule: Operators can only assign tickets to themselves
+    // Automatically enforce and lock assignee to current user for Operators
     if (userRole === 'Operator' && updateTicketDto.assignee !== undefined) {
-      if (updateTicketDto.assignee !== currentUserName) {
-        throw new ForbiddenException('Operators can only assign tickets to themselves.');
-      }
+      updateTicketDto.assignee = currentUserName;
     }
     
     this.logger.debug(`[PATCH/PUT /tickets/${id}] Updating ticket state by: ${currentUserName}`);
