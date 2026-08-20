@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo, memo, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { fetchTicketStats } from '../api/axiosInstance';
 import { useTickets } from "../context/TicketContext";
+import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
 import {
   XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, PieChart, Pie, Cell, Legend
@@ -136,7 +138,7 @@ const normalizeTicket = (t, now) => {
     id: t._id || t.id || t.ticketId || t.code || "N/A",
     ticketId: t.ticketId || t.id || t._id || t.code || "N/A",
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
-    source: rawSourceStr,
+    entrySource: rawSourceStr,
     assigneeName,
     subAssignmentName,
     subAssignmentAt: subAssignedAtRaw,
@@ -223,19 +225,41 @@ const GeneratorListCard = memo(({ title, data, totalLabel = "total" }) => {
 });
 GeneratorListCard.displayName = "GeneratorListCard";
 
-export const Dashboard = ({ tickets: propTickets }) => {
-  const { tickets: contextTickets, isLoading: contextLoading, fetchTickets } = useTickets();
+export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { tickets: contextTickets, isLoading: contextLoading, fetchTickets, updateTicket } = useTickets();
+  const { user, isAdmin, isManager, role } = useAuth();
   
   const tickets = (propTickets && propTickets.length > 0) ? propTickets : contextTickets;
   const loading = contextLoading && (!tickets || tickets.length === 0);
 
   const [backendStats, setBackendStats] = useState(null);
-  const [now] = useState(() => new Date());
+  const [now, setNow] = useState(() => new Date());
   
-  // New UI controls state
+  // UI controls state
   const [velocityDays, setVelocityDays] = useState(7);
   const [selectedTab, setSelectedTab] = useState("all");
   const [selectedPriorityFilter, setSelectedPriorityFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [operators, setOperators] = useState([]);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const userRoleRaw = role || user?.role || user?.userType || user?.type || "";
+  
+  const currentRole = useMemo(() => {
+    return typeof userRoleRaw === 'string' ? userRoleRaw.replace(/\s+/g, "_").toLowerCase() : "";
+  }, [userRoleRaw]);
+  
+  const isUserManagerOrAdmin = useMemo(() => {
+    return isAdmin || isManager || currentRole.includes('admin') || currentRole.includes('manager');
+  }, [isAdmin, isManager, currentRole]);
+
+  const queue = searchParams.get("queue") || "all-work";
 
   const hasFetchedTicketsRef = useRef(false);
   const hasFetchedStatsRef = useRef(false);
@@ -243,9 +267,9 @@ export const Dashboard = ({ tickets: propTickets }) => {
   useEffect(() => {
     if (!propTickets && fetchTickets && !hasFetchedTicketsRef.current) {
       hasFetchedTicketsRef.current = true;
-      fetchTickets('all-work');
+      fetchTickets(queue);
     }
-  }, []);
+  }, [queue, fetchTickets, propTickets]);
 
   useEffect(() => {
     let isMounted = true;
@@ -268,6 +292,48 @@ export const Dashboard = ({ tickets: propTickets }) => {
     };
   }, []);
 
+  useEffect(() => {
+    const fetchOperatorsList = async () => {
+      try {
+        const response = await api.get('/users');
+        const allUsers = response.data || [];
+        const filteredOps = allUsers.filter(u => {
+          const r = (u.role || u.userType || "").replace(/\s+/g, "_").toLowerCase();
+          return r.includes('operator') || r.includes('transporter') || !r.includes('admin');
+        });
+        setOperators(filteredOps);
+      } catch (err) {
+        console.error("Failed to fetch operators list", err);
+      }
+    };
+    if (isUserManagerOrAdmin) {
+      fetchOperatorsList();
+    }
+  }, [isUserManagerOrAdmin]);
+
+  const handleAssignToMe = useCallback(async (e, mongoId) => {
+    e.stopPropagation();
+    try {
+      const currentUserName = user?.name || user?.username || user?.fullName || "Operator";
+      await updateTicket(mongoId, { assignee: currentUserName });
+      if (fetchTickets) fetchTickets(queue, true);
+    } catch (err) {
+      console.error("Failed to assign ticket to self", err);
+      alert(err.response?.data?.message || "Failed to assign ticket");
+    }
+  }, [user, updateTicket, fetchTickets, queue]);
+
+  const handleManagerAssign = useCallback(async (mongoId, selectedOperatorName) => {
+    if (!selectedOperatorName) return;
+    try {
+      await updateTicket(mongoId, { assignee: selectedOperatorName });
+      if (fetchTickets) fetchTickets(queue, true);
+    } catch (err) {
+      console.error("Failed to assign ticket", err);
+      alert(err.response?.data?.message || "Failed to assign ticket");
+    }
+  }, [updateTicket, fetchTickets, queue]);
+
   const normalizedTickets = useMemo(() => (Array.isArray(tickets) ? tickets : []).map((t) => normalizeTicket(t, now)), [tickets, now]);
 
   const formatDate = (dateString) => {
@@ -275,7 +341,7 @@ export const Dashboard = ({ tickets: propTickets }) => {
     const d = new Date(dateString);
     return isNaN(d.getTime()) 
       ? "Invalid" 
-      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   const handleExportExcel = () => {
@@ -312,7 +378,7 @@ export const Dashboard = ({ tickets: propTickets }) => {
         `"${(t.ticketId || "").toString().replace(/"/g, '""')}"`,
         `"${(t.title || "").replace(/"/g, '""')}"`,
         `"${(t.description || "").replace(/"/g, '""')}"`,
-        `"${(t.source || "").replace(/"/g, '""')}"`,
+        `"${(t.entrySource || "").replace(/"/g, '""')}"`,
         `"${(t.category || "").replace(/"/g, '""')}"`,
         `"${(t.priority || "").replace(/"/g, '""')}"`,
         `"${(t.status || "").replace(/"/g, '""')}"`,
@@ -357,17 +423,14 @@ export const Dashboard = ({ tickets: propTickets }) => {
     let unassignedCount = 0;
 
     normalizedTickets.forEach(t => {
-      // Creator / Generator
-      const src = t.source || "Direct System";
+      const src = t.entrySource || "Direct System";
       generatorMap[src] = (generatorMap[src] || 0) + 1;
 
-      // Status filters count
       const isClosed = t.isResolved || ["closed", "resolved", "completed", "done"].includes(t.status.toLowerCase());
       const isAssigned = t.assigneeName.toLowerCase() !== "unassigned" && t.assigneeName !== "";
 
       if (isClosed) {
         closedCount++;
-        // Track operator resolution
         if (isAssigned) {
           operatorResolvedMap[t.assigneeName] = (operatorResolvedMap[t.assigneeName] || 0) + 1;
         }
@@ -381,14 +444,12 @@ export const Dashboard = ({ tickets: propTickets }) => {
         unassignedCount++;
       }
 
-      // Priority counts & resolutions
       const prio = t.priority || "Low";
       if (priorityMap[prio] !== undefined) {
         priorityMap[prio]++;
         if (isClosed) priorityResolvedMap[prio]++;
       }
 
-      // SLA Health
       const sla = t.slaStatus || "On Track";
       if (slaHealthMap[sla] !== undefined) {
         slaHealthMap[sla]++;
@@ -453,25 +514,49 @@ export const Dashboard = ({ tickets: propTickets }) => {
     };
   }, [normalizedTickets, stats, velocityDays]);
 
-  // Filtered tickets based on active tab and priority filter
+  // Filtered tickets based on active tab, priority filter, search term, and permissions
   const filteredTickets = useMemo(() => {
     return normalizedTickets.filter(t => {
+      if (!isUserManagerOrAdmin) {
+        const assigneeLower = t.assigneeName.trim().toLowerCase();
+        const subAssigneeLower = t.subAssignmentName.trim().toLowerCase();
+        const userName = (user?.name || user?.username || user?.fullName || "").trim().toLowerCase();
+        const userEmail = (user?.email || "").split("@")[0].toLowerCase();
+
+        const isAssignedToThem = 
+          (userName && assigneeLower.includes(userName)) ||
+          (subAssigneeLower && userName && subAssigneeLower.includes(userName)) ||
+          (userEmail && assigneeLower.includes(userEmail));
+
+        const isUnassigned = !t.isAssigned;
+
+        if (!isAssignedToThem && !isUnassigned) return false;
+      }
+
       const isClosed = t.isResolved || ["closed", "resolved", "completed", "done"].includes(t.status.toLowerCase());
       const isAssigned = t.assigneeName.toLowerCase() !== "unassigned" && t.assigneeName !== "";
 
-      // Tab filter
       if (selectedTab === "open" && isClosed) return false;
       if (selectedTab === "assigned" && !isAssigned) return false;
       if (selectedTab === "closed" && !isClosed) return false;
 
-      // Priority filter
       if (selectedPriorityFilter !== "all" && t.priority.toLowerCase() !== selectedPriorityFilter.toLowerCase()) {
         return false;
       }
 
-      return true;
+      let matchesQueue = true;
+      if (queue === "sla-risk") {
+        matchesQueue = t.status?.toLowerCase() === "open" && (t.slaStatus === "Breached" || t.slaStatus === "At Risk");
+      } else if (queue === "open") {
+        matchesQueue = t.status?.toLowerCase() === "open";
+      } else if (queue === "unassigned") {
+        matchesQueue = !t.isAssigned;
+      }
+
+      const searchStr = searchTerm.toLowerCase();
+      return matchesQueue && (t.title?.toLowerCase().includes(searchStr) || t.ticketId?.toLowerCase().includes(searchStr));
     });
-  }, [normalizedTickets, selectedTab, selectedPriorityFilter]);
+  }, [normalizedTickets, selectedTab, selectedPriorityFilter, queue, searchTerm, isUserManagerOrAdmin, user]);
 
   if (loading) return <div className="h-96 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
 
@@ -483,12 +568,23 @@ export const Dashboard = ({ tickets: propTickets }) => {
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Operational Dashboard</h2>
           <p className="text-sm text-slate-500 mt-1">Real-time ticketing lifecycle, creator tracking, operator resolution metrics, and SLA health</p>
         </div>
-        <button
-          onClick={handleExportExcel}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-xs flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center"
-        >
-          <Download size={16} /> Export to Excel
-        </button>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {onOpenCreateTicket && (
+            <button 
+              onClick={onOpenCreateTicket} 
+              className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer justify-center flex-1 sm:flex-none"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+              Add Ticket
+            </button>
+          )}
+          <button
+            onClick={handleExportExcel}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-xs flex items-center gap-2 cursor-pointer justify-center flex-1 sm:flex-none"
+          >
+            <Download size={16} /> Export to Excel
+          </button>
+        </div>
       </div>
 
       {/* Top Metric Cards */}
@@ -519,13 +615,9 @@ export const Dashboard = ({ tickets: propTickets }) => {
 
       {/* Widgets Grid: Generators, Operators, and SLA Donut */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Creators / Generators Breakdown */}
         <GeneratorListCard title="TICKETS CREATED BY ROLE / SOURCE" data={chartData.generator} totalLabel="tickets" />
-
-        {/* Operator Resolution Breakdown */}
         <GeneratorListCard title="RESOLVED TICKETS BY OPERATOR" data={chartData.operatorResolved} totalLabel="resolved" />
 
-        {/* SLA Health Donut Chart */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-72">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">SLA Health Distribution</h4>
@@ -560,7 +652,7 @@ export const Dashboard = ({ tickets: propTickets }) => {
         </div>
       </div>
 
-      {/* Velocity Trend Chart with Days Selector (Height decreased to h-32) */}
+      {/* Velocity Trend Chart with Days Selector */}
       <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Ticket Intake Velocity Trend</h4>
@@ -602,7 +694,7 @@ export const Dashboard = ({ tickets: propTickets }) => {
         </div>
       </div>
 
-      {/* Priority Summary & Filter Bar placed right above the table */}
+      {/* Priority Summary & Filter Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <ShieldAlert size={18} className="text-amber-500" />
@@ -611,10 +703,10 @@ export const Dashboard = ({ tickets: propTickets }) => {
         <div className="flex flex-wrap items-center gap-2">
           {[
             { key: "all", label: "All Priorities", count: stats.total },
-            { key: "critical", label: "Critical", count: stats.byPriority["Critical"], resolved: stats.byPriorityResolved["Critical"], color: "rose" },
-            { key: "high", label: "High", count: stats.byPriority["High"], resolved: stats.byPriorityResolved["High"], color: "amber" },
-            { key: "medium", label: "Medium", count: stats.byPriority["Medium"], resolved: stats.byPriorityResolved["Medium"], color: "blue" },
-            { key: "low", label: "Low", count: stats.byPriority["Low"], resolved: stats.byPriorityResolved["Low"], color: "slate" },
+            { key: "critical", label: "Critical", count: stats.byPriority["Critical"], resolved: stats.byPriorityResolved["Critical"] },
+            { key: "high", label: "High", count: stats.byPriority["High"], resolved: stats.byPriorityResolved["High"] },
+            { key: "medium", label: "Medium", count: stats.byPriority["Medium"], resolved: stats.byPriorityResolved["Medium"] },
+            { key: "low", label: "Low", count: stats.byPriority["Low"], resolved: stats.byPriorityResolved["Low"] },
           ].map(p => (
             <button
               key={p.key}
@@ -634,117 +726,182 @@ export const Dashboard = ({ tickets: propTickets }) => {
         </div>
       </div>
 
-      {/* Ticket List Table Section */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/40">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tickets Matrix ({selectedTab.toUpperCase()})</h3>
-              <span className="px-2.5 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100">
-                {filteredTickets.length} Records
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">Real-time telemetry tracking category, assignee, execution intervals, and SLA health.</p>
-          </div>
-          
-          {/* Status Tab Filters */}
-          <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl">
-            {[
-              { key: "all", label: "All Work" },
-              { key: "open", label: "Open" },
-              { key: "assigned", label: "Assigned" },
-              { key: "closed", label: "Closed" }
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setSelectedTab(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                  selectedTab === tab.key ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      {/* Filters and Search Toolbar */}
+      <div className="px-6 py-4 bg-white border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
+        <div className="relative w-full max-w-sm">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </span>
+          <input
+            type="text"
+            placeholder="Search by Ticket ID or Title..."
+            className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50/75 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all shadow-2xs placeholder:text-slate-400 text-slate-800"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
+        
+        {/* Status Tab Filters */}
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto justify-center">
+          {[
+            { key: "all", label: "All Work" },
+            { key: "open", label: "Open" },
+            { key: "assigned", label: "Assigned" },
+            { key: "closed", label: "Closed" }
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setSelectedTab(tab.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                selectedTab === tab.key ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        <div className="w-full overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600 border-collapse min-w-[1100px]">
-            <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
-              <tr>
-                <th className="p-4">ID</th>
-                <th className="p-4">Entry</th>
-                <th className="p-4">Title</th>
-                <th className="p-4">Category</th>
-                <th className="p-4">Priority</th>
-                <th className="p-4">Assignee</th>
-                <th className="p-4">Assignment Time</th>
-                <th className="p-4">SLA Active Time</th>
-                <th className="p-4">SLA Health</th>
-                <th className="p-4">Status & Resolution</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredTickets.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{t.ticketId}</td>
-                  <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{formatDate(t.createdAt)}</td>
-                  <td className="p-4 font-semibold text-slate-900 max-w-[200px] truncate">{t.title}</td>
-                  <td className="p-4 text-slate-500 whitespace-nowrap text-xs">{t.category || "—"}</td>
-                  <td className="p-4 whitespace-nowrap">
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
-                      t.priority === "Critical" ? "bg-rose-100 text-rose-700" :
-                      t.priority === "High" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"
-                    }`}>
-                      {t.priority}
-                    </span>
-                  </td>
-                  <td className="p-4 font-medium text-slate-700 whitespace-nowrap text-xs">{t.assigneeName}</td>
-                  <td className="p-4 whitespace-nowrap">
-                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                      t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
-                    }`}>
-                      {t.assignmentTimeFormatted}
-                    </span>
-                  </td>
-                  <td className="p-4 whitespace-nowrap">
-                    <span className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg text-xs font-semibold">
-                      {t.slaTimeFormatted}
-                    </span>
-                  </td>
-                  <td className="p-4 whitespace-nowrap">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                      t.slaStatus === "Breached" ? "bg-rose-100 text-rose-700 border border-rose-200" : 
-                      t.slaStatus === "At Risk" ? "bg-amber-100 text-amber-700 border border-amber-200" : 
-                      "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                    }`}>
-                      {t.slaStatus}
-                    </span>
-                  </td>
-                  <td className="p-4 whitespace-nowrap">
-                    <div className="flex flex-col gap-1 items-start">
-                      <span className={`px-3 py-1 font-bold uppercase rounded-full text-[10px] tracking-wider shadow-2xs ${
-                        t.isResolved ? "bg-emerald-600 text-white" : "bg-blue-600 text-white"
-                      }`}>
-                        {t.status || "Open"}
-                      </span>
-                      <span className={`text-[11px] font-medium ${t.isResolved ? "text-emerald-700 font-bold" : "text-slate-400 italic"}`}>
-                        Total: {t.finalResolutionTimeFormatted}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredTickets.length === 0 && (
+      {/* Main Table Section (Matched with TicketList layout precisely) */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        {filteredTickets.length === 0 ? (
+          <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
+            <svg className="w-9 h-9 text-slate-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7m16 0v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5m16 0h-2.586a1 1 0 0 0-.707.293l-2.414 2.414a1 1 0 0 1-.707.293h-3.172a1 1 0 0 1-.707-.293l-2.414-2.414A1 1 0 0 0 6.586 13H4"/></svg>
+            No tickets found matching the selected filter parameters.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1100px]">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                 <tr>
-                  <td colSpan="10" className="p-16 text-center text-sm text-slate-400 italic">
-                    No tickets available matching the selected filter parameters.
-                  </td>
+                  <th className="py-3.5 px-4 font-semibold">ID</th>
+                  <th className="py-3.5 px-4 font-semibold">Entry Source</th>
+                  <th className="py-3.5 px-4 font-semibold">Created Date</th>
+                  <th className="py-3.5 px-4 font-semibold">Title</th>
+                  <th className="py-3.5 px-4 font-semibold">Category</th>
+                  <th className="py-3.5 px-4 font-semibold">Assignee</th>
+                  <th className="py-3.5 px-4 font-semibold">Assignment Time</th>
+                  <th className="py-3.5 px-4 font-semibold">SLA Active Time</th>
+                  <th className="py-3.5 px-4 font-semibold">Sub-Assignment</th>
+                  <th className="py-3.5 px-4 font-semibold">Sub-Assignee Time</th>
+                  <th className="py-3.5 px-4 font-semibold">SLA Health</th>
+                  <th className="py-3.5 px-4 font-semibold">Status & Resolution</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredTickets.map((t) => {
+                  const mongoId = t._id || t.id;
+                  const isResolvedState = t.isResolved || ["closed", "resolved", "completed", "done"].includes((t.status || "").toLowerCase());
+                  const isRestricted = !isUserManagerOrAdmin;
+
+                  return (
+                    <tr 
+                      key={mongoId} 
+                      onClick={() => navigate(`/tickets/${t.ticketId}`)} 
+                      className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
+                    >
+                      <td className="py-3.5 px-4 font-semibold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">{t.ticketId}</td>
+                      <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
+                        <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[11px]">
+                          {t.entrySource}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
+                      <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[200px] truncate" title={t.title}>{t.title}</td>
+                      <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{t.category || "—"}</td>
+                      
+                      <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {t.isAssigned ? (
+                          <span className="text-slate-800 font-medium">{t.assigneeName}</span>
+                        ) : !isUserManagerOrAdmin ? (
+                          <button
+                            onClick={(e) => handleAssignToMe(e, mongoId)}
+                            className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-[11px] px-2.5 py-1 rounded-md font-medium transition-all shadow-2xs cursor-pointer"
+                          >
+                            Assign to Me
+                          </button>
+                        ) : (
+                          <div className="relative">
+                            <select
+                              value={t.assignee || t.assignedTo || "Unassigned"}
+                              disabled={isRestricted || isResolvedState}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleManagerAssign(mongoId, e.target.value);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full py-1 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
+                            >
+                              <option value="Unassigned">Assign to Operator...</option>
+                              {operators.map((u) => {
+                                const userName = u.name || u.fullName || u.username;
+                                const userRole = u.role || u.userType || 'Operator';
+                                return (
+                                  <option key={u._id || u.id} value={userName}>
+                                    {userName} ({userRole})
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-md font-medium ${
+                          t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
+                        }`}>
+                          {t.assignmentTimeFormatted}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-md font-medium ${
+                          t.slaTimeFormatted !== "N/A" ? "bg-blue-50 text-blue-700 border border-blue-100/80" : "bg-slate-50 text-slate-400 italic"
+                        }`}>
+                          {t.slaTimeFormatted}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="font-medium text-slate-700">{t.subAssignmentName || "—"}</div>
+                        {t.subAssignmentAt && (
+                          <div className="text-[10px] text-slate-400 mt-0.5">{formatDate(t.subAssignmentAt)}</div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-md font-medium ${
+                          t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? "bg-purple-50 text-purple-700 border border-purple-100/80" : "bg-slate-50 text-slate-400 italic"
+                        }`}>
+                          {t.subAssignmentTimeFormatted}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
+                          t.slaStatus === "Breached" ? "bg-rose-50 text-rose-700 border border-rose-200" : 
+                          t.slaStatus === "At Risk" ? "bg-amber-50 text-amber-700 border border-amber-200" : 
+                          "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        }`}>
+                          {t.slaStatus}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className={`px-2.5 py-0.5 font-bold uppercase rounded-md text-[10px] tracking-wider shadow-2xs ${
+                            isResolvedState ? "bg-emerald-600 text-white" : "bg-blue-600 text-white"
+                          }`}>
+                            {t.status || "Open"}
+                          </span>
+                          <span className={`text-[10px] font-medium ${isResolvedState ? "text-emerald-700 font-semibold" : "text-slate-400 italic"}`}>
+                            Total: {t.finalResolutionTimeFormatted}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
