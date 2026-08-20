@@ -10,6 +10,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [now, setNow] = useState(new Date());
   const [operators, setOperators] = useState([]);
+  const [selectedPriority, setSelectedPriority] = useState("all");
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000);
@@ -39,7 +40,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       fetchedRef.current = queue;
       fetchTickets(queue);
     }
-  }, [queue]); // Notice fetchTickets is intentionally omitted to prevent instability loops
+  }, [queue]);
 
   useEffect(() => {
     const fetchOperators = async () => {
@@ -65,7 +66,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     try {
       const currentUserName = user?.name || user?.username || user?.fullName || "Operator";
       await updateTicket(mongoId, { assignee: currentUserName });
-      fetchTickets(queue, true); // Force refresh on action
+      fetchTickets(queue, true);
     } catch (err) {
       console.error("Failed to assign ticket to self", err);
       alert(err.response?.data?.message || "Failed to assign ticket");
@@ -76,7 +77,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     if (!selectedOperatorName) return;
     try {
       await updateTicket(mongoId, { assignee: selectedOperatorName });
-      fetchTickets(queue, true); // Force refresh on action
+      fetchTickets(queue, true);
     } catch (err) {
       console.error("Failed to assign ticket", err);
       alert(err.response?.data?.message || "Failed to assign ticket");
@@ -164,6 +165,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
       const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
       const entrySource = t.generator || t.source || "System / Direct";
+      const priority = (t.priority || "medium").toLowerCase();
 
       return {
         ...t,
@@ -173,6 +175,8 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         subAssignmentAt: subAssignedAtRaw,
         slaStatus,
         entrySource,
+        priority,
+        isResolved,
         assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
         slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
         subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
@@ -180,6 +184,47 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       };
     });
   }, [tickets, now]);
+
+  // Calculate counts for priority metrics based on current queue/role context
+  const priorityCounts = useMemo(() => {
+    const base = ticketData.filter((t) => {
+      if (!isUserManagerOrAdmin) {
+        const assigneeLower = t.assigneeName.trim().toLowerCase();
+        const subAssigneeLower = t.subAssignmentName.trim().toLowerCase();
+        const userName = (user?.name || user?.username || user?.fullName || "").trim().toLowerCase();
+        const userEmail = (user?.email || "").split("@")[0].toLowerCase();
+
+        const isAssignedToThem = 
+          (userName && assigneeLower.includes(userName)) ||
+          (subAssigneeLower && userName && subAssigneeLower.includes(userName)) ||
+          (userEmail && assigneeLower.includes(userEmail));
+        const isUnassigned = !t.isAssigned;
+        if (!isAssignedToThem && !isUnassigned) return false;
+      }
+
+      if (queue === "sla-risk") {
+        return t.status?.toLowerCase() === "open" && (t.slaStatus === "Breached" || t.slaStatus === "At Risk");
+      } else if (queue === "open") {
+        return t.status?.toLowerCase() === "open";
+      } else if (queue === "unassigned") {
+        return !t.isAssigned;
+      } else if (queue === "assigned") {
+        return t.isAssigned;
+      } else if (queue === "closed") {
+        return t.isResolved;
+      }
+      return true;
+    });
+
+    const counts = {
+      all: { total: base.length, resolved: base.filter(t => t.isResolved).length },
+      critical: { total: base.filter(t => t.priority === "critical" || t.priority === "urgent").length, resolved: base.filter(t => (t.priority === "critical" || t.priority === "urgent") && t.isResolved).length },
+      high: { total: base.filter(t => t.priority === "high").length, resolved: base.filter(t => t.priority === "high" && t.isResolved).length },
+      medium: { total: base.filter(t => t.priority === "medium").length, resolved: base.filter(t => t.priority === "medium" && t.isResolved).length },
+      low: { total: base.filter(t => t.priority === "low").length, resolved: base.filter(t => t.priority === "low" && t.isResolved).length },
+    };
+    return counts;
+  }, [ticketData, queue, isUserManagerOrAdmin, user]);
 
   const filteredTickets = useMemo(() => {
     return ticketData.filter((t) => {
@@ -200,18 +245,33 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       }
 
       let matchesQueue = true;
-      if (queue === "sla-risk") {
+      if (queue === "sla-risk" || queue === "sla risks") {
         matchesQueue = t.status?.toLowerCase() === "open" && (t.slaStatus === "Breached" || t.slaStatus === "At Risk");
       } else if (queue === "open") {
         matchesQueue = t.status?.toLowerCase() === "open";
       } else if (queue === "unassigned") {
         matchesQueue = !t.isAssigned;
+      } else if (queue === "assigned") {
+        matchesQueue = t.isAssigned;
+      } else if (queue === "closed") {
+        matchesQueue = t.isResolved;
+      }
+
+      let matchesPriority = true;
+      if (selectedPriority !== "all") {
+        if (selectedPriority === "critical") {
+          matchesPriority = t.priority === "critical" || t.priority === "urgent";
+        } else {
+          matchesPriority = t.priority === selectedPriority;
+        }
       }
 
       const searchStr = searchTerm.toLowerCase();
-      return matchesQueue && (t.title?.toLowerCase().includes(searchStr) || t.ticketId?.toLowerCase().includes(searchStr));
+      const matchesSearch = !searchTerm || t.title?.toLowerCase().includes(searchStr) || t.ticketId?.toLowerCase().includes(searchStr);
+
+      return matchesQueue && matchesPriority && matchesSearch;
     });
-  }, [ticketData, queue, searchTerm, isUserManagerOrAdmin, user]);
+  }, [ticketData, queue, searchTerm, isUserManagerOrAdmin, user, selectedPriority]);
 
   return (
     <div className="flex flex-col h-full font-sans bg-slate-50 text-slate-900 antialiased selection:bg-blue-600 selection:text-white">
@@ -231,9 +291,73 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           Add Ticket
         </button>
       </div>
+
+      {/* Priority Breakdown & Filters Bar */}
+      <div className="px-8 py-3 bg-white border-b border-slate-200 flex items-center gap-3 overflow-x-auto">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-700 tracking-wider whitespace-nowrap mr-2">
+          <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          PRIORITY BREAKDOWN & FILTERS:
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSelectedPriority("all")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedPriority === "all" 
+                ? "bg-slate-900 text-white shadow-sm" 
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200"
+            }`}
+          >
+            All Priorities <span className={`px-1.5 py-0.2 rounded text-[10px] ${selectedPriority === "all" ? "bg-slate-800 text-slate-200" : "bg-slate-200 text-slate-600"}`}>{priorityCounts.all.total}</span>
+          </button>
+          
+          <button
+            onClick={() => setSelectedPriority("critical")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedPriority === "critical" 
+                ? "bg-slate-900 text-white shadow-sm" 
+                : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            Critical <span className="text-[10px] text-slate-400 font-normal">{priorityCounts.critical.total} ({priorityCounts.critical.resolved} res)</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedPriority("high")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedPriority === "high" 
+                ? "bg-slate-900 text-white shadow-sm" 
+                : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            High <span className="text-[10px] text-slate-400 font-normal">{priorityCounts.high.total} ({priorityCounts.high.resolved} res)</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedPriority("medium")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedPriority === "medium" 
+                ? "bg-slate-900 text-white shadow-sm" 
+                : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            Medium <span className="text-[10px] text-slate-400 font-normal">{priorityCounts.medium.total} ({priorityCounts.medium.resolved} res)</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedPriority("low")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedPriority === "low" 
+                ? "bg-slate-900 text-white shadow-sm" 
+                : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            Low <span className="text-[10px] text-slate-400 font-normal">{priorityCounts.low.total} ({priorityCounts.low.resolved} res)</span>
+          </button>
+        </div>
+      </div>
       
-      {/* Filters and Search Toolbar */}
-      <div className="px-8 py-4 bg-slate-50/75 border-b border-slate-200 flex items-center justify-between gap-4">
+      {/* Search and Queue Tabs Toolbar */}
+      <div className="px-8 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-4">
         <div className="relative w-full max-w-sm">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -246,8 +370,32 @@ export const TicketList = ({ onOpenCreateTicket }) => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="text-xs font-medium text-slate-500 whitespace-nowrap">
-          Showing <span className="font-semibold text-slate-800">{filteredTickets.length}</span> tickets
+
+        {/* Queue Navigation Tabs */}
+        <div className="flex items-center bg-slate-200/60 p-1 rounded-lg border border-slate-200">
+          {[
+            { key: "all-work", label: "All Work" },
+            { key: "unassigned", label: "Unassigned" },
+            { key: "open", label: "Open" },
+            { key: "assigned", label: "Assigned" },
+            { key: "closed", label: "Closed" },
+            { key: "sla-risk", label: "SLA Risks" }
+          ].map((tab) => {
+            const isActive = queue === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => navigate(`/tickets?queue=${tab.key}`)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  isActive 
+                    ? "bg-white text-slate-900 shadow-xs" 
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -262,7 +410,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           ) : filteredTickets.length === 0 ? (
             <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
               <svg className="w-9 h-9 text-slate-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7m16 0v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5m16 0h-2.586a1 1 0 0 0-.707.293l-2.414 2.414a1 1 0 0 1-.707.293h-3.172a1 1 0 0 1-.707-.293l-2.414-2.414A1 1 0 0 0 6.586 13H4"/></svg>
-              No tickets found in this view queue.
+              No tickets found matching your active filters.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -273,7 +421,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                     <th className="py-3.5 px-4 font-semibold">Entry Source</th>
                     <th className="py-3.5 px-4 font-semibold">Created Date</th>
                     <th className="py-3.5 px-4 font-semibold">Title</th>
-                    <th className="py-3.5 px-4 font-semibold">Category</th>
+                    <th className="py-3.5 px-4 font-semibold">Priority</th>
                     <th className="py-3.5 px-4 font-semibold">Assignee</th>
                     <th className="py-3.5 px-4 font-semibold">Assignment Time</th>
                     <th className="py-3.5 px-4 font-semibold">SLA Active Time</th>
@@ -286,7 +434,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                 <tbody className="divide-y divide-slate-100">
                   {filteredTickets.map((t) => {
                     const mongoId = t._id || t.id;
-                    const isResolvedState = ["closed", "resolved", "completed", "done"].includes((t.status || "").toLowerCase());
+                    const isResolvedState = t.isResolved;
                     const isRestricted = !isUserManagerOrAdmin;
 
                     return (
@@ -303,7 +451,15 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         </td>
                         <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
                         <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[200px] truncate" title={t.title}>{t.title}</td>
-                        <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{t.category || "—"}</td>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                            t.priority === "critical" || t.priority === "urgent" ? "bg-rose-100 text-rose-700" :
+                            t.priority === "high" ? "bg-amber-100 text-amber-700" :
+                            t.priority === "medium" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
+                          }`}>
+                            {t.priority}
+                          </span>
+                        </td>
                         
                         <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {t.isAssigned ? (
