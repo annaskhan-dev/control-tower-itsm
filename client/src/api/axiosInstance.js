@@ -47,13 +47,17 @@ axiosInstance.interceptors.response.use(
       if (!isLoginRequest) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
-        // Note: Let your React Router components handle navigation safely via state/context 
-        // instead of forcing a hard reload window.location.href assignment here.
       }
     }
     
     return Promise.reject(error);
   }
 );
+
+// Added helper function to resolve build error in Dashboard.jsx
+export const fetchTicketStats = async () => {
+  const response = await axiosInstance.get('/tickets/stats');
+  return response.data;
+};
 
 export default axiosInstance;
