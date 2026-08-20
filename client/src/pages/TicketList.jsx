@@ -166,8 +166,9 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const entrySource = t.generator || t.source || "System / Direct";
       const priority = (t.priority || "medium").toLowerCase();
       
-      // Explicitly pull issueType. If missing, fallback to category or 'General'
       const issueType = t.issueType || t.type || t.category || "General";
+      // Explicit category mapping fallback
+      const category = t.category || t.department || t.serviceArea || "General";
 
       return {
         ...t,
@@ -178,7 +179,8 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         slaStatus,
         entrySource,
         priority,
-        issueType, // Passed to return object
+        issueType,
+        category,
         isResolved,
         assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
         slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
@@ -411,14 +413,15 @@ export const TicketList = ({ onOpenCreateTicket }) => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1200px]">
+              <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1300px]">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                   <tr>
                     <th className="py-3.5 px-4 font-semibold">ID</th>
                     <th className="py-3.5 px-4 font-semibold">Entry Source</th>
                     <th className="py-3.5 px-4 font-semibold">Created Date</th>
                     <th className="py-3.5 px-4 font-semibold">Title</th>
-                    <th className="py-3.5 px-4 font-semibold">Issue Type</th> {/* Displaying explicit Issue Type */}
+                    <th className="py-3.5 px-4 font-semibold">Category</th> {/* Added Category Column */}
+                    <th className="py-3.5 px-4 font-semibold">Issue Type</th>
                     <th className="py-3.5 px-4 font-semibold">Priority</th>
                     <th className="py-3.5 px-4 font-semibold">Assignee</th>
                     <th className="py-3.5 px-4 font-semibold">Assignment Time</th>
@@ -448,9 +451,15 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
-                        <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[200px] truncate" title={t.title}>{t.title}</td>
+                        <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[180px] truncate" title={t.title}>{t.title}</td>
                         
-                        {/* Rendered Issue Type from our mapped data */}
+                        {/* Rendered Category Column */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-md text-[11px] font-medium">
+                            {t.category}
+                          </span>
+                        </td>
+
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-100 rounded-md text-[11px] font-medium uppercase tracking-wider">
                             {t.issueType}
