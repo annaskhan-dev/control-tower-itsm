@@ -8,15 +8,20 @@ export class CreateTicketDto {
 
   @IsString()
   @IsNotEmpty()
-  type!: string; // Marked as required for logic processing
+  type!: string;
+
+  // Added issueType to accept the selection from your frontend modal
+  @IsString()
+  @IsNotEmpty()
+  issueType!: string; 
 
   @IsString()
   @IsNotEmpty()
-  priority!: string; // Marked as required for logic processing
+  priority!: string;
 
   @IsString()
   @IsNotEmpty()
-  category!: string; // Marked as required for SLA lookup
+  category!: string;
 
   @IsString()
   @IsOptional()
@@ -28,7 +33,7 @@ export class CreateTicketDto {
 
   @IsString()
   @IsOptional()
-  generator?: string; // Validates ticket generator payload
+  generator?: string;
 
   @IsString()
   @IsOptional()
@@ -38,7 +43,6 @@ export class CreateTicketDto {
   @IsOptional()
   assignee?: string;
 
-  // Validation: subAssignment can only be specified if assignee is present and not empty/unassigned
   @ValidateIf((o) => o.assignee && o.assignee.trim() !== '' && o.assignee.toLowerCase() !== 'unassigned')
   @IsString()
   @IsNotEmpty()
@@ -49,12 +53,10 @@ export class CreateTicketDto {
   @IsDate()
   subAssignmentAt?: Date;
 
-  // companyId is usually handled by the controller via req.user
   @IsOptional()
   @IsString()
   companyId?: string; 
 
-  // Added to support dynamic telemetry and extra tracking context matching schema
   @IsObject()
   @IsOptional()
   metadata?: Record<string, any>;

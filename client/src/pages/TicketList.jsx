@@ -39,7 +39,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       fetchedRef.current = queue;
       fetchTickets(queue);
     }
-  }, [queue]);
+  }, [queue, fetchTickets]);
 
   useEffect(() => {
     const fetchOperators = async () => {

@@ -69,17 +69,26 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title.trim() || isSubmitting) return;
+    
+    // Validation: Ensure required fields are filled
+    if (!formData.title.trim()) return alert("Please select a title");
+    if (!formData.issueType) return alert("Please select an issue type");
+    if (!formData.category) return alert("Please select a category");
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
 
     const ticketGenerator = user?.role || user?.name || user?.username || "Operator";
 
+    // Build clean payload
     const payload = {
       ...formData,
       generator: ticketGenerator,
       source: "Control Tower UI"
     };
+
+    // Remove UI-only fields that the backend doesn't expect
+    delete payload.slaDeadline;
 
     try {
       await createTicket(payload, token);
@@ -120,7 +129,6 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {/* Row 1: Type & Issue Type */}
             <div>
               <label className="block text-slate-600 font-semibold mb-0.5">Type</label>
               <select
@@ -147,7 +155,6 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
               </select>
             </div>
 
-            {/* Row 2: Category & Priority */}
             <div>
               <label className="block text-slate-600 font-semibold mb-0.5">Category</label>
               <select
@@ -175,7 +182,6 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
               </div>
             </div>
 
-            {/* Row 3: Assignee spanning full width */}
             <div className="col-span-2">
               <label className="block text-slate-600 font-semibold mb-0.5">Assignee</label>
               <select

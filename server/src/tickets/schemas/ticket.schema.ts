@@ -15,8 +15,12 @@ export class Ticket extends Document {
   @Prop({ trim: true })
   source!: string;
 
+  // Added issueType to the schema so it is saved in the database
+  @Prop({ index: true })
+  issueType!: string;
+
   @Prop({ required: true, default: 'Direct API / System', index: true })
-  generator!: string; // Automatically falls back to this default if left blank
+  generator!: string;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: false, index: true })
   createdBy?: Types.ObjectId;
