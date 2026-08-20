@@ -84,12 +84,12 @@ export class TicketsController {
     const userName = req.user.name || req.user.username || (req.user.email ? req.user.email.split('@')[0] : 'User');
     const userId = req.user.sub;
 
-    // Formats the entry source as "Ali (Operator)" instead of just the role string
+    // Forces generator to combine the username and role (e.g., "Ali (Operator)")
     const formattedSource = `${userName} (${userRole})`;
 
     const enrichedTicketDto = {
       ...createTicketDto,
-      generator: createTicketDto['generator'] || formattedSource,
+      generator: formattedSource, // Overrides the frontend payload value directly
     };
 
     this.logger.debug(`[POST /tickets] Creating ticket by user: ${userName}, role: ${userRole}, generator: ${enrichedTicketDto.generator}`);
