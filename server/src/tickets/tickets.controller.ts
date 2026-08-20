@@ -42,6 +42,18 @@ export class TicketsController {
 
   constructor(private readonly ticketsService: TicketsService) {}
 
+  // Helper method to dynamically extract and format the user's name
+  private extractUserName(user: AuthenticatedRequest['user']): string {
+    if (user.name) return user.name;
+    if (user.username) return user.username;
+    if (user.fullName) return user.fullName;
+    if (user.email) {
+      const prefix = user.email.split('@')[0];
+      return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    }
+    return 'User';
+  }
+
   @Post('sla-configs/categories')
   @Roles('Manager', 'Super Admin')
   async createSlaCategory(
@@ -82,9 +94,7 @@ export class TicketsController {
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async create(@Req() req: AuthenticatedRequest, @Body() createTicketDto: CreateTicketDto) {
     const userRole = req.user.role || 'User';
-    
-    // Checks all possible name fields and falls back to 'Ali' instead of 'User'
-    const userName = req.user.name || req.user.username || req.user.fullName || (req.user.email ? req.user.email.split('@')[0] : null) || 'Ali';
+    const userName = this.extractUserName(req.user);
     const userId = req.user.sub;
 
     const formattedSource = `${userName} (${userRole})`;
@@ -109,7 +119,7 @@ export class TicketsController {
   @Roles('Operator', 'Manager', 'Super Admin', 'Agent', 'Transporter', 'Shipper Ops', 'Sales Person')
   async getStats(@Req() req: AuthenticatedRequest) {
     const userRole = req.user.role || '';
-    const userName = req.user.name || req.user.username || req.user.fullName || (req.user.email ? req.user.email.split('@')[0] : null) || 'Ali';
+    const userName = this.extractUserName(req.user);
     
     this.logger.debug(`[GET /tickets/stats] Fetching operational statistics for company: ${req.user.companyId}`);
 
@@ -125,7 +135,7 @@ export class TicketsController {
     @Query('queue') queue: string
   ) {
     const userRole = req.user.role || '';
-    const userName = req.user.name || req.user.username || req.user.fullName || (req.user.email ? req.user.email.split('@')[0] : null) || 'Ali';
+    const userName = this.extractUserName(req.user);
     
     this.logger.debug(`[GET /tickets] Request received from user: ${userName}, role: ${userRole}, queue: ${queue}`);
 
@@ -178,7 +188,7 @@ export class TicketsController {
       }
     }
 
-    const currentUserName = req.user.name || req.user.username || req.user.fullName || (req.user.email ? req.user.email.split('@')[0] : null) || 'Ali';
+    const currentUserName = this.extractUserName(req.user);
     const userRole = req.user.role;
 
     if (userRole === 'Operator' && updateTicketDto.assignee !== undefined) {
