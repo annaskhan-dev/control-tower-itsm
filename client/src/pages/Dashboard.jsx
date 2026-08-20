@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, memo, useRef } from "react";
+import React, { useState, useEffect, useMemo, memo, useRef, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { fetchTicketStats } from '../api/axiosInstance';
 import { useTickets } from "../context/TicketContext";
@@ -762,7 +762,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Main Table Section (Matched with TicketList layout precisely) */}
+      {/* Main Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {filteredTickets.length === 0 ? (
           <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
