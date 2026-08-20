@@ -78,7 +78,10 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
 
     setIsSubmitting(true);
 
-    const ticketGenerator = user?.role || user?.name || user?.username || "Operator";
+    // FIXED: Prioritize name/username/fullName over role so it correctly picks up "Hamza"
+    const userName = user?.name || user?.username || user?.fullName || (user?.email ? user.email.split('@')[0] : 'User');
+    const userRole = user?.role || 'Operator';
+    const ticketGenerator = `${userName} (${userRole})`;
 
     // Build clean payload
     const payload = {
