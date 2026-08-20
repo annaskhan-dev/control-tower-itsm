@@ -180,20 +180,35 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * List-based Card for Creators & Sources
+ * List-based Card for Creators & Sources (supports custom color themes)
  */
-const GeneratorListCard = memo(({ title, data, totalLabel = "total" }) => {
+const GeneratorListCard = memo(({ title, data, totalLabel = "total", theme = "emerald" }) => {
   const totalValue = useMemo(() => data.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0), [data]);
+
+  const themeStyles = {
+    emerald: {
+      iconColor: "text-emerald-600",
+      badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-100",
+      itemBadgeBg: "bg-emerald-50 text-emerald-700 border-emerald-100/60"
+    },
+    blue: {
+      iconColor: "text-blue-600",
+      badgeBg: "bg-blue-50 text-blue-700 border-blue-100",
+      itemBadgeBg: "bg-blue-50 text-blue-700 border-blue-100/60"
+    }
+  };
+
+  const currentTheme = themeStyles[theme] || themeStyles.emerald;
 
   return (
     <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-72">
       <div>
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <Layers size={16} className="text-emerald-600" />
+            <Layers size={16} className={currentTheme.iconColor} />
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{title}</h4>
           </div>
-          <span className="text-xs font-bold px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100">
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${currentTheme.badgeBg}`}>
             Total: {totalValue}
           </span>
         </div>
@@ -204,7 +219,7 @@ const GeneratorListCard = memo(({ title, data, totalLabel = "total" }) => {
           data.map((item, idx) => (
             <div key={`gen-row-${idx}`} className="flex items-center justify-between py-1">
               <span className="text-sm font-medium text-slate-700 truncate pr-2">{item.name}</span>
-              <span className="text-xs font-bold px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100/60 whitespace-nowrap">
+              <span className={`text-xs font-bold px-3 py-1 rounded-lg border whitespace-nowrap ${currentTheme.itemBadgeBg}`}>
                 {item.count} {totalLabel}
               </span>
             </div>
@@ -501,11 +516,31 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       count: Number(count) || 0,
     })).filter(d => d.count > 0);
 
+    const totalSlaCount = Math.max(1, (stats.slaHealth["On Track"] || 0) + (stats.slaHealth["At Risk"] || 0) + (stats.slaHealth["Breached"] || 0));
+
     const slaPieEntries = [
-      { name: "On Track", value: stats.slaHealth["On Track"] || 0, color: "#10b981" },
-      { name: "At Risk", value: stats.slaHealth["At Risk"] || 0, color: "#f59e0b" },
-      { name: "Breached", value: stats.slaHealth["Breached"] || 0, color: "#f43f5e" },
-    ].filter(d => d.value > 0);
+      { 
+        name: "On Track", 
+        value: stats.slaHealth["On Track"] || 0, 
+        percentage: Math.round(((stats.slaHealth["On Track"] || 0) / totalSlaCount) * 100),
+        color: "#10b981",
+        description: "Executing within threshold"
+      },
+      { 
+        name: "At Risk", 
+        value: stats.slaHealth["At Risk"] || 0, 
+        percentage: Math.round(((stats.slaHealth["At Risk"] || 0) / totalSlaCount) * 100),
+        color: "#f59e0b",
+        description: "Approaching target limit"
+      },
+      { 
+        name: "Breached", 
+        value: stats.slaHealth["Breached"] || 0, 
+        percentage: Math.round(((stats.slaHealth["Breached"] || 0) / totalSlaCount) * 100),
+        color: "#f43f5e",
+        description: "Exceeded time constraint"
+      },
+    ].filter(d => d.value >= 0);
 
     return {
       generator: generatorEntries,
@@ -616,41 +651,62 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         ))}
       </div>
 
-      {/* Widgets Grid: Generators, Operators, and SLA Donut */}
+      {/* Widgets Grid: Generators, Operators, and Detailed SLA Card */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <GeneratorListCard title="TICKETS CREATED BY ROLE / SOURCE" data={chartData.generator} totalLabel="tickets" />
-        <GeneratorListCard title="RESOLVED TICKETS BY OPERATOR" data={chartData.operatorResolved} totalLabel="resolved" />
+        <GeneratorListCard title="TICKETS CREATED BY ROLE / SOURCE" data={chartData.generator} totalLabel="tickets" theme="blue" />
+        <GeneratorListCard title="RESOLVED TICKETS BY OPERATOR" data={chartData.operatorResolved} totalLabel="resolved" theme="emerald" />
 
-        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-72">
+        {/* Enhanced SLA Health Distribution Card with 3 Key Detail Points */}
+        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">SLA Health Distribution</h4>
             <span className="text-xs font-bold px-2.5 py-1 bg-rose-50 text-rose-700 rounded-lg border border-rose-100">
               Risk: {stats.slaRisk}
             </span>
           </div>
-          <div className="h-40 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartData.slaPie}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={42}
-                  outerRadius={62}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  {chartData.slaPie.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend iconSize={8} wrapperStyle={{ fontSize: '11px' }} />
-              </PieChart>
-            </ResponsiveContainer>
+
+          <div className="flex flex-col xl:flex-row items-center gap-2 my-1">
+            <div className="h-32 w-full xl:w-1/2">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData.slaPie}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={36}
+                    outerRadius={54}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    {chartData.slaPie.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* 3 Detail Points for SLA Categories */}
+            <div className="w-full xl:w-1/2 flex flex-col gap-1.5 text-xs">
+              {chartData.slaPie.map((item, idx) => (
+                <div key={`sla-point-${idx}`} className="flex items-center justify-between bg-slate-50/80 p-1.5 rounded-lg border border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="font-semibold text-slate-700">{item.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1 font-bold">
+                    <span className="text-slate-900">{item.value}</span>
+                    <span className="text-[10px] text-slate-400 font-normal">({item.percentage}%)</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-400 italic">
-            Proportional breakdown of active and resolved SLAs.
+
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 italic">
+            <span>Proportional breakdown of active SLAs.</span>
+            <span className="font-medium text-slate-500">Total Monitored: {stats.total}</span>
           </div>
         </div>
       </div>
