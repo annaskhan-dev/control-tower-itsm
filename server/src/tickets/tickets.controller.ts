@@ -101,7 +101,8 @@ export class TicketsController {
 
     const enrichedTicketDto = {
       ...createTicketDto,
-      generator: formattedSource,
+      generator: formattedSource, // Forces override to prevent frontend placeholder overwrite
+      source: formattedSource,    // Ensures compatibility if source field is mapped elsewhere
     };
 
     this.logger.debug(`[POST /tickets] Creating ticket by user: ${userName}, role: ${userRole}, generator: ${enrichedTicketDto.generator}`);
