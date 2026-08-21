@@ -1238,7 +1238,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Main Table Section (Unified with Ticket List Styling & Columns) */}
+      {/* Main Table Section (Unified with Full Ticket List Columns) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {filteredTickets.length === 0 ? (
           <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
@@ -1259,7 +1259,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1250px]">
+            <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1550px]">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                 <tr>
                   <th className="py-3.5 px-4 font-semibold">Ticket ID</th>
@@ -1271,7 +1271,10 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                   <th className="py-3.5 px-4 font-semibold">Status</th>
                   <th className="py-3.5 px-4 font-semibold">SLA Health</th>
                   <th className="py-3.5 px-4 font-semibold">Assignee</th>
-                  <th className="py-3.5 px-4 font-semibold">Duration</th>
+                  <th className="py-3.5 px-4 font-semibold">Assignment Dur</th>
+                  <th className="py-3.5 px-4 font-semibold">Sub-Assignee</th>
+                  <th className="py-3.5 px-4 font-semibold">Sub-Assignment Dur</th>
+                  <th className="py-3.5 px-4 font-semibold">Resolution Dur</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1309,7 +1312,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
                       {/* Title */}
                       <td
-                        className="py-3.5 px-4 font-medium text-slate-900 max-w-[220px] truncate"
+                        className="py-3.5 px-4 font-medium text-slate-900 max-w-[200px] truncate"
                         title={t.title}
                       >
                         {t.title}
@@ -1412,14 +1415,33 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         )}
                       </td>
 
-                      {/* Duration / Resolution */}
+                      {/* Assignment Duration */}
+                      <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                        {t.assignmentTimeFormatted}
+                      </td>
+
+                      {/* Sub-Assignee */}
+                      <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
+                        {t.isSubAssigned ? (
+                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-[11px]">
+                            {t.subAssignmentName}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">None</span>
+                        )}
+                      </td>
+
+                      {/* Sub-Assignment Duration */}
+                      <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                        {t.subAssignmentTimeFormatted}
+                      </td>
+
+                      {/* Final Resolution Duration */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span
                           className={`text-[11px] font-medium ${isResolvedState ? "text-emerald-700 font-semibold" : "text-slate-400 italic"}`}
                         >
-                          {isResolvedState
-                            ? `Res: ${t.finalResolutionTimeFormatted}`
-                            : t.assignmentTimeFormatted}
+                          {t.finalResolutionTimeFormatted}
                         </span>
                       </td>
                     </tr>
