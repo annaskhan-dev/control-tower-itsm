@@ -157,17 +157,32 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at || (isSubAssigned ? (t.updatedAt || t.createdAt) : null);
       const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
 
+      // Primary assignment start and end logic
       let primaryAssignmentMs = 0;
+      let primaryStartFormatted = isAssigned ? formatDate(assignedAtRaw || t.createdAt) : "Unassigned";
+      let primaryEndFormatted = "Active";
+
       if (isAssigned) {
         const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
         primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
+        if (isSubAssigned && subAssignedAtTime) {
+          primaryEndFormatted = formatDate(subAssignedAtRaw);
+        } else if (isResolved) {
+          primaryEndFormatted = formatDate(resolvedAtRaw);
+        }
       }
 
       const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
+      // Sub-assignment timeline metrics
       let subAssignmentTimeMs = 0;
+      let subStartFormatted = "Not Sub-Assigned";
+      let subEndFormatted = "—";
+
       if (isSubAssigned && subAssignedAtTime) {
         subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subAssignedAtTime);
+        subStartFormatted = formatDate(subAssignedAtRaw);
+        subEndFormatted = isResolved ? formatDate(resolvedAtRaw) : "Active";
       }
 
       const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
@@ -189,8 +204,12 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         issueType,
         category,
         isResolved,
-        assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
+        primaryStartFormatted,
+        primaryEndFormatted,
+        primaryAssignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
         slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
+        subStartFormatted,
+        subEndFormatted,
         subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
         finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
       };
@@ -420,7 +439,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1300px]">
+              <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1600px]">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                   <tr>
                     <th className="py-3.5 px-4 font-semibold">ID</th>
@@ -430,13 +449,14 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                     <th className="py-3.5 px-4 font-semibold">Category</th>
                     <th className="py-3.5 px-4 font-semibold">Issue Type</th>
                     <th className="py-3.5 px-4 font-semibold">Priority</th>
-                    <th className="py-3.5 px-4 font-semibold">Assignee</th>
-                    <th className="py-3.5 px-4 font-semibold">Assignment Time</th>
-                    <th className="py-3.5 px-4 font-semibold">SLA Active Time</th>
-                    <th className="py-3.5 px-4 font-semibold">Sub-Assignment</th>
-                    <th className="py-3.5 px-4 font-semibold">Sub-Assignee Time</th>
+                    <th className="py-3.5 px-4 font-semibold">Primary Assignee</th>
+                    <th className="py-3.5 px-4 font-semibold">Primary Start / End Time</th>
+                    <th className="py-3.5 px-4 font-semibold">Primary Duration</th>
+                    <th className="py-3.5 px-4 font-semibold">Sub-Assignee</th>
+                    <th className="py-3.5 px-4 font-semibold">Sub-Assignment Timeline</th>
+                    <th className="py-3.5 px-4 font-semibold">Sub-Assignee Duration</th>
                     <th className="py-3.5 px-4 font-semibold">SLA Health</th>
-                    <th className="py-3.5 px-4 font-semibold">Status & Resolution</th>
+                    <th className="py-3.5 px-4 font-semibold">Status & Total Resolution</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -523,26 +543,42 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                           )}
                         </td>
 
+                        {/* Primary Start & End Time Column */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded-md font-medium ${
-                            t.assignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
-                          }`}>
-                            {t.assignmentTimeFormatted}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded-md font-medium ${
-                            t.slaTimeFormatted !== "N/A" ? "bg-blue-50 text-blue-700 border border-blue-100/80" : "bg-slate-50 text-slate-400 italic"
-                          }`}>
-                            {t.slaTimeFormatted}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="font-medium text-slate-700">{t.subAssignmentName || "—"}</div>
-                          {t.subAssignmentAt && (
-                            <div className="text-[10px] text-slate-400 mt-0.5">{formatDate(t.subAssignmentAt)}</div>
+                          {t.isAssigned ? (
+                            <div className="flex flex-col text-[11px]">
+                              <span className="text-slate-700 font-medium">Start: {t.primaryStartFormatted}</span>
+                              <span className="text-slate-500 text-[10px]">End: {t.primaryEndFormatted}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic">Unassigned</span>
                           )}
                         </td>
+
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-md font-medium ${
+                            t.primaryAssignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
+                          }`}>
+                            {t.primaryAssignmentTimeFormatted}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="font-medium text-slate-700">{t.subAssignmentName || "—"}</div>
+                        </td>
+
+                        {/* Sub-Assignment Timeline (Start & End) */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {t.subAssignmentName ? (
+                            <div className="flex flex-col text-[11px]">
+                              <span className="text-purple-700 font-medium">Start: {t.subStartFormatted}</span>
+                              <span className="text-slate-500 text-[10px]">End: {t.subEndFormatted}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">Not Sub-Assigned</span>
+                          )}
+                        </td>
+
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded-md font-medium ${
                             t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? "bg-purple-50 text-purple-700 border border-purple-100/80" : "bg-slate-50 text-slate-400 italic"
@@ -550,6 +586,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                             {t.subAssignmentTimeFormatted}
                           </span>
                         </td>
+
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
                             t.slaStatus === "Breached" ? "bg-rose-50 text-rose-700 border border-rose-200" : 
@@ -559,6 +596,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                             {t.slaStatus}
                           </span>
                         </td>
+                        
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <div className="flex flex-col gap-1 items-start">
                             <span className={`px-2.5 py-0.5 font-bold uppercase rounded-md text-[10px] tracking-wider shadow-2xs ${
