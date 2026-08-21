@@ -60,6 +60,18 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     }
   }, [isUserManagerOrAdmin]);
 
+  const handleAssignToMe = useCallback(async (e, mongoId) => {
+    e.stopPropagation();
+    try {
+      const currentUserName = user?.name || user?.username || user?.fullName || "Operator";
+      await updateTicket(mongoId, { assignee: currentUserName });
+      fetchTickets(queue, true);
+    } catch (err) {
+      console.error("Failed to assign ticket to self", err);
+      alert(err.response?.data?.message || "Failed to assign ticket");
+    }
+  }, [user, updateTicket, fetchTickets, queue]);
+
   const handleManagerAssign = useCallback(async (mongoId, selectedOperatorName) => {
     if (!selectedOperatorName) return;
     try {
@@ -155,6 +167,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const priority = (t.priority || "medium").toLowerCase();
       
       const issueType = t.issueType || t.type || t.category || "General";
+      // Explicit category mapping fallback
       const category = t.category || t.department || t.serviceArea || "General";
 
       return {
@@ -407,7 +420,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                     <th className="py-3.5 px-4 font-semibold">Entry Source</th>
                     <th className="py-3.5 px-4 font-semibold">Created Date</th>
                     <th className="py-3.5 px-4 font-semibold">Title</th>
-                    <th className="py-3.5 px-4 font-semibold">Category</th>
+                    <th className="py-3.5 px-4 font-semibold">Category</th> {/* Added Category Column */}
                     <th className="py-3.5 px-4 font-semibold">Issue Type</th>
                     <th className="py-3.5 px-4 font-semibold">Priority</th>
                     <th className="py-3.5 px-4 font-semibold">Assignee</th>
@@ -440,6 +453,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
                         <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[180px] truncate" title={t.title}>{t.title}</td>
                         
+                        {/* Rendered Category Column */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-md text-[11px] font-medium">
                             {t.category}
@@ -466,7 +480,12 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                           {t.isAssigned ? (
                             <span className="text-slate-800 font-medium">{t.assigneeName}</span>
                           ) : !isUserManagerOrAdmin ? (
-                            <span className="text-slate-400 italic text-[11px]">Unassigned</span>
+                            <button
+                              onClick={(e) => handleAssignToMe(e, mongoId)}
+                              className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-[11px] px-2.5 py-1 rounded-md font-medium transition-all shadow-2xs cursor-pointer"
+                            >
+                              Assign to Me
+                            </button>
                           ) : (
                             <div className="relative">
                               <select
