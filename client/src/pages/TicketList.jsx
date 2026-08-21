@@ -30,6 +30,14 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     return isAdmin || isManager || currentRole.includes('admin') || currentRole.includes('manager');
   }, [isAdmin, isManager, currentRole]);
 
+  // Check if the current user is strictly an operator (and not shipper, sales person, or transporter)
+  const isOperatorOnly = useMemo(() => {
+    return currentRole.includes('operator') && 
+           !currentRole.includes('shipper') && 
+           !currentRole.includes('sales') && 
+           !currentRole.includes('transporter');
+  }, [currentRole]);
+
   const queue = searchParams.get("queue") || "all-work";
 
   const fetchedRef = useRef(null);
@@ -167,7 +175,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const priority = (t.priority || "medium").toLowerCase();
       
       const issueType = t.issueType || t.type || t.category || "General";
-      // Explicit category mapping fallback
       const category = t.category || t.department || t.serviceArea || "General";
 
       return {
@@ -420,7 +427,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                     <th className="py-3.5 px-4 font-semibold">Entry Source</th>
                     <th className="py-3.5 px-4 font-semibold">Created Date</th>
                     <th className="py-3.5 px-4 font-semibold">Title</th>
-                    <th className="py-3.5 px-4 font-semibold">Category</th> {/* Added Category Column */}
+                    <th className="py-3.5 px-4 font-semibold">Category</th>
                     <th className="py-3.5 px-4 font-semibold">Issue Type</th>
                     <th className="py-3.5 px-4 font-semibold">Priority</th>
                     <th className="py-3.5 px-4 font-semibold">Assignee</th>
@@ -453,7 +460,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
                         <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[180px] truncate" title={t.title}>{t.title}</td>
                         
-                        {/* Rendered Category Column */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-md text-[11px] font-medium">
                             {t.category}
@@ -480,12 +486,16 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                           {t.isAssigned ? (
                             <span className="text-slate-800 font-medium">{t.assigneeName}</span>
                           ) : !isUserManagerOrAdmin ? (
-                            <button
-                              onClick={(e) => handleAssignToMe(e, mongoId)}
-                              className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-[11px] px-2.5 py-1 rounded-md font-medium transition-all shadow-2xs cursor-pointer"
-                            >
-                              Assign to Me
-                            </button>
+                            isOperatorOnly ? (
+                              <button
+                                onClick={(e) => handleAssignToMe(e, mongoId)}
+                                className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-[11px] px-2.5 py-1 rounded-md font-medium transition-all shadow-2xs cursor-pointer"
+                              >
+                                Assign to Me
+                              </button>
+                            ) : (
+                              <span className="text-slate-400 italic">Unassigned</span>
+                            )
                           ) : (
                             <div className="relative">
                               <select
