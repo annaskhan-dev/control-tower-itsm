@@ -35,6 +35,8 @@ import {
   Layers,
   CheckCircle2,
   ShieldAlert,
+  FolderOpen,
+  CheckCircle,
 } from "lucide-react";
 
 /**
@@ -633,7 +635,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   };
 
   // Comprehensive Metrics Calculation
-  // Comprehensive Metrics Calculation
   const stats = useMemo(() => {
     let generatorMap = {};
     let operatorResolvedMap = {};
@@ -644,6 +645,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     let assignedCount = 0;
     let unassignedCount = 0;
     let closedCount = 0;
+    let openCount = 0;
 
     normalizedTickets.forEach((t) => {
       const src = t.entrySource || "Direct System";
@@ -655,7 +657,11 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           t.status.toLowerCase(),
         );
 
-      if (isClosed) closedCount++;
+      if (isClosed) {
+        closedCount++;
+      } else {
+        openCount++;
+      }
 
       // Core Logic: Assign status
       if (t.isAssigned) {
@@ -683,6 +689,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       assigned: assignedCount,
       unassigned: unassignedCount,
       closed: closedCount,
+      open: openCount,
       slaRisk: (slaHealthMap["Breached"] || 0) + (slaHealthMap["At Risk"] || 0),
       byGenerator: generatorMap,
       byOperatorResolved: operatorResolvedMap,
@@ -902,15 +909,26 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Top Metric Cards */}
-      {/* Top Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Top Metric Cards - 6 Columns Expanded */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           {
             label: "Total Tickets",
             val: stats.total,
             icon: Ticket,
             tab: "all",
+          },
+          {
+            label: "Open",
+            val: stats.open,
+            icon: FolderOpen,
+            tab: "open",
+          },
+          {
+            label: "Resolved",
+            val: stats.closed,
+            icon: CheckCircle,
+            tab: "closed",
           },
           {
             label: "Unassigned",
@@ -934,24 +952,24 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           <div
             key={item.label}
             onClick={() => setSelectedTab(item.tab)}
-            className={`p-5 bg-white border rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition cursor-pointer ${
+            className={`p-4 bg-white border rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition cursor-pointer ${
               selectedTab === item.tab
                 ? "border-blue-500 ring-2 ring-blue-100"
                 : "border-slate-200/80"
             }`}
           >
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 {item.label}
               </p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1">
+              <h3 className="text-xl font-bold text-slate-900 mt-0.5">
                 {item.val}
               </h3>
             </div>
             <div
-              className={`p-3 rounded-xl ${selectedTab === item.tab ? "bg-blue-50 text-blue-600" : "bg-slate-50 text-slate-600"}`}
+              className={`p-2.5 rounded-xl ${selectedTab === item.tab ? "bg-blue-50 text-blue-600" : "bg-slate-50 text-slate-600"}`}
             >
-              <item.icon size={22} />
+              <item.icon size={18} />
             </div>
           </div>
         ))}
