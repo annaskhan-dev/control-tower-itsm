@@ -30,11 +30,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     return isAdmin || isManager || currentRole.includes('admin') || currentRole.includes('manager');
   }, [isAdmin, isManager, currentRole]);
 
-  // Check if the current user is Sales or Shipper Ops
-  const isSalesOrShipper = useMemo(() => {
-    return currentRole.includes('sales') || currentRole.includes('shipper');
-  }, [currentRole]);
-
   const queue = searchParams.get("queue") || "all-work";
 
   const fetchedRef = useRef(null);
@@ -172,6 +167,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const priority = (t.priority || "medium").toLowerCase();
       
       const issueType = t.issueType || t.type || t.category || "General";
+      // Explicit category mapping fallback
       const category = t.category || t.department || t.serviceArea || "General";
 
       return {
@@ -196,7 +192,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   const priorityCounts = useMemo(() => {
     const base = ticketData.filter((t) => {
-      if (!isUserManagerOrAdmin && !isSalesOrShipper) {
+      if (!isUserManagerOrAdmin) {
         const assigneeLower = t.assigneeName.trim().toLowerCase();
         const subAssigneeLower = t.subAssignmentName.trim().toLowerCase();
         const userName = (user?.name || user?.username || user?.fullName || "").trim().toLowerCase();
@@ -232,11 +228,11 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       low: { total: base.filter(t => t.priority === "low").length, resolved: base.filter(t => t.priority === "low" && t.isResolved).length },
     };
     return counts;
-  }, [ticketData, queue, isUserManagerOrAdmin, isSalesOrShipper, user]);
+  }, [ticketData, queue, isUserManagerOrAdmin, user]);
 
   const filteredTickets = useMemo(() => {
     return ticketData.filter((t) => {
-      if (!isUserManagerOrAdmin && !isSalesOrShipper) {
+      if (!isUserManagerOrAdmin) {
         const assigneeLower = t.assigneeName.trim().toLowerCase();
         const subAssigneeLower = t.subAssignmentName.trim().toLowerCase();
         const userName = (user?.name || user?.username || user?.fullName || "").trim().toLowerCase();
@@ -279,7 +275,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
       return matchesQueue && matchesPriority && matchesSearch;
     });
-  }, [ticketData, queue, searchTerm, isUserManagerOrAdmin, isSalesOrShipper, user, selectedPriority]);
+  }, [ticketData, queue, searchTerm, isUserManagerOrAdmin, user, selectedPriority]);
 
   return (
     <div className="flex flex-col h-full font-sans bg-slate-50 text-slate-900 antialiased selection:bg-blue-600 selection:text-white">
@@ -424,7 +420,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                     <th className="py-3.5 px-4 font-semibold">Entry Source</th>
                     <th className="py-3.5 px-4 font-semibold">Created Date</th>
                     <th className="py-3.5 px-4 font-semibold">Title</th>
-                    <th className="py-3.5 px-4 font-semibold">Category</th>
+                    <th className="py-3.5 px-4 font-semibold">Category</th> {/* Added Category Column */}
                     <th className="py-3.5 px-4 font-semibold">Issue Type</th>
                     <th className="py-3.5 px-4 font-semibold">Priority</th>
                     <th className="py-3.5 px-4 font-semibold">Assignee</th>
@@ -457,6 +453,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
                         <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[180px] truncate" title={t.title}>{t.title}</td>
                         
+                        {/* Rendered Category Column */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-md text-[11px] font-medium">
                             {t.category}
@@ -482,8 +479,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {t.isAssigned ? (
                             <span className="text-slate-800 font-medium">{t.assigneeName}</span>
-                          ) : isSalesOrShipper ? (
-                            <span className="text-slate-400 italic font-normal">N/A</span>
                           ) : !isUserManagerOrAdmin ? (
                             <button
                               onClick={(e) => handleAssignToMe(e, mongoId)}
