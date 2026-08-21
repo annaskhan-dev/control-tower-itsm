@@ -30,7 +30,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     return isAdmin || isManager || currentRole.includes('admin') || currentRole.includes('manager');
   }, [isAdmin, isManager, currentRole]);
 
-  // Check if the current user is strictly an operator (and not shipper, sales person, or transporter)
   const isOperatorOnly = useMemo(() => {
     return currentRole.includes('operator') && 
            !currentRole.includes('shipper') && 
@@ -39,7 +38,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   }, [currentRole]);
 
   const queue = searchParams.get("queue") || "all-work";
-
   const fetchedRef = useRef(null);
 
   useEffect(() => {
@@ -95,16 +93,16 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     if (!dateString) return "—";
     const d = new Date(dateString);
     return isNaN(d.getTime()) 
-      ? "Invalid" 
+      ? "—" 
       : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   const formatDuration = (ms) => {
     if (ms === null || ms === undefined || isNaN(ms)) return "—";
-    if (ms < 60000) return "Just now"; 
+    if (ms < 60000) return "< 1m"; 
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours === 0 && mins === 0) return "Just now";
+    if (hours === 0 && mins === 0) return "< 1m";
     return `${hours}h ${mins}m`;
   };
 
@@ -123,9 +121,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       if (deadlineRaw) {
         const deadline = new Date(deadlineRaw);
         if (!isNaN(deadline.getTime())) {
-          const evaluationTime = currentOrResolveTime;
-          const diffMinutes = (deadline.getTime() - evaluationTime) / (1000 * 60);
-          
+          const diffMinutes = (deadline.getTime() - currentOrResolveTime) / (1000 * 60);
           if (diffMinutes < 0) {
             slaStatus = "Breached";
           } else if (diffMinutes <= 30 && !isResolved) {
@@ -157,10 +153,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at || (isSubAssigned ? (t.updatedAt || t.createdAt) : null);
       const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
 
-      // Primary assignment start and end logic
+      // 1. Primary Assignment Timeline Calculation
       let primaryAssignmentMs = 0;
-      let primaryStartFormatted = isAssigned ? formatDate(assignedAtRaw || t.createdAt) : "Unassigned";
-      let primaryEndFormatted = "Active";
+      let primaryStartFormatted = isAssigned ? formatDate(assignedAtRaw || t.createdAt) : "—";
+      let primaryEndFormatted = isAssigned ? (isResolved ? "Resolved" : "Active") : "—";
 
       if (isAssigned) {
         const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
@@ -174,9 +170,9 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
       const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
-      // Sub-assignment timeline metrics
+      // 2. Sub-Assignment Timeline Calculation
       let subAssignmentTimeMs = 0;
-      let subStartFormatted = "Not Sub-Assigned";
+      let subStartFormatted = "—";
       let subEndFormatted = "—";
 
       if (isSubAssigned && subAssignedAtTime) {
@@ -188,7 +184,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
       const entrySource = t.generator || t.source || "System / Direct";
       const priority = (t.priority || "medium").toLowerCase();
-      
       const issueType = t.issueType || t.type || t.category || "General";
       const category = t.category || t.department || t.serviceArea || "General";
 
@@ -197,7 +192,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         assigneeName,
         isAssigned,
         subAssignmentName,
-        subAssignmentAt: subAssignedAtRaw,
         slaStatus,
         entrySource,
         priority,
@@ -206,11 +200,11 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         isResolved,
         primaryStartFormatted,
         primaryEndFormatted,
-        primaryAssignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
-        slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
+        primaryAssignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "—",
+        slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "—",
         subStartFormatted,
         subEndFormatted,
-        subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
+        subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "—",
         finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
       };
     });
@@ -246,14 +240,13 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       return true;
     });
 
-    const counts = {
+    return {
       all: { total: base.length, resolved: base.filter(t => t.isResolved).length },
       critical: { total: base.filter(t => t.priority === "critical" || t.priority === "urgent").length, resolved: base.filter(t => (t.priority === "critical" || t.priority === "urgent") && t.isResolved).length },
       high: { total: base.filter(t => t.priority === "high").length, resolved: base.filter(t => t.priority === "high" && t.isResolved).length },
       medium: { total: base.filter(t => t.priority === "medium").length, resolved: base.filter(t => t.priority === "medium" && t.isResolved).length },
       low: { total: base.filter(t => t.priority === "low").length, resolved: base.filter(t => t.priority === "low" && t.isResolved).length },
     };
-    return counts;
   }, [ticketData, queue, isUserManagerOrAdmin, user]);
 
   const filteredTickets = useMemo(() => {
@@ -270,7 +263,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           (userEmail && assigneeLower.includes(userEmail));
 
         const isUnassigned = !t.isAssigned;
-
         if (!isAssignedToThem && !isUnassigned) return false;
       }
 
@@ -305,6 +297,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
 
   return (
     <div className="flex flex-col h-full font-sans bg-slate-50 text-slate-900 antialiased selection:bg-blue-600 selection:text-white">
+      {/* Top Header */}
       <div className="flex justify-between items-center px-8 py-5 bg-white border-b border-slate-200 shadow-2xs">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Support Tickets</h1>
@@ -321,69 +314,39 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         </button>
       </div>
 
+      {/* Priority Filters Bar */}
       <div className="px-8 py-3 bg-white border-b border-slate-200 flex items-center gap-3 overflow-x-auto">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-700 tracking-wider whitespace-nowrap mr-2">
           <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-          PRIORITY BREAKDOWN & FILTERS:
+          PRIORITY FILTERS:
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setSelectedPriority("all")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-              selectedPriority === "all" 
-                ? "bg-slate-900 text-white shadow-sm" 
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200"
-            }`}
-          >
-            All Priorities <span className={`px-1.5 py-0.2 rounded text-[10px] ${selectedPriority === "all" ? "bg-slate-800 text-slate-200" : "bg-slate-200 text-slate-600"}`}>{priorityCounts.all.total}</span>
-          </button>
-          
-          <button
-            onClick={() => setSelectedPriority("critical")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-              selectedPriority === "critical" 
-                ? "bg-slate-900 text-white shadow-sm" 
-                : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
-          >
-            Critical <span className="text-[10px] text-slate-400 font-normal">{priorityCounts.critical.total} ({priorityCounts.critical.resolved} res)</span>
-          </button>
-
-          <button
-            onClick={() => setSelectedPriority("high")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-              selectedPriority === "high" 
-                ? "bg-slate-900 text-white shadow-sm" 
-                : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
-          >
-            High <span className="text-[10px] text-slate-400 font-normal">{priorityCounts.high.total} ({priorityCounts.high.resolved} res)</span>
-          </button>
-
-          <button
-            onClick={() => setSelectedPriority("medium")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-              selectedPriority === "medium" 
-                ? "bg-slate-900 text-white shadow-sm" 
-                : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
-          >
-            Medium <span className="text-[10px] text-slate-400 font-normal">{priorityCounts.medium.total} ({priorityCounts.medium.resolved} res)</span>
-          </button>
-
-          <button
-            onClick={() => setSelectedPriority("low")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-              selectedPriority === "low" 
-                ? "bg-slate-900 text-white shadow-sm" 
-                : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
-          >
-            Low <span className="text-[10px] text-slate-400 font-normal">{priorityCounts.low.total} ({priorityCounts.low.resolved} res)</span>
-          </button>
+          {[
+            { id: "all", label: "All Priorities", count: priorityCounts.all.total },
+            { id: "critical", label: "Critical", count: priorityCounts.critical.total },
+            { id: "high", label: "High", count: priorityCounts.high.total },
+            { id: "medium", label: "Medium", count: priorityCounts.medium.total },
+            { id: "low", label: "Low", count: priorityCounts.low.total }
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setSelectedPriority(item.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedPriority === item.id 
+                  ? "bg-slate-900 text-white shadow-sm" 
+                  : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+              }`}
+            >
+              {item.label} 
+              <span className={`px-1.5 py-0.2 rounded text-[10px] ${selectedPriority === item.id ? "bg-slate-800 text-slate-200" : "bg-slate-200 text-slate-600"}`}>
+                {item.count}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
       
+      {/* Search & Queue Nav */}
       <div className="px-8 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-4">
         <div className="relative w-full max-w-sm">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -406,25 +369,21 @@ export const TicketList = ({ onOpenCreateTicket }) => {
             { key: "assigned", label: "Assigned" },
             { key: "closed", label: "Closed" },
             { key: "sla-risk", label: "SLA Risks" }
-          ].map((tab) => {
-            const isActive = queue === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => navigate(`/tickets?queue=${tab.key}`)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                  isActive 
-                    ? "bg-white text-slate-900 shadow-xs" 
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => navigate(`/tickets?queue=${tab.key}`)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                queue === tab.key ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
+      {/* Main Table Content */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           {isLoading ? (
@@ -439,18 +398,17 @@ export const TicketList = ({ onOpenCreateTicket }) => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1600px]">
+              <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1700px]">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                   <tr>
                     <th className="py-3.5 px-4 font-semibold">ID</th>
-                    <th className="py-3.5 px-4 font-semibold">Entry Source</th>
-                    <th className="py-3.5 px-4 font-semibold">Created Date</th>
+                    <th className="py-3.5 px-4 font-semibold">Source</th>
+                    <th className="py-3.5 px-4 font-semibold">Created</th>
                     <th className="py-3.5 px-4 font-semibold">Title</th>
                     <th className="py-3.5 px-4 font-semibold">Category</th>
-                    <th className="py-3.5 px-4 font-semibold">Issue Type</th>
                     <th className="py-3.5 px-4 font-semibold">Priority</th>
                     <th className="py-3.5 px-4 font-semibold">Primary Assignee</th>
-                    <th className="py-3.5 px-4 font-semibold">Primary Start / End Time</th>
+                    <th className="py-3.5 px-4 font-semibold">Primary Assignment Timeline</th>
                     <th className="py-3.5 px-4 font-semibold">Primary Duration</th>
                     <th className="py-3.5 px-4 font-semibold">Sub-Assignee</th>
                     <th className="py-3.5 px-4 font-semibold">Sub-Assignment Timeline</th>
@@ -469,27 +427,17 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                       <tr 
                         key={mongoId} 
                         onClick={() => navigate(`/tickets/${t.ticketId}`)} 
-                        className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
+                        className="hover:bg-slate-50/85 cursor-pointer transition-colors group"
                       >
                         <td className="py-3.5 px-4 font-semibold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">{t.ticketId}</td>
-                        <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
-                          <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[11px]">
-                            {t.entrySource}
-                          </span>
+                        <td className="py-3.5 px-4 text-slate-700 whitespace-nowrap">
+                          <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[11px]">{t.entrySource}</span>
                         </td>
                         <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{formatDate(t.createdAt)}</td>
-                        <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[180px] truncate" title={t.title}>{t.title}</td>
+                        <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[160px] truncate" title={t.title}>{t.title}</td>
                         
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-md text-[11px] font-medium">
-                            {t.category}
-                          </span>
-                        </td>
-
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-100 rounded-md text-[11px] font-medium uppercase tracking-wider">
-                            {t.issueType}
-                          </span>
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-md text-[11px] font-medium">{t.category}</span>
                         </td>
 
                         <td className="py-3.5 px-4 whitespace-nowrap">
@@ -502,9 +450,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                           </span>
                         </td>
                         
+                        {/* Primary Assignee Column */}
                         <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {t.isAssigned ? (
-                            <span className="text-slate-800 font-medium">{t.assigneeName}</span>
+                            <span className="text-slate-800 font-semibold">{t.assigneeName}</span>
                           ) : !isUserManagerOrAdmin ? (
                             isOperatorOnly ? (
                               <button
@@ -517,76 +466,78 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                               <span className="text-slate-400 italic">Unassigned</span>
                             )
                           ) : (
-                            <div className="relative">
-                              <select
-                                value={t.assignee || t.assignedTo || "Unassigned"}
-                                disabled={isRestricted || isResolvedState}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  handleManagerAssign(mongoId, e.target.value);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full py-1 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
-                              >
-                                <option value="Unassigned">Assign to Operator...</option>
-                                {operators.map((u) => {
-                                  const userName = u.name || u.fullName || u.username;
-                                  const userRole = u.role || u.userType || 'Operator';
-                                  return (
-                                    <option key={u._id || u.id} value={userName}>
-                                      {userName} ({userRole})
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                            </div>
+                            <select
+                              value={t.assignee || t.assignedTo || "Unassigned"}
+                              disabled={isRestricted || isResolvedState}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleManagerAssign(mongoId, e.target.value);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full py-1 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none disabled:bg-slate-100 cursor-pointer shadow-2xs"
+                            >
+                              <option value="Unassigned">Assign to Operator...</option>
+                              {operators.map((u) => {
+                                const userName = u.name || u.fullName || u.username;
+                                const userRole = u.role || u.userType || 'Operator';
+                                return (
+                                  <option key={u._id || u.id} value={userName}>
+                                    {userName} ({userRole})
+                                  </option>
+                                );
+                              })}
+                            </select>
                           )}
                         </td>
 
-                        {/* Primary Start & End Time Column */}
+                        {/* Primary Assignment Timeline (Start & End) */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           {t.isAssigned ? (
-                            <div className="flex flex-col text-[11px]">
-                              <span className="text-slate-700 font-medium">Start: {t.primaryStartFormatted}</span>
-                              <span className="text-slate-500 text-[10px]">End: {t.primaryEndFormatted}</span>
+                            <div className="flex flex-col text-[11px] bg-slate-50/80 p-1.5 rounded-md border border-slate-200/60 gap-0.5">
+                              <span className="text-slate-700 font-medium">Start: <span className="text-slate-900 font-semibold">{t.primaryStartFormatted}</span></span>
+                              <span className="text-slate-500 text-[10px]">End: <span className="text-slate-700 font-medium">{t.primaryEndFormatted}</span></span>
                             </div>
                           ) : (
-                            <span className="text-slate-400 italic">Unassigned</span>
+                            <span className="text-slate-400 italic">—</span>
                           )}
                         </td>
 
+                        {/* Primary Duration */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded-md font-medium ${
-                            t.primaryAssignmentTimeFormatted !== "Unassigned" ? "bg-slate-100 text-slate-700 border border-slate-200/60" : "bg-slate-50 text-slate-400 italic"
-                          }`}>
+                          <span className="px-2 py-1 rounded-md font-medium bg-slate-100 text-slate-700 border border-slate-200/60">
                             {t.primaryAssignmentTimeFormatted}
                           </span>
                         </td>
 
+                        {/* Sub-Assignee Name */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="font-medium text-slate-700">{t.subAssignmentName || "—"}</div>
+                          <span className={`font-medium ${t.subAssignmentName ? "text-purple-700 font-semibold" : "text-slate-400 italic"}`}>
+                            {t.subAssignmentName || "None"}
+                          </span>
                         </td>
 
                         {/* Sub-Assignment Timeline (Start & End) */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           {t.subAssignmentName ? (
-                            <div className="flex flex-col text-[11px]">
-                              <span className="text-purple-700 font-medium">Start: {t.subStartFormatted}</span>
-                              <span className="text-slate-500 text-[10px]">End: {t.subEndFormatted}</span>
+                            <div className="flex flex-col text-[11px] bg-purple-50/40 p-1.5 rounded-md border border-purple-100 gap-0.5">
+                              <span className="text-purple-900 font-medium">Start: <span className="font-semibold">{t.subStartFormatted}</span></span>
+                              <span className="text-purple-700/80 text-[10px]">End: <span className="font-medium">{t.subEndFormatted}</span></span>
                             </div>
                           ) : (
-                            <span className="text-slate-400 italic text-[11px]">Not Sub-Assigned</span>
+                            <span className="text-slate-400 italic text-[11px]">—</span>
                           )}
                         </td>
 
+                        {/* Sub-Assignee Duration */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded-md font-medium ${
-                            t.subAssignmentTimeFormatted !== "Not Sub-Assigned" ? "bg-purple-50 text-purple-700 border border-purple-100/80" : "bg-slate-50 text-slate-400 italic"
+                          <span className={`px-2 py-1 rounded-md font-medium ${
+                            t.subAssignmentName ? "bg-purple-50 text-purple-700 border border-purple-100/80" : "bg-slate-50 text-slate-400 italic"
                           }`}>
                             {t.subAssignmentTimeFormatted}
                           </span>
                         </td>
 
+                        {/* SLA Health Indicator */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
                             t.slaStatus === "Breached" ? "bg-rose-50 text-rose-700 border border-rose-200" : 
@@ -597,15 +548,15 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                           </span>
                         </td>
                         
+                        {/* Status & Total Resolution */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <div className="flex flex-col gap-1 items-start">
                             <span className={`px-2.5 py-0.5 font-bold uppercase rounded-md text-[10px] tracking-wider shadow-2xs ${
-                              t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "bg-emerald-600 text-white" :
-                              "bg-blue-600 text-white"
+                              t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "bg-emerald-600 text-white" : "bg-blue-600 text-white"
                             }`}>
                               {t.status || "Open"}
                             </span>
-                            <span className={`text-[10px] font-medium ${t.status?.toLowerCase() === "resolved" || t.status?.toLowerCase() === "closed" ? "text-emerald-700 font-semibold" : "text-slate-400 italic"}`}>
+                            <span className={`text-[10px] font-medium ${t.isResolved ? "text-emerald-700 font-semibold" : "text-slate-400 italic"}`}>
                               Total: {t.finalResolutionTimeFormatted}
                             </span>
                           </div>
