@@ -283,7 +283,7 @@ const normalizeTicket = (t, now) => {
 };
 
 /**
- * Custom Styled Tooltip Component for Charts
+ * Custom Styled Tooltip Component for Charts[cite: 5]
  */
 const CustomTooltip = memo(({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -310,7 +310,7 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * List-based Card for Creators & Sources (supports custom color themes)
+ * List-based Card for Creators & Sources (supports custom color themes)[cite: 5]
  */
 const GeneratorListCard = memo(
   ({ title, data, totalLabel = "total", theme = "emerald" }) => {
@@ -634,7 +634,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     document.body.removeChild(link);
   };
 
-  // Comprehensive Metrics Calculation
+  // Comprehensive Metrics Calculation[cite: 5]
   const stats = useMemo(() => {
     let generatorMap = {};
     let operatorResolvedMap = {};
@@ -698,7 +698,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     };
   }, [normalizedTickets, backendStats]);
 
-  // Dynamic Chart & Trend Data
+  // Dynamic Chart & Trend Data[cite: 5]
   const chartData = useMemo(() => {
     const daysCount = Math.max(1, Math.min(30, Number(velocityDays) || 7));
     const velocityDaysArr = Array.from({ length: daysCount }).map((_, i) => {
@@ -782,7 +782,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     };
   }, [normalizedTickets, stats, velocityDays]);
 
-  // Filtered tickets based on active tab, priority filter, search term, and permissions
+  // Filtered tickets based on active tab, priority filter, search term, and permissions[cite: 5]
   const filteredTickets = useMemo(() => {
     return normalizedTickets.filter((t) => {
       if (!isUserManagerOrAdmin) {
@@ -866,7 +866,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 font-sans text-slate-800 p-4 sm:p-6 overflow-x-hidden">
-      {/* Header */}
+      {/* Header[cite: 5] */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
@@ -874,7 +874,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             Real-time ticketing lifecycle, creator tracking, operator resolution
-            metrics, and SLA health
+            metrics, and SLA health[cite: 5]
           </p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -908,7 +908,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Top Metric Cards - 6 Columns Expanded */}
+      {/* Top Metric Cards - 6 Columns Expanded[cite: 5] */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           { label: "Total Tickets", val: stats.total, icon: Ticket, tab: "all" },
@@ -964,7 +964,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         ))}
       </div>
 
-      {/* Widgets Grid: Generators, Operators, and Detailed SLA Card */}
+      {/* Widgets Grid: Generators, Operators, and Detailed SLA Card[cite: 5] */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <GeneratorListCard
           title="TICKETS CREATED BY ROLE / SOURCE"
@@ -979,7 +979,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           theme="emerald"
         />
 
-        {/* Enhanced SLA Health Distribution Card with 3 Key Detail Points */}
+        {/* Enhanced SLA Health Distribution Card with 3 Key Detail Points[cite: 5] */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -1012,7 +1012,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
               </ResponsiveContainer>
             </div>
 
-            {/* 3 Detail Points for SLA Categories */}
+            {/* 3 Detail Points for SLA Categories[cite: 5] */}
             <div className="w-full xl:w-1/2 flex flex-col gap-1.5 text-xs">
               {chartData.slaPie.map((item, idx) => (
                 <div
@@ -1048,7 +1048,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Velocity Trend Chart with Days Selector */}
+      {/* Velocity Trend Chart with Days Selector[cite: 5] */}
       <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -1132,7 +1132,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Priority Summary & Filter Bar */}
+      {/* Priority Summary & Filter Bar[cite: 5] */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <ShieldAlert size={18} className="text-amber-500" />
@@ -1189,7 +1189,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Filters and Search Toolbar */}
+      {/* Filters and Search Toolbar[cite: 5] */}
       <div className="px-6 py-4 bg-white border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
         <div className="relative w-full max-w-sm">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -1213,7 +1213,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           />
         </div>
 
-        {/* Status Tab Filters */}
+        {/* Status Tab Filters[cite: 5] */}
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto justify-center flex-wrap">
           {[
             { key: "all", label: "All Work" },
@@ -1238,7 +1238,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Main Table Section (Unified with Full Ticket List Columns) */}
+      {/* Main Table Section (Unified with Full Ticket List Columns)[cite: 5] */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {filteredTickets.length === 0 ? (
           <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
