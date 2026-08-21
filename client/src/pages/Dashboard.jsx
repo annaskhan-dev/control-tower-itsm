@@ -242,23 +242,38 @@ const normalizeTicket = (t, now) => {
   const formatDateShort = (dStr) => {
     if (!dStr) return null;
     const d = new Date(dStr);
-    return isNaN(d.getTime()) ? null : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return isNaN(d.getTime())
+      ? null
+      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+          ", " +
+          d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  const primaryStartFormatted = isAssigned ? formatDateShort(assignedAtRaw || t.createdAt) : null;
-  const primaryEndFormatted = isAssigned ? (isSubAssigned && subAssignedAtRaw ? formatDateShort(subAssignedAtRaw) : (isResolved ? formatDateShort(resolvedAtRaw) : "Present")) : null;
-  const primaryTimelineStr = primaryStartFormatted ? `${primaryStartFormatted} → ${primaryEndFormatted}` : "—";
+  const primaryStartFormatted = isAssigned
+    ? formatDateShort(assignedAtRaw || t.createdAt)
+    : null;
+  const primaryEndFormatted = isAssigned
+    ? isSubAssigned && subAssignedAtRaw
+      ? formatDateShort(subAssignedAtRaw)
+      : isResolved
+        ? formatDateShort(resolvedAtRaw)
+        : "Present"
+    : null;
 
-  const subStartFormatted = isSubAssigned ? formatDateShort(subAssignedAtRaw) : null;
-  const subEndFormatted = isSubAssigned ? (isResolved ? formatDateShort(resolvedAtRaw) : "Present") : null;
-  const subTimelineStr = subStartFormatted ? `${subStartFormatted} → ${subEndFormatted}` : "—";
+  const subStartFormatted = isSubAssigned
+    ? formatDateShort(subAssignedAtRaw)
+    : null;
+  const subEndFormatted = isSubAssigned
+    ? isResolved
+      ? formatDateShort(resolvedAtRaw)
+      : "Present"
+    : null;
 
   const formatDuration = (ms) => {
     if (ms === null || ms === undefined || isNaN(ms)) return "—";
-    if (ms < 60000) return "Just now";
+    if (ms < 60000) return "0h 1m";
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours === 0 && mins === 0) return "Just now";
     return `${hours}h ${mins}m`;
   };
 
@@ -269,7 +284,7 @@ const normalizeTicket = (t, now) => {
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     entrySource: rawSourceStr,
     assigneeName,
-    subAssignmentName: isSubAssigned ? subAssignmentName : "—",
+    subAssignmentName: isSubAssigned ? subAssignmentName : "None",
     subAssignmentAt: subAssignedAtRaw,
     status: t.status || "Open",
     createdAt: t.createdAt || t.created_at || new Date().toISOString(),
@@ -279,11 +294,13 @@ const normalizeTicket = (t, now) => {
     isResolved,
     isSubAssigned,
     isAssigned,
-    primaryTimelineFormatted: primaryTimelineStr,
+    primaryStartFormatted,
+    primaryEndFormatted,
     assignmentTimeFormatted: isAssigned
       ? formatDuration(primaryAssignmentMs)
-      : "Unassigned",
-    subTimelineFormatted: subTimelineStr,
+      : "—",
+    subStartFormatted,
+    subEndFormatted,
     subAssignmentTimeFormatted: isSubAssigned
       ? formatDuration(subAssignmentTimeMs)
       : "—",
@@ -573,23 +590,19 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       "Title",
       "Category",
       "Priority",
-      "Assignee",
+      "Primary Assignee",
       "Primary Assignment Timeline",
       "Primary Duration",
       "Sub-Assignee",
       "Sub-Assignment Timeline",
       "Sub-Assignee Duration",
       "SLA Health",
-      "Status",
-      "Final Resolution Duration",
+      "Status & Total Resolution",
     ];
 
     const csvRows = recentTickets.map((t) => {
       const createdAtFormatted = t.createdAt
         ? new Date(t.createdAt).toLocaleString()
-        : "";
-      const resolvedAtFormatted = t.resolvedAt
-        ? new Date(t.resolvedAt).toLocaleString()
         : "";
 
       return [
@@ -600,14 +613,13 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         `"${(t.category || "").replace(/"/g, '""')}"`,
         `"${(t.priority || "").replace(/"/g, '""')}"`,
         `"${(t.assigneeName || "").replace(/"/g, '""')}"`,
-        `"${(t.primaryTimelineFormatted || "").replace(/"/g, '""')}"`,
+        `"${t.primaryStartFormatted ? `Start: ${t.primaryStartFormatted} End: ${t.primaryEndFormatted}` : "—"}"`,
         `"${t.assignmentTimeFormatted || "Unassigned"}"`,
         `"${(t.subAssignmentName || "").replace(/"/g, '""')}"`,
-        `"${(t.subTimelineFormatted || "").replace(/"/g, '""')}"`,
+        `"${t.subStartFormatted ? `Start: ${t.subStartFormatted} End: ${t.subEndFormatted}` : "—"}"`,
         `"${t.subAssignmentTimeFormatted || "—"}"`,
         `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
-        `"${(t.status || "").replace(/"/g, '""')}"`,
-        `"${t.finalResolutionTimeFormatted || "Pending"}"`,
+        `"${(t.status || "").replace(/"/g, '""')} (Total: ${t.finalResolutionTimeFormatted})"`,
       ].join(",");
     });
 
@@ -1221,7 +1233,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Main Table Section updated with requested exact column sequence */}
+      {/* Main Table Section Styled Based on Screenshot Layout */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {filteredTickets.length === 0 ? (
           <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
@@ -1278,37 +1290,37 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                       className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
                     >
                       {/* ID */}
-                      <td className="py-3.5 px-4 font-semibold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">
+                      <td className="py-4 px-4 font-semibold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">
                         {t.ticketId}
                       </td>
 
                       {/* Source */}
-                      <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
+                      <td className="py-4 px-4 font-medium text-slate-700 whitespace-nowrap">
                         <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[11px]">
                           {t.entrySource}
                         </span>
                       </td>
 
                       {/* Created */}
-                      <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                      <td className="py-4 px-4 text-slate-500 whitespace-nowrap">
                         {formatDate(t.createdAt)}
                       </td>
 
                       {/* Title */}
                       <td
-                        className="py-3.5 px-4 font-medium text-slate-900 max-w-[180px] truncate"
+                        className="py-4 px-4 font-medium text-slate-900 max-w-[180px] truncate"
                         title={t.title}
                       >
                         {t.title}
                       </td>
 
                       {/* Category */}
-                      <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                      <td className="py-4 px-4 text-slate-500 whitespace-nowrap">
                         {t.category || "—"}
                       </td>
 
                       {/* Priority */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-4 px-4 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
                             t.priority === "Critical"
@@ -1324,13 +1336,13 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         </span>
                       </td>
 
-                      {/* Primary Assignee */}
+                      {/* Primary Assignee (Styled text matching screenshot) */}
                       <td
-                        className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap"
+                        className="py-4 px-4 font-medium text-slate-800 whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {t.isAssigned ? (
-                          <span className="text-slate-800 font-medium">
+                          <span className="text-slate-900 font-medium">
                             {t.assigneeName}
                           </span>
                         ) : !isUserManagerOrAdmin ? (
@@ -1371,57 +1383,91 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         )}
                       </td>
 
-                      {/* Primary Assignment Timeline */}
-                      <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap font-mono text-[11px]">
-                        {t.primaryTimelineFormatted}
-                      </td>
-
-                      {/* Primary Duration */}
-                      <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                        {t.assignmentTimeFormatted}
-                      </td>
-
-                      {/* Sub-Assignee */}
-                      <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
-                        {t.isSubAssigned ? (
-                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-[11px]">
-                            {t.subAssignmentName}
-                          </span>
+                      {/* Primary Assignment Timeline (Boxed start/end matching screenshot design) */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        {t.primaryStartFormatted ? (
+                          <div className="inline-flex flex-col bg-slate-50/80 border border-slate-200/80 rounded-xl px-3 py-1.5 text-[11px] shadow-2xs">
+                            <span className="text-slate-500 font-medium">
+                              Start: {t.primaryStartFormatted}
+                            </span>
+                            <span className="text-slate-500 font-medium">
+                              End: {t.primaryEndFormatted}
+                            </span>
+                          </div>
                         ) : (
-                          <span className="text-slate-400 italic">—</span>
+                          <span className="text-slate-400">—</span>
                         )}
                       </td>
 
-                      {/* Sub-Assignment Timeline */}
-                      <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap font-mono text-[11px]">
-                        {t.subTimelineFormatted}
+                      {/* Primary Duration (Pill badge styling) */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        {t.isAssigned ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-xl bg-slate-100/80 border border-slate-200 text-slate-700 font-medium text-[11px] shadow-2xs">
+                            {t.assignmentTimeFormatted}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
 
-                      {/* Sub-Assignee Duration */}
-                      <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                        {t.subAssignmentTimeFormatted}
+                      {/* Sub-Assignee (Styled purple/colored text matching screenshot) */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        {t.isSubAssigned ? (
+                          <span className="font-medium text-purple-700">
+                            {t.subAssignmentName}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">None</span>
+                        )}
+                      </td>
+
+                      {/* Sub-Assignment Timeline (Light purple boxed style matching screenshot) */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        {t.isSubAssigned && t.subStartFormatted ? (
+                          <div className="inline-flex flex-col bg-purple-50/40 border border-purple-100 rounded-xl px-3 py-1.5 text-[11px] shadow-2xs">
+                            <span className="text-purple-900 font-medium">
+                              Start: {t.subStartFormatted}
+                            </span>
+                            <span className="text-purple-700 font-medium">
+                              End: {t.subEndFormatted}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      {/* Sub-Assignee Duration (Light purple pill styling matching screenshot) */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        {t.isSubAssigned ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-xl bg-purple-50/60 border border-purple-100 text-purple-700 font-medium text-[11px] shadow-2xs">
+                            {t.subAssignmentTimeFormatted}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
 
                       {/* SLA Health */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-4 px-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
+                          className={`inline-flex items-center px-3 py-1 rounded-xl font-medium text-[11px] border ${
                             t.slaStatus === "Breached"
-                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              ? "bg-rose-50 text-rose-700 border-rose-200"
                               : t.slaStatus === "At Risk"
-                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-emerald-50 text-emerald-700 border-emerald-200"
                           }`}
                         >
                           {t.slaStatus}
                         </span>
                       </td>
 
-                      {/* Status & Total Resolution */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
+                      {/* Status & Total Resolution (Rounded pill badge + Total subtext matching screenshot) */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
                           <span
-                            className={`px-2.5 py-0.5 font-bold uppercase rounded-md text-[10px] tracking-wider shadow-2xs inline-block ${
+                            className={`px-3 py-1 font-bold uppercase rounded-xl text-[10px] tracking-wider shadow-xs inline-flex items-center justify-center w-max ${
                               isResolvedState
                                 ? "bg-emerald-600 text-white"
                                 : "bg-blue-600 text-white"
@@ -1429,10 +1475,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                           >
                             {t.status || "Open"}
                           </span>
-                          <span
-                            className={`text-[11px] font-medium ${isResolvedState ? "text-emerald-700 font-semibold" : "text-slate-400 italic"}`}
-                          >
-                            ({t.finalResolutionTimeFormatted})
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            Total: {t.finalResolutionTimeFormatted}
                           </span>
                         </div>
                       </td>
