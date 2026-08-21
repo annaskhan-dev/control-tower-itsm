@@ -230,10 +230,6 @@ const normalizeTicket = (t, now) => {
     primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
   }
 
-  const slaTimeMs = isAssigned
-    ? Math.max(0, currentOrResolveTime - assignedAtTime)
-    : 0;
-
   let subAssignmentTimeMs = 0;
   if (isSubAssigned && subAssignedAtTime) {
     subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subAssignedAtTime);
@@ -242,6 +238,20 @@ const normalizeTicket = (t, now) => {
   const finalResolutionTimeMs = isResolved
     ? Math.max(0, resolvedAtTime - createdAtTime)
     : null;
+
+  const formatDateShort = (dStr) => {
+    if (!dStr) return null;
+    const d = new Date(dStr);
+    return isNaN(d.getTime()) ? null : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const primaryStartFormatted = isAssigned ? formatDateShort(assignedAtRaw || t.createdAt) : null;
+  const primaryEndFormatted = isAssigned ? (isSubAssigned && subAssignedAtRaw ? formatDateShort(subAssignedAtRaw) : (isResolved ? formatDateShort(resolvedAtRaw) : "Present")) : null;
+  const primaryTimelineStr = primaryStartFormatted ? `${primaryStartFormatted} → ${primaryEndFormatted}` : "—";
+
+  const subStartFormatted = isSubAssigned ? formatDateShort(subAssignedAtRaw) : null;
+  const subEndFormatted = isSubAssigned ? (isResolved ? formatDateShort(resolvedAtRaw) : "Present") : null;
+  const subTimelineStr = subStartFormatted ? `${subStartFormatted} → ${subEndFormatted}` : "—";
 
   const formatDuration = (ms) => {
     if (ms === null || ms === undefined || isNaN(ms)) return "—";
@@ -259,7 +269,7 @@ const normalizeTicket = (t, now) => {
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     entrySource: rawSourceStr,
     assigneeName,
-    subAssignmentName,
+    subAssignmentName: isSubAssigned ? subAssignmentName : "—",
     subAssignmentAt: subAssignedAtRaw,
     status: t.status || "Open",
     createdAt: t.createdAt || t.created_at || new Date().toISOString(),
@@ -269,13 +279,14 @@ const normalizeTicket = (t, now) => {
     isResolved,
     isSubAssigned,
     isAssigned,
+    primaryTimelineFormatted: primaryTimelineStr,
     assignmentTimeFormatted: isAssigned
       ? formatDuration(primaryAssignmentMs)
       : "Unassigned",
-    slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
+    subTimelineFormatted: subTimelineStr,
     subAssignmentTimeFormatted: isSubAssigned
       ? formatDuration(subAssignmentTimeMs)
-      : "Not Sub-Assigned",
+      : "—",
     finalResolutionTimeFormatted: isResolved
       ? formatDuration(finalResolutionTimeMs)
       : "Pending",
@@ -283,7 +294,7 @@ const normalizeTicket = (t, now) => {
 };
 
 /**
- * Custom Styled Tooltip Component for Charts[cite: 5]
+ * Custom Styled Tooltip Component for Charts
  */
 const CustomTooltip = memo(({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -310,7 +321,7 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * List-based Card for Creators & Sources (supports custom color themes)[cite: 5]
+ * List-based Card for Creators & Sources
  */
 const GeneratorListCard = memo(
   ({ title, data, totalLabel = "total", theme = "emerald" }) => {
@@ -405,7 +416,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   const [backendStats, setBackendStats] = useState(null);
   const [now, setNow] = useState(() => new Date());
 
-  // UI controls state
   const [velocityDays, setVelocityDays] = useState(7);
   const [selectedTab, setSelectedTab] = useState("all");
   const [selectedPriorityFilter, setSelectedPriorityFilter] = useState("all");
@@ -558,65 +568,46 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
     const headers = [
       "Ticket ID",
-      "Title",
-      "Description",
       "Source",
+      "Created At",
+      "Title",
       "Category",
       "Priority",
-      "Ticket Status",
-      "SLA Health",
-      "SLA Deadline",
       "Assignee",
-      "Assigned At",
-      "Assignment Duration",
-      "SLA Active Duration",
+      "Primary Assignment Timeline",
+      "Primary Duration",
       "Sub-Assignee",
-      "Sub-Assigned At",
-      "Sub-Assignment Duration",
-      "Resolved At",
+      "Sub-Assignment Timeline",
+      "Sub-Assignee Duration",
+      "SLA Health",
+      "Status",
       "Final Resolution Duration",
-      "Company ID",
-      "Created At",
     ];
 
     const csvRows = recentTickets.map((t) => {
       const createdAtFormatted = t.createdAt
         ? new Date(t.createdAt).toLocaleString()
         : "";
-      const assignedAtFormatted = t.assignedAt
-        ? new Date(t.assignedAt).toLocaleString()
-        : "";
-      const subAssignmentAtFormatted = t.subAssignmentAt
-        ? new Date(t.subAssignmentAt).toLocaleString()
-        : "";
       const resolvedAtFormatted = t.resolvedAt
         ? new Date(t.resolvedAt).toLocaleString()
-        : "";
-      const slaDeadlineFormatted = t.slaDeadline
-        ? new Date(t.slaDeadline).toLocaleString()
         : "";
 
       return [
         `"${(t.ticketId || "").toString().replace(/"/g, '""')}"`,
-        `"${(t.title || "").replace(/"/g, '""')}"`,
-        `"${(t.description || "").replace(/"/g, '""')}"`,
         `"${(t.entrySource || "").replace(/"/g, '""')}"`,
+        `"${createdAtFormatted}"`,
+        `"${(t.title || "").replace(/"/g, '""')}"`,
         `"${(t.category || "").replace(/"/g, '""')}"`,
         `"${(t.priority || "").replace(/"/g, '""')}"`,
-        `"${(t.status || "").replace(/"/g, '""')}"`,
-        `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
-        `"${slaDeadlineFormatted}"`,
         `"${(t.assigneeName || "").replace(/"/g, '""')}"`,
-        `"${assignedAtFormatted}"`,
+        `"${(t.primaryTimelineFormatted || "").replace(/"/g, '""')}"`,
         `"${t.assignmentTimeFormatted || "Unassigned"}"`,
-        `"${t.slaTimeFormatted || "N/A"}"`,
         `"${(t.subAssignmentName || "").replace(/"/g, '""')}"`,
-        `"${subAssignmentAtFormatted}"`,
-        `"${t.subAssignmentTimeFormatted || "Not Sub-Assigned"}"`,
-        `"${resolvedAtFormatted}"`,
+        `"${(t.subTimelineFormatted || "").replace(/"/g, '""')}"`,
+        `"${t.subAssignmentTimeFormatted || "—"}"`,
+        `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
+        `"${(t.status || "").replace(/"/g, '""')}"`,
         `"${t.finalResolutionTimeFormatted || "Pending"}"`,
-        `"${(t.companyId || "").toString().replace(/"/g, '""')}"`,
-        `"${createdAtFormatted}"`,
       ].join(",");
     });
 
@@ -634,7 +625,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     document.body.removeChild(link);
   };
 
-  // Comprehensive Metrics Calculation[cite: 5]
   const stats = useMemo(() => {
     let generatorMap = {};
     let operatorResolvedMap = {};
@@ -698,7 +688,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     };
   }, [normalizedTickets, backendStats]);
 
-  // Dynamic Chart & Trend Data[cite: 5]
   const chartData = useMemo(() => {
     const daysCount = Math.max(1, Math.min(30, Number(velocityDays) || 7));
     const velocityDaysArr = Array.from({ length: daysCount }).map((_, i) => {
@@ -782,7 +771,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     };
   }, [normalizedTickets, stats, velocityDays]);
 
-  // Filtered tickets based on active tab, priority filter, search term, and permissions[cite: 5]
   const filteredTickets = useMemo(() => {
     return normalizedTickets.filter((t) => {
       if (!isUserManagerOrAdmin) {
@@ -866,15 +854,14 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 font-sans text-slate-800 p-4 sm:p-6 overflow-x-hidden">
-      {/* Header[cite: 5] */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
             Operational Dashboard
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Real-time ticketing lifecycle, creator tracking, operator resolution
-            metrics, and SLA health[cite: 5]
+            Real-time ticketing lifecycle, creator tracking, operator resolution metrics, and SLA health
           </p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -908,7 +895,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Top Metric Cards - 6 Columns Expanded[cite: 5] */}
+      {/* Top Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           { label: "Total Tickets", val: stats.total, icon: Ticket, tab: "all" },
@@ -964,7 +951,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         ))}
       </div>
 
-      {/* Widgets Grid: Generators, Operators, and Detailed SLA Card[cite: 5] */}
+      {/* Widgets Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <GeneratorListCard
           title="TICKETS CREATED BY ROLE / SOURCE"
@@ -979,7 +966,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           theme="emerald"
         />
 
-        {/* Enhanced SLA Health Distribution Card with 3 Key Detail Points[cite: 5] */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -1012,7 +998,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
               </ResponsiveContainer>
             </div>
 
-            {/* 3 Detail Points for SLA Categories[cite: 5] */}
             <div className="w-full xl:w-1/2 flex flex-col gap-1.5 text-xs">
               {chartData.slaPie.map((item, idx) => (
                 <div
@@ -1048,7 +1033,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Velocity Trend Chart with Days Selector[cite: 5] */}
+      {/* Velocity Trend Chart */}
       <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -1127,12 +1112,11 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           </ResponsiveContainer>
         </div>
         <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-400 italic">
-          Daily volume intake pattern over the selected {velocityDays}-day
-          window.
+          Daily volume intake pattern over the selected {velocityDays}-day window.
         </div>
       </div>
 
-      {/* Priority Summary & Filter Bar[cite: 5] */}
+      {/* Priority Summary & Filter Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <ShieldAlert size={18} className="text-amber-500" />
@@ -1189,7 +1173,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Filters and Search Toolbar[cite: 5] */}
+      {/* Filters and Search Toolbar */}
       <div className="px-6 py-4 bg-white border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
         <div className="relative w-full max-w-sm">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -1213,7 +1197,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           />
         </div>
 
-        {/* Status Tab Filters[cite: 5] */}
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto justify-center flex-wrap">
           {[
             { key: "all", label: "All Work" },
@@ -1238,7 +1221,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Main Table Section (Unified with Full Ticket List Columns)[cite: 5] */}
+      {/* Main Table Section updated with requested exact column sequence */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {filteredTickets.length === 0 ? (
           <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
@@ -1259,22 +1242,23 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1550px]">
+            <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1750px]">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                 <tr>
-                  <th className="py-3.5 px-4 font-semibold">Ticket ID</th>
+                  <th className="py-3.5 px-4 font-semibold">ID</th>
                   <th className="py-3.5 px-4 font-semibold">Source</th>
-                  <th className="py-3.5 px-4 font-semibold">Created At</th>
+                  <th className="py-3.5 px-4 font-semibold">Created</th>
                   <th className="py-3.5 px-4 font-semibold">Title</th>
                   <th className="py-3.5 px-4 font-semibold">Category</th>
                   <th className="py-3.5 px-4 font-semibold">Priority</th>
-                  <th className="py-3.5 px-4 font-semibold">Status</th>
-                  <th className="py-3.5 px-4 font-semibold">SLA Health</th>
-                  <th className="py-3.5 px-4 font-semibold">Assignee</th>
-                  <th className="py-3.5 px-4 font-semibold">Assignment Dur</th>
+                  <th className="py-3.5 px-4 font-semibold">Primary Assignee</th>
+                  <th className="py-3.5 px-4 font-semibold">Primary Assignment Timeline</th>
+                  <th className="py-3.5 px-4 font-semibold">Primary Duration</th>
                   <th className="py-3.5 px-4 font-semibold">Sub-Assignee</th>
-                  <th className="py-3.5 px-4 font-semibold">Sub-Assignment Dur</th>
-                  <th className="py-3.5 px-4 font-semibold">Resolution Dur</th>
+                  <th className="py-3.5 px-4 font-semibold">Sub-Assignment Timeline</th>
+                  <th className="py-3.5 px-4 font-semibold">Sub-Assignee Duration</th>
+                  <th className="py-3.5 px-4 font-semibold">SLA Health</th>
+                  <th className="py-3.5 px-4 font-semibold">Status & Total Resolution</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1293,7 +1277,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                       onClick={() => navigate(`/tickets/${t.ticketId}`)}
                       className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
                     >
-                      {/* Ticket ID */}
+                      {/* ID */}
                       <td className="py-3.5 px-4 font-semibold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">
                         {t.ticketId}
                       </td>
@@ -1305,14 +1289,14 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         </span>
                       </td>
 
-                      {/* Created At */}
+                      {/* Created */}
                       <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
                         {formatDate(t.createdAt)}
                       </td>
 
                       {/* Title */}
                       <td
-                        className="py-3.5 px-4 font-medium text-slate-900 max-w-[200px] truncate"
+                        className="py-3.5 px-4 font-medium text-slate-900 max-w-[180px] truncate"
                         title={t.title}
                       >
                         {t.title}
@@ -1340,35 +1324,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         </span>
                       </td>
 
-                      {/* Status */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`px-2.5 py-0.5 font-bold uppercase rounded-md text-[10px] tracking-wider shadow-2xs inline-block ${
-                            isResolvedState
-                              ? "bg-emerald-600 text-white"
-                              : "bg-blue-600 text-white"
-                          }`}
-                        >
-                          {t.status || "Open"}
-                        </span>
-                      </td>
-
-                      {/* SLA Health */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
-                            t.slaStatus === "Breached"
-                              ? "bg-rose-50 text-rose-700 border border-rose-200"
-                              : t.slaStatus === "At Risk"
-                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          }`}
-                        >
-                          {t.slaStatus}
-                        </span>
-                      </td>
-
-                      {/* Assignee */}
+                      {/* Primary Assignee */}
                       <td
                         className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
@@ -1415,7 +1371,12 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         )}
                       </td>
 
-                      {/* Assignment Duration */}
+                      {/* Primary Assignment Timeline */}
+                      <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap font-mono text-[11px]">
+                        {t.primaryTimelineFormatted}
+                      </td>
+
+                      {/* Primary Duration */}
                       <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
                         {t.assignmentTimeFormatted}
                       </td>
@@ -1427,22 +1388,53 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                             {t.subAssignmentName}
                           </span>
                         ) : (
-                          <span className="text-slate-400 italic">None</span>
+                          <span className="text-slate-400 italic">—</span>
                         )}
                       </td>
 
-                      {/* Sub-Assignment Duration */}
+                      {/* Sub-Assignment Timeline */}
+                      <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap font-mono text-[11px]">
+                        {t.subTimelineFormatted}
+                      </td>
+
+                      {/* Sub-Assignee Duration */}
                       <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
                         {t.subAssignmentTimeFormatted}
                       </td>
 
-                      {/* Final Resolution Duration */}
+                      {/* SLA Health */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span
-                          className={`text-[11px] font-medium ${isResolvedState ? "text-emerald-700 font-semibold" : "text-slate-400 italic"}`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
+                            t.slaStatus === "Breached"
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : t.slaStatus === "At Risk"
+                                ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          }`}
                         >
-                          {t.finalResolutionTimeFormatted}
+                          {t.slaStatus}
                         </span>
+                      </td>
+
+                      {/* Status & Total Resolution */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-2.5 py-0.5 font-bold uppercase rounded-md text-[10px] tracking-wider shadow-2xs inline-block ${
+                              isResolvedState
+                                ? "bg-emerald-600 text-white"
+                                : "bg-blue-600 text-white"
+                            }`}
+                          >
+                            {t.status || "Open"}
+                          </span>
+                          <span
+                            className={`text-[11px] font-medium ${isResolvedState ? "text-emerald-700 font-semibold" : "text-slate-400 italic"}`}
+                          >
+                            ({t.finalResolutionTimeFormatted})
+                          </span>
+                        </div>
                       </td>
                     </tr>
                   );
