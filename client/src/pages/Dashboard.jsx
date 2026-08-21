@@ -663,7 +663,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         openCount++;
       }
 
-      // Core Logic: Assign status
       if (t.isAssigned) {
         assignedCount++;
         if (isClosed) {
@@ -912,18 +911,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       {/* Top Metric Cards - 6 Columns Expanded */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          {
-            label: "Total Tickets",
-            val: stats.total,
-            icon: Ticket,
-            tab: "all",
-          },
-          {
-            label: "Open",
-            val: stats.open,
-            icon: FolderOpen,
-            tab: "open",
-          },
+          { label: "Total Tickets", val: stats.total, icon: Ticket, tab: "all" },
+          { label: "Open", val: stats.open, icon: FolderOpen, tab: "open" },
           {
             label: "Resolved",
             val: stats.closed,
@@ -1249,7 +1238,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Main Table Section */}
+      {/* Main Table Section (Unified with Ticket List Styling & Columns) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {filteredTickets.length === 0 ? (
           <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
@@ -1270,25 +1259,19 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1100px]">
+            <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1250px]">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                 <tr>
-                  <th className="py-3.5 px-4 font-semibold">ID</th>
-                  <th className="py-3.5 px-4 font-semibold">Entry Source</th>
-                  <th className="py-3.5 px-4 font-semibold">Created Date</th>
+                  <th className="py-3.5 px-4 font-semibold">Ticket ID</th>
+                  <th className="py-3.5 px-4 font-semibold">Source</th>
+                  <th className="py-3.5 px-4 font-semibold">Created At</th>
                   <th className="py-3.5 px-4 font-semibold">Title</th>
                   <th className="py-3.5 px-4 font-semibold">Category</th>
-                  <th className="py-3.5 px-4 font-semibold">Assignee</th>
-                  <th className="py-3.5 px-4 font-semibold">Assignment Time</th>
-                  <th className="py-3.5 px-4 font-semibold">SLA Active Time</th>
-                  <th className="py-3.5 px-4 font-semibold">Sub-Assignment</th>
-                  <th className="py-3.5 px-4 font-semibold">
-                    Sub-Assignee Time
-                  </th>
+                  <th className="py-3.5 px-4 font-semibold">Priority</th>
+                  <th className="py-3.5 px-4 font-semibold">Status</th>
                   <th className="py-3.5 px-4 font-semibold">SLA Health</th>
-                  <th className="py-3.5 px-4 font-semibold">
-                    Status & Resolution
-                  </th>
+                  <th className="py-3.5 px-4 font-semibold">Assignee</th>
+                  <th className="py-3.5 px-4 font-semibold">Duration</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1307,27 +1290,82 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                       onClick={() => navigate(`/tickets/${t.ticketId}`)}
                       className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
                     >
+                      {/* Ticket ID */}
                       <td className="py-3.5 px-4 font-semibold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">
                         {t.ticketId}
                       </td>
+
+                      {/* Source */}
                       <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
                         <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[11px]">
                           {t.entrySource}
                         </span>
                       </td>
+
+                      {/* Created At */}
                       <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
                         {formatDate(t.createdAt)}
                       </td>
+
+                      {/* Title */}
                       <td
-                        className="py-3.5 px-4 font-medium text-slate-900 max-w-[200px] truncate"
+                        className="py-3.5 px-4 font-medium text-slate-900 max-w-[220px] truncate"
                         title={t.title}
                       >
                         {t.title}
                       </td>
+
+                      {/* Category */}
                       <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
                         {t.category || "—"}
                       </td>
 
+                      {/* Priority */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
+                            t.priority === "Critical"
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : t.priority === "High"
+                                ? "bg-orange-50 text-orange-700 border border-orange-200"
+                                : t.priority === "Medium"
+                                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                  : "bg-slate-100 text-slate-700 border border-slate-200"
+                          }`}
+                        >
+                          {t.priority}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span
+                          className={`px-2.5 py-0.5 font-bold uppercase rounded-md text-[10px] tracking-wider shadow-2xs inline-block ${
+                            isResolvedState
+                              ? "bg-emerald-600 text-white"
+                              : "bg-blue-600 text-white"
+                          }`}
+                        >
+                          {t.status || "Open"}
+                        </span>
+                      </td>
+
+                      {/* SLA Health */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
+                            t.slaStatus === "Breached"
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : t.slaStatus === "At Risk"
+                                ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          }`}
+                        >
+                          {t.slaStatus}
+                        </span>
+                      </td>
+
+                      {/* Assignee */}
                       <td
                         className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
@@ -1374,79 +1412,15 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         )}
                       </td>
 
+                      {/* Duration / Resolution */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span
-                          className={`px-2 py-0.5 rounded-md font-medium ${
-                            t.assignmentTimeFormatted !== "Unassigned"
-                              ? "bg-slate-100 text-slate-700 border border-slate-200/60"
-                              : "bg-slate-50 text-slate-400 italic"
-                          }`}
+                          className={`text-[11px] font-medium ${isResolvedState ? "text-emerald-700 font-semibold" : "text-slate-400 italic"}`}
                         >
-                          {t.assignmentTimeFormatted}
+                          {isResolvedState
+                            ? `Res: ${t.finalResolutionTimeFormatted}`
+                            : t.assignmentTimeFormatted}
                         </span>
-                      </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-0.5 rounded-md font-medium ${
-                            t.slaTimeFormatted !== "N/A"
-                              ? "bg-blue-50 text-blue-700 border border-blue-100/80"
-                              : "bg-slate-50 text-slate-400 italic"
-                          }`}
-                        >
-                          {t.slaTimeFormatted}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="font-medium text-slate-700">
-                          {t.subAssignmentName || "—"}
-                        </div>
-                        {t.subAssignmentAt && (
-                          <div className="text-[10px] text-slate-400 mt-0.5">
-                            {formatDate(t.subAssignmentAt)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-0.5 rounded-md font-medium ${
-                            t.subAssignmentTimeFormatted !== "Not Sub-Assigned"
-                              ? "bg-purple-50 text-purple-700 border border-purple-100/80"
-                              : "bg-slate-50 text-slate-400 italic"
-                          }`}
-                        >
-                          {t.subAssignmentTimeFormatted}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
-                            t.slaStatus === "Breached"
-                              ? "bg-rose-50 text-rose-700 border border-rose-200"
-                              : t.slaStatus === "At Risk"
-                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          }`}
-                        >
-                          {t.slaStatus}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="flex flex-col gap-1 items-start">
-                          <span
-                            className={`px-2.5 py-0.5 font-bold uppercase rounded-md text-[10px] tracking-wider shadow-2xs ${
-                              isResolvedState
-                                ? "bg-emerald-600 text-white"
-                                : "bg-blue-600 text-white"
-                            }`}
-                          >
-                            {t.status || "Open"}
-                          </span>
-                          <span
-                            className={`text-[10px] font-medium ${isResolvedState ? "text-emerald-700 font-semibold" : "text-slate-400 italic"}`}
-                          >
-                            Total: {t.finalResolutionTimeFormatted}
-                          </span>
-                        </div>
                       </td>
                     </tr>
                   );
