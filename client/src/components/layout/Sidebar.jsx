@@ -37,11 +37,11 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user, mobileOpen, setMob
     if (onOpenCreateTicket) onOpenCreateTicket();
   };
 
-  // Define nav items (Added Sales and Shipper roles to Manage Tickets and Unassigned)
+  // Define nav items with exact database role strings included
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Manager'] },
-    { label: 'Manage Tickets', path: '/tickets?queue=all', icon: Inbox, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter', 'Sales', 'Shipper'] },
-    { label: 'Unassigned', path: '/tickets?queue=unassigned', icon: InboxIcon, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter', 'Sales', 'Shipper'] },
+    { label: 'Manage Tickets', path: '/tickets?queue=all', icon: Inbox, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter', 'Sales', 'Sales Person', 'Shipper', 'Shipper Ops'] },
+    { label: 'Unassigned', path: '/tickets?queue=unassigned', icon: InboxIcon, roles: ['Super Admin', 'Manager', 'Operator', 'Agent', 'Transporter', 'Sales', 'Sales Person', 'Shipper', 'Shipper Ops'] },
     { label: 'SLA Risk', path: '/tickets?queue=sla-risk', icon: AlertTriangle, roles: ['Super Admin', 'Manager'] },
     { label: 'SLA Settings', path: '/sla', icon: Clock, roles: ['Super Admin', 'Manager'] },
     { label: 'User Management', path: '/users', icon: Users, roles: ['Super Admin', 'Manager'] },
