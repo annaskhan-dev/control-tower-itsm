@@ -4,12 +4,14 @@ import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
 import { Ticket, TicketSchema } from '../tickets/schemas/ticket.schema';
 import { DriverSupport, DriverSupportSchema } from '../driver-support/schemas/driver-support.schema';
+import { SessionLog, SessionLogSchema } from '../schemas/session-log.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Ticket.name, schema: TicketSchema },
       { name: DriverSupport.name, schema: DriverSupportSchema },
+      { name: SessionLog.name, schema: SessionLogSchema },
     ]),
   ],
   controllers: [ReportsController],
