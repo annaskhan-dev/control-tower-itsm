@@ -316,7 +316,7 @@ const normalizeTicket = (t, now) => {
 const CustomTooltip = memo(({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-900/95 backdrop-blur-sm text-white text-xs px-3 py-2 rounded-xl shadow-xl border border-slate-700/65">
+      <div className="bg-slate-900/95 backdrop-blur-sm text-white text-xs px-3 py-2 rounded-xl shadow-xl border border-slate-700/65 animate-in fade-in zoom-in-95 duration-150">
         {label && <p className="font-bold text-slate-300 mb-1">{label}</p>}
         {payload.map((entry, index) => (
           <div key={`tooltip-${index}`} className="flex items-center gap-2">
@@ -363,7 +363,7 @@ const GeneratorListCard = memo(
     const currentTheme = themeStyles[theme] || themeStyles.emerald;
 
     return (
-      <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-72">
+      <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between h-72">
         <div>
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
@@ -385,7 +385,7 @@ const GeneratorListCard = memo(
             data.map((item, idx) => (
               <div
                 key={`gen-row-${idx}`}
-                className="flex items-center justify-between py-1"
+                className="flex items-center justify-between py-1 transition-all"
               >
                 <span className="text-sm font-medium text-slate-700 truncate pr-2">
                   {item.name}
@@ -569,7 +569,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     [tickets, now],
   );
 
-  // Generate full year months dynamically (Jan - Dec) matching current year or latest tickets
   const fullYearMonths = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const monthsList = [
@@ -906,13 +905,16 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
   if (loading)
     return (
-      <div className="h-96 flex items-center justify-center">
-        <Loader2 className="animate-spin text-blue-600" size={32} />
+      <div className="h-96 flex flex-col items-center justify-center gap-3 animate-in fade-in duration-300">
+        <Loader2 className="animate-spin text-blue-600" size={36} />
+        <p className="text-xs font-medium text-slate-500 animate-pulse">
+          Loading dashboard metrics...
+        </p>
       </div>
     );
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 font-sans text-slate-800 p-4 sm:p-6 overflow-x-hidden">
+    <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 font-sans text-slate-800 p-4 sm:p-6 overflow-x-hidden animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -987,7 +989,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           <div
             key={item.label}
             onClick={() => setSelectedTab(item.tab)}
-            className={`p-4 bg-white border rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition cursor-pointer ${
+            className={`p-4 bg-white border rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-all cursor-pointer ${
               selectedTab === item.tab
                 ? "border-blue-500 ring-2 ring-blue-100"
                 : "border-slate-200/80"
@@ -1002,7 +1004,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
               </h3>
             </div>
             <div
-              className={`p-2.5 rounded-xl ${selectedTab === item.tab ? "bg-blue-50 text-blue-600" : "bg-slate-50 text-slate-600"}`}
+              className={`p-2.5 rounded-xl transition-all ${selectedTab === item.tab ? "bg-blue-50 text-blue-600" : "bg-slate-50 text-slate-600"}`}
             >
               <item.icon size={18} />
             </div>
@@ -1025,7 +1027,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           theme="emerald"
         />
 
-        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between">
+        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               SLA Health Distribution
@@ -1047,6 +1049,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                     outerRadius={54}
                     paddingAngle={4}
                     dataKey="value"
+                    isAnimationActive={true}
+                    animationDuration={800}
                   >
                     {chartData.slaPie.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1061,7 +1065,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
               {chartData.slaPie.map((item, idx) => (
                 <div
                   key={`sla-point-${idx}`}
-                  className="flex items-center justify-between bg-slate-50/80 p-1.5 rounded-lg border border-slate-100"
+                  className="flex items-center justify-between bg-slate-50/80 p-1.5 rounded-lg border border-slate-100 transition-all"
                 >
                   <div className="flex items-center gap-1.5">
                     <span
@@ -1093,7 +1097,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       </div>
 
       {/* Active Time & Monthly Average Card */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6">
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6 transition-all duration-300">
         <h3 className="text-lg font-semibold text-gray-800 mb-3">User Active Time & Monthly Averages</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-600">
@@ -1108,7 +1112,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
             <tbody>
               {activeTimes.length > 0 ? (
                 activeTimes.map((item, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-50">
+                  <tr key={index} className="border-b hover:bg-gray-50 transition-colors">
                     <td className="p-3 font-medium text-gray-900">{item.name}</td>
                     <td className="p-3">{item.role}</td>
                     <td className="p-3">{item.totalActiveHours ? item.totalActiveHours.toFixed(2) : 0} hrs</td>
@@ -1126,11 +1130,11 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       </div>
 
       {/* Month-on-Month Tickets Breakdown Card */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6">
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6 transition-all duration-300">
         <h3 className="text-lg font-semibold text-gray-800 mb-3">Month-on-Month Ticket Breakdown</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {fullYearMonths.map((row, index) => (
-            <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col justify-between">
+            <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col justify-between transition-all hover:shadow-xs">
               <div>
                 <span className="text-sm font-bold text-gray-700">Period: {row.period}</span>
                 <p className="text-xs text-gray-500 mt-1">
@@ -1143,7 +1147,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       </div>
 
       {/* Velocity Trend Chart */}
-      <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between">
+      <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
             Ticket Intake Velocity Trend
@@ -1163,7 +1167,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                   Math.max(1, Math.min(30, Number(e.target.value))),
                 )
               }
-              className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer"
+              className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer transition-all"
             >
               {[1, 3, 7, 14, 21, 30].map((d) => (
                 <option key={d} value={d}>
@@ -1215,7 +1219,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                   strokeWidth: 2,
                   stroke: "#ffffff",
                 }}
-                isAnimationActive={false}
+                isAnimationActive={true}
+                animationDuration={1000}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -1264,7 +1269,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
             <button
               key={p.key}
               onClick={() => setSelectedPriorityFilter(p.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition border flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border flex items-center gap-1.5 cursor-pointer ${
                 selectedPriorityFilter === p.key
                   ? "bg-slate-900 text-white border-slate-900 shadow-sm"
                   : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
@@ -1318,7 +1323,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
             <button
               key={tab.key}
               onClick={() => setSelectedTab(tab.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 selectedTab === tab.key
                   ? "bg-white text-slate-900 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -1331,7 +1336,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       </div>
 
       {/* Main Table Section Styled Based on Screenshot Layout */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden transition-all duration-300">
         {filteredTickets.length === 0 ? (
           <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
             <svg
