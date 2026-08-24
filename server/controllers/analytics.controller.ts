@@ -1,10 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { SessionLog, SessionLogDocument } from '../src/schemas/session-log.schema'; // Adjust path if needed
-import { Ticket, TicketDocument } from '../src/tickets/schemas/ticket.schema'; // Adjust path if needed
+import { SessionLog, SessionLogDocument } from '../src/schemas/session-log.schema'; 
+import { Ticket, TicketDocument } from '../src/tickets/schemas/ticket.schema'; 
 
-@Controller('analytics')
+@Controller('reports') // <-- Changed from 'analytics' to 'reports'
 export class AnalyticsController {
   constructor(
     @InjectModel(SessionLog.name) private sessionLogModel: Model<SessionLogDocument>,

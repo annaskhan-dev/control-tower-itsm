@@ -1,29 +1,31 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LoggerMiddleware } from '../middleware/logger.middleware';
+
+// Feature Modules
 import { AuthModule } from './auth/auth.module';
 import { DriverSupportModule } from './driver-support/driver-support.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { RoadAlertsModule } from './road-alerts/road-alerts.module';
 import { UsersModule } from './users/users.module';
 
-// 1. Import Schemas and Analytics Controller
+// Schemas & Controllers
 import { SessionLog, SessionLogSchema } from './schemas/session-log.schema';
-import { Ticket, TicketSchema } from './tickets/schemas/ticket.schema'; // Added Ticket schema import
+import { Ticket, TicketSchema } from './tickets/schemas/ticket.schema';
 import { AnalyticsController } from '../controllers/analytics.controller';
 
 @Module({
   imports: [
-    // 1. ConfigModule MUST be the first import to load variables globally
+    // 1. ConfigModule must be first to load environment variables globally
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
     }),
     
-    // 2. Updated to use MongooseModule.forRootAsync to safely resolve environment variables post-configuration load
+    // 2. Safely resolve environment variables post-configuration load
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -32,7 +34,7 @@ import { AnalyticsController } from '../controllers/analytics.controller';
       inject: [ConfigService],
     }),
 
-    // 3. Register SessionLog and Ticket schemas for dependency injection
+    // 3. Register global SessionLog and Ticket schemas for dependency injection
     MongooseModule.forFeature([
       { name: SessionLog.name, schema: SessionLogSchema },
       { name: Ticket.name, schema: TicketSchema },
@@ -46,18 +48,18 @@ import { AnalyticsController } from '../controllers/analytics.controller';
   ],
   controllers: [
     AppController,
-    AnalyticsController, // 4. Added AnalyticsController here
+    AnalyticsController,
   ],
   providers: [AppService],
 })
 export class AppModule {
   constructor() {
-    console.log('--- DEBUG: AppModule check ---');
+    console.log('--- DEBUG: AppModule initialized ---');
     console.log('JWT_SECRET is defined:', !!process.env.JWT_SECRET);
     console.log('MONGODB_URI is defined:', !!process.env.MONGODB_URI);
   }
 
-  configure(consumer: any) {
+  configure(consumer: MiddlewareConsumer) {
     consumer.apply(LoggerMiddleware).forRoutes('*');
   }
 }
