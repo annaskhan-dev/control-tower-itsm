@@ -38,16 +38,18 @@ export class TicketsService {
     }
   }
 
-  // FIXED: Strictly prioritize sub-assignment first so resolution credit goes to the sub-assignee (e.g., Ali)
-  private getEffectiveResolver(ticket: any): string {
-    const sub = ticket.subAssignment;
+  // FIXED: Strictly checks subAssignment first from either the updated ticket or fallback to existing record
+  private getEffectiveResolver(ticket: any, fallbackTicket?: any): string {
+    const sub = ticket?.subAssignment || fallbackTicket?.subAssignment;
     if (sub && typeof sub === 'string' && sub !== 'Unassigned' && sub.trim() !== '') {
       return sub.trim();
     }
-    const assignee = ticket.assignee || ticket.assignedTo;
+    
+    const assignee = ticket?.assignee || ticket?.assignedTo || fallbackTicket?.assignee || fallbackTicket?.assignedTo;
     if (assignee && typeof assignee === 'string' && assignee !== 'Unassigned' && assignee.trim() !== '') {
       return assignee.trim();
     }
+    
     return 'Unassigned';
   }
 
@@ -209,7 +211,8 @@ export class TicketsService {
     }
 
     if (isNewResolved && !isAlreadyResolved) {
-      const targetUser = this.getEffectiveResolver(updatedTicket);
+      // Pass both the updated ticket and existing ticket to guarantee subAssignment is caught
+      const targetUser = this.getEffectiveResolver(updatedTicket, existingTicket);
 
       if (targetUser && targetUser !== 'Unassigned') {
         try {
