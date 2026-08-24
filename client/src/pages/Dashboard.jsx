@@ -11,6 +11,7 @@ import { fetchTicketStats } from "../api/axiosInstance";
 import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
 import api, { fetchActiveTimeStats, fetchMonthOnMonthReport } from "../services/api";
+import axios from 'axios';
 import {
   XAxis,
   YAxis,
@@ -431,8 +432,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   const loading = contextLoading && (!tickets || tickets.length === 0);
 
   const [backendStats, setBackendStats] = useState(null);
-  const [activeTimeStatsData, setActiveTimeStatsData] = useState([]);
-  const [momReportData, setMomReportData] = useState([]);
+  const [activeTimes, setActiveTimes] = useState([]);
+  const [monthOnMonth, setMonthOnMonth] = useState([]);
   const [now, setNow] = useState(() => new Date());
 
   const [velocityDays, setVelocityDays] = useState(7);
@@ -487,17 +488,21 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           setBackendStats(data);
         }
 
-        const activeTimeRes = await fetchActiveTimeStats();
-        if (activeTimeRes && isMounted) {
-          setActiveTimeStatsData(activeTimeRes);
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+        const baseUrl = 'https://control-tower-itsm-production.up.railway.app';
+
+        const activeRes = await axios.get(`${baseUrl}/reports/active-time`, { headers });
+        if (activeRes.data && isMounted) {
+          setActiveTimes(activeRes.data);
         }
 
-        const momRes = await fetchMonthOnMonthReport();
-        if (momRes && isMounted) {
-          setMomReportData(momRes);
+        const momRes = await axios.get(`${baseUrl}/reports/month-on-month`, { headers });
+        if (momRes.data && isMounted) {
+          setMonthOnMonth(momRes.data);
         }
       } catch (err) {
-        console.error("Failed to load backend stats:", err);
+        console.error("Error fetching dashboard analytics:", err);
       }
     };
     getStatsData();
@@ -1054,6 +1059,60 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
               Total Monitored: {stats.total}
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* Active Time & Monthly Average Card */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-3">User Active Time & Monthly Averages</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-gray-600">
+            <thead className="bg-gray-50 uppercase text-xs text-gray-500">
+              <tr>
+                <th className="p-3">User / Operator</th>
+                <th className="p-3">Role</th>
+                <th className="p-3">Total Active Hours</th>
+                <th className="p-3">Avg Hours / Session</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeTimes.length > 0 ? (
+                activeTimes.map((item, index) => (
+                  <tr key={index} className="border-b hover:bg-gray-50">
+                    <td className="p-3 font-medium text-gray-900">{item.name}</td>
+                    <td className="p-3">{item.role}</td>
+                    <td className="p-3">{item.totalActiveHours ? item.totalActiveHours.toFixed(2) : 0} hrs</td>
+                    <td className="p-3">{item.averageActiveHoursPerSession ? item.averageActiveHoursPerSession.toFixed(2) : 0} hrs</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4" className="p-4 text-center text-gray-400">No session active data available yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Month-on-Month Tickets Tab/Card */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-3">Month-on-Month Ticket Breakdown</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {monthOnMonth.length > 0 ? (
+            monthOnMonth.map((row, index) => (
+              <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
+                <div>
+                  <span className="text-sm font-bold text-gray-700">Period: {row._id}</span>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Created: <span className="font-semibold text-blue-600">{row.totalCreated}</span> | Resolved: <span className="font-semibold text-green-600">{row.totalResolved}</span>
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-gray-400 p-2">No month-on-month data recorded yet.</p>
+          )}
         </div>
       </div>
 
