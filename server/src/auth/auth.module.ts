@@ -1,7 +1,8 @@
+// src/auth/auth.module.ts
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { MongooseModule } from '@nestjs/mongoose'; // <--- Import MongooseModule
+import { MongooseModule } from '@nestjs/mongoose';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -9,7 +10,7 @@ import { RolesGuard } from './roles.guard';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config'; 
-import { SessionLog, SessionLogSchema } from '../schemas/session-log.schema'; // <--- Import SessionLog schema
+import { SessionLog, SessionLogSchema } from '../schemas/session-log.schema';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { SessionLog, SessionLogSchema } from '../schemas/session-log.schema'; //
     UsersModule,
     ConfigModule, 
     MongooseModule.forFeature([
-      { name: SessionLog.name, schema: SessionLogSchema }, // <--- Register SessionLog model locally in AuthModule
+      { name: SessionLog.name, schema: SessionLogSchema },
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -38,7 +39,8 @@ import { SessionLog, SessionLogSchema } from '../schemas/session-log.schema'; //
   exports: [
     AuthService, 
     JwtAuthGuard, 
-    RolesGuard
+    RolesGuard,
+    UsersModule, // <--- Export UsersModule so TicketsModule can access the User model
   ],
 })
 export class AuthModule {}
