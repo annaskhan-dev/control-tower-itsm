@@ -494,7 +494,7 @@ export const TicketDetail = () => {
                   title={isStatusLockedBySubAssignment ? "Primary assignees cannot change ticket status once sub-assigned" : ""}
                   className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
-                  {["Open", "In Progress", "Resolved", "Closed"].map((o) => <option key={o} value={o}>{o}</option>)}
+                  {["Open", "In Progress", "Resolved"].map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
                 {isStatusLockedBySubAssignment && (
                   <span className="text-[9px] text-amber-600 mt-0.5 block">Status change locked because ticket is sub-assigned.</span>
