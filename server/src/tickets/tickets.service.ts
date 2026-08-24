@@ -198,7 +198,6 @@ export class TicketsService {
       if (isNewResolved) {
         updateData.resolvedAt = new Date();
 
-        // FIX: Ensure active subAssignment isn't accidentally overwritten with null if only status is patched
         if (!updateData.subAssignment && existingTicket.subAssignment) {
           updateData.subAssignment = existingTicket.subAssignment;
         }
@@ -207,8 +206,6 @@ export class TicketsService {
       }
     }
 
-    // FIX: If the user is resolving the ticket right now and subAssignment wasn't explicitly passed in updateTicketDto,
-    // explicitly ensure subAssignment is preserved in updateData so findOneAndUpdate stores it accurately.
     if (isNewResolved && !isAlreadyResolved) {
       if (!updateData.subAssignment && existingTicket.subAssignment) {
         updateData.subAssignment = existingTicket.subAssignment;
@@ -224,7 +221,6 @@ export class TicketsService {
     }
 
     if (isNewResolved && !isAlreadyResolved) {
-      // Pass the fully updatedTicket first so getEffectiveResolver checks updated subAssignment/assignee
       const targetUser = this.getEffectiveResolver(updatedTicket, existingTicket);
 
       if (targetUser && targetUser !== 'Unassigned') {
@@ -234,6 +230,8 @@ export class TicketsService {
               companyId, 
               $or: [
                 { name: new RegExp(`^${targetUser}$`, 'i') }, 
+                { fullName: new RegExp(`^${targetUser}$`, 'i') },
+                { username: new RegExp(`^${targetUser}$`, 'i') },
                 { email: new RegExp(`^${targetUser}$`, 'i') },
                 { role: new RegExp(`^${targetUser}$`, 'i') }
               ] 
