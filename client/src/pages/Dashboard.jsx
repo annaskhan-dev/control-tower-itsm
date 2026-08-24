@@ -487,7 +487,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           setBackendStats(data);
         }
 
-        // Use pre-configured api instance to prevent path structure conflicts
         const activeRes = await api.get('/reports/active-time');
         if (activeRes.data && isMounted) {
           setActiveTimes(activeRes.data);
@@ -1091,18 +1090,24 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Month-on-Month Tickets Tab/Card */}
+      {/* Month-on-Month Tickets Breakdown Card */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-3">Month-on-Month Ticket Breakdown</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {monthOnMonth.length > 0 ? (
             monthOnMonth.map((row, index) => (
-              <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
+              <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col justify-between">
                 <div>
-                  <span className="text-sm font-bold text-gray-700">Period: {row._id}</span>
+                  <span className="text-sm font-bold text-gray-700">Period: {row.period || `${row.month}, ${row.year}`}</span>
                   <p className="text-xs text-gray-500 mt-1">
-                    Created: <span className="font-semibold text-blue-600">{row.totalCreated}</span> | Resolved: <span className="font-semibold text-green-600">{row.totalResolved}</span>
+                    Created: <span className="font-semibold text-blue-600">{row.ticketsCreated}</span> | Resolved: <span className="font-semibold text-green-600">{row.ticketsResolved}</span>
                   </p>
+                </div>
+                <div className="mt-3 text-xs text-slate-500 border-t border-slate-200/60 pt-2">
+                  <span className="font-semibold text-slate-700">Operators/Users:</span>{" "}
+                  {row.operators && row.operators.filter(Boolean).length > 0
+                    ? row.operators.filter(Boolean).join(", ")
+                    : "None assigned"}
                 </div>
               </div>
             ))
