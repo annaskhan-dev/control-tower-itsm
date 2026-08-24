@@ -4,7 +4,7 @@ import { Model } from 'mongoose';
 import { SessionLog, SessionLogDocument } from '../src/schemas/session-log.schema'; 
 import { Ticket, TicketDocument } from '../src/tickets/schemas/ticket.schema'; 
 
-@Controller('reports') // <-- Changed from 'analytics' to 'reports'
+@Controller('reports') 
 export class AnalyticsController {
   constructor(
     @InjectModel(SessionLog.name) private sessionLogModel: Model<SessionLogDocument>,
@@ -60,7 +60,9 @@ export class AnalyticsController {
                 { 
                   $or: [
                     { $eq: ['$status', 'Resolved'] },
+                    { $eq: ['$status', 'resolved'] },
                     { $eq: ['$status', 'closed'] },
+                    { $eq: ['$status', 'Closed'] },
                     { $eq: ['$status', 'Resolved/Closed'] }
                   ] 
                 }, 
@@ -77,6 +79,31 @@ export class AnalyticsController {
           _id: 0,
           year: '$_id.year',
           month: '$_id.month',
+          period: {
+            $concat: [
+              {
+                $switch: {
+                  branches: [
+                    { case: { $eq: ['$_id.month', 1] }, then: 'January' },
+                    { case: { $eq: ['$_id.month', 2] }, then: 'February' },
+                    { case: { $eq: ['$_id.month', 3] }, then: 'March' },
+                    { case: { $eq: ['$_id.month', 4] }, then: 'April' },
+                    { case: { $eq: ['$_id.month', 5] }, then: 'May' },
+                    { case: { $eq: ['$_id.month', 6] }, then: 'June' },
+                    { case: { $eq: ['$_id.month', 7] }, then: 'July' },
+                    { case: { $eq: ['$_id.month', 8] }, then: 'August' },
+                    { case: { $eq: ['$_id.month', 9] }, then: 'September' },
+                    { case: { $eq: ['$_id.month', 10] }, then: 'October' },
+                    { case: { $eq: ['$_id.month', 11] }, then: 'November' },
+                    { case: { $eq: ['$_id.month', 12] }, then: 'December' },
+                  ],
+                  default: 'Unknown',
+                },
+              },
+              ' ',
+              { $toString: '$_id.year' },
+            ],
+          },
           ticketsCreated: 1,
           ticketsResolved: 1,
           operators: 1,
