@@ -180,29 +180,31 @@ export class TicketsController {
     const currentStatus = (existingTicket.status || '').toLowerCase();
     const isAlreadyResolved = ['closed', 'resolved', 'completed', 'done'].includes(currentStatus);
 
+    // Rule: Once a ticket is resolved/closed, it cannot be modified or opened again
     if (isAlreadyResolved) {
+      const isTryingToChangeStatus = updateTicketDto.status !== undefined && 
+        !['closed', 'resolved', 'completed', 'done'].includes(updateTicketDto.status.toLowerCase());
+
       const isChangingCategory = updateTicketDto.category !== undefined && updateTicketDto.category !== existingTicket.category;
       const isChangingSubAssignment = 'subAssignment' in updateTicketDto && updateTicketDto.subAssignment !== existingTicket.subAssignment;
 
-      if (isChangingCategory || isChangingSubAssignment) {
-        throw new BadRequestException('Cannot modify category or sub-assignment once a ticket is resolved or closed.');
+      if (isTryingToChangeStatus || isChangingCategory || isChangingSubAssignment) {
+        throw new BadRequestException('Once a ticket has been resolved or closed, it cannot be reopened or modified.');
       }
     }
 
     const currentUserName = this.extractUserName(req.user);
     const userRole = req.user.role;
 
-    // Requirement: When a ticket is sub-assigned, primary assignees cannot change status, 
+    // Rule: When a ticket is sub-assigned, primary assignees cannot change status, 
     // but the assigned sub-assignee, Managers, and Super Admins can.
     const hasSubAssignment = Boolean(existingTicket.subAssignment);
     const isTryingToChangeStatus = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
     const isManagerOrAdmin = ['Manager', 'Super Admin'].includes(userRole);
 
-    // Dynamically check if the current user is the sub-assignee assigned to this ticket
     const isSubAssignee = existingTicket.subAssignment && 
       existingTicket.subAssignment.trim().toLowerCase() === currentUserName.trim().toLowerCase();
 
-    // Block status change only if sub-assigned, trying to change status, AND user is NOT manager/admin and NOT the sub-assignee
     if (hasSubAssignment && isTryingToChangeStatus && !isManagerOrAdmin && !isSubAssignee) {
       throw new BadRequestException('Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.');
     }
