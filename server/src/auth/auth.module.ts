@@ -6,6 +6,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
 import { UsersModule } from '../users/users.module';
+import { DriverSupportModule } from '../driver-support/driver-support.module';
 import { AuthController } from './auth.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config'; 
 
@@ -13,6 +14,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
   imports: [
     PassportModule,
     UsersModule, // This gives AuthModule access to everything exported by UsersModule
+    DriverSupportModule, // Gives AuthModule access to SessionLogModel
     ConfigModule, 
     JwtModule.registerAsync({
       imports: [ConfigModule],
