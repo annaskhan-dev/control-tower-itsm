@@ -607,7 +607,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   const tickets =
     propTickets && propTickets.length > 0 ? propTickets : contextTickets;
   
-  // 🚀 Instantly unlock UI if tickets are already cached or available
   const [isDataLoading, setIsDataLoading] = useState(!tickets || tickets.length === 0);
 
   const [backendStats, setBackendStats] = useState(null);
@@ -667,7 +666,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       hasFetchedStatsRef.current = true;
 
       try {
-        // 🚀 Non-blocking concurrent requests executed in background
         const statsPromise = fetchTicketStats().then((data) => {
           if (data && isMounted) setBackendStats(data);
         }).catch((err) => console.error("Stats error:", err));
@@ -692,7 +690,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
     getStatsData();
 
-    // 🚀 Fallback safety guard so the skeleton spinner never locks the page longer than 300ms
     const safetyTimer = setTimeout(() => {
       if (isMounted) setIsDataLoading(false);
     }, 300);
@@ -904,8 +901,14 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
       if (isClosed) {
         closedCount++;
-        // 🛠️ Fixed to track all resolved tickets across operators or fallback correctly so total matches
-        const operatorKey = t.isAssigned && t.assigneeName ? t.assigneeName : "Unassigned / Other";
+        // 🛠️ FIX: Prioritize sub-assignee for resolution credit if assigned, otherwise primary assignee or unassigned fallback
+        let operatorKey = "Unassigned / Other";
+        if (t.isSubAssigned && t.subAssignmentName && t.subAssignmentName !== "None") {
+          operatorKey = t.subAssignmentName;
+        } else if (t.isAssigned && t.assigneeName) {
+          operatorKey = t.assigneeName;
+        }
+        
         operatorResolvedMap[operatorKey] = (operatorResolvedMap[operatorKey] || 0) + 1;
       } else {
         openCount++;
