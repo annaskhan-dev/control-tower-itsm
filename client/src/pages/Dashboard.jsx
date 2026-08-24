@@ -619,6 +619,11 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   const [selectedPriorityFilter, setSelectedPriorityFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [operators, setOperators] = useState([]);
+  
+  // Filter state for Month-on-Month breakdown (defaults to current month name e.g., "August")
+  const currentYearStr = new Date().getFullYear().toString();
+  const currentMonthName = new Date().toLocaleString("en-US", { month: "long" });
+  const [selectedMomMonth, setSelectedMomMonth] = useState(currentMonthName);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000);
@@ -790,12 +795,17 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       const existingData = dataMap[periodStr] || dataMap[`${mName} ${currentYear}`];
 
       return {
+        month: mName,
         period: periodStr,
         ticketsCreated: existingData ? existingData.ticketsCreated : createdCount,
         ticketsResolved: existingData ? existingData.ticketsResolved : resolvedCount,
       };
     });
   }, [monthOnMonth, normalizedTickets]);
+
+  const filteredMonthData = useMemo(() => {
+    return fullYearMonths.filter((row) => row.month === selectedMomMonth);
+  }, [fullYearMonths, selectedMomMonth]);
 
   const formatDate = useCallback((dateString) => {
     if (!dateString) return "—";
@@ -901,7 +911,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
       if (isClosed) {
         closedCount++;
-        // 🛠️ FIX: Prioritize sub-assignee for resolution credit if assigned, otherwise primary assignee or unassigned fallback
         let operatorKey = "Unassigned / Other";
         if (t.isSubAssigned && t.subAssignmentName && t.subAssignmentName !== "None") {
           operatorKey = t.subAssignmentName;
@@ -1353,19 +1362,40 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Month-on-Month Tickets Breakdown Card */}
+      {/* Month-on-Month Tickets Breakdown Card with Filter */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6 transition-all duration-300">
-        <h3 className="text-lg font-semibold text-gray-800 mb-3">Month-on-Month Ticket Breakdown</h3>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+          <h3 className="text-lg font-semibold text-gray-800">Month-on-Month Ticket Breakdown</h3>
+          <div className="flex items-center gap-2">
+            <label htmlFor="mom-month-select" className="text-xs text-gray-500 font-medium">
+              Filter Month:
+            </label>
+            <select
+              id="mom-month-select"
+              value={selectedMomMonth}
+              onChange={(e) => setSelectedMomMonth(e.target.value)}
+              className="text-xs font-bold bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer transition-all"
+            >
+              {[
+                "January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"
+              ].map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {isDataLoading ? (
-            [1, 2, 3].map((i) => (
-              <div key={i} className="p-4 bg-gray-50 rounded-xl border border-gray-100 h-20 animate-pulse flex flex-col justify-center gap-2">
-                <div className="h-4 bg-slate-200 rounded w-28" />
-                <div className="h-3 bg-slate-200 rounded w-40" />
-              </div>
-            ))
-          ) : (
-            fullYearMonths.map((row, index) => (
+            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 h-20 animate-pulse flex flex-col justify-center gap-2">
+              <div className="h-4 bg-slate-200 rounded w-28" />
+              <div className="h-3 bg-slate-200 rounded w-40" />
+            </div>
+          ) : filteredMonthData.length > 0 ? (
+            filteredMonthData.map((row, index) => (
               <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col justify-between transition-all hover:shadow-xs">
                 <div>
                   <span className="text-sm font-bold text-gray-700">Period: {row.period}</span>
@@ -1375,6 +1405,10 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                 </div>
               </div>
             ))
+          ) : (
+            <div className="col-span-full p-6 text-center text-xs text-gray-400 italic">
+              No ticket metrics found for {selectedMomMonth}.
+            </div>
           )}
         </div>
       </div>
