@@ -197,6 +197,11 @@ export class TicketsService {
       isNewResolved = ['closed', 'resolved', 'completed', 'done'].includes(updateData.status.toLowerCase());
       if (isNewResolved) {
         updateData.resolvedAt = new Date();
+        
+        // CRITICAL FIX: Ensure subAssignment is preserved if the incoming update only changes status
+        if (!updateData.subAssignment && existingTicket.subAssignment) {
+          updateData.subAssignment = existingTicket.subAssignment;
+        }
       } else {
         updateData.resolvedAt = null;
       }
@@ -215,7 +220,6 @@ export class TicketsService {
 
       if (targetUser && targetUser !== 'Unassigned') {
         try {
-          // FIXED: Now checks name, email, or role so titles like "Shipper" match user records successfully
           await this.userModel.findOneAndUpdate(
             { 
               companyId, 
