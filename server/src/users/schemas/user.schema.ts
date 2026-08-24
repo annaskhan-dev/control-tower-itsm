@@ -30,6 +30,13 @@ export class User {
 
   @Prop()
   avatarColor!: string;
+
+  // Add these fields to track resolved/completed tickets for sub-assignees
+  @Prop({ default: 0 })
+  resolvedCount!: number;
+
+  @Prop({ default: 0 })
+  completedTickets!: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

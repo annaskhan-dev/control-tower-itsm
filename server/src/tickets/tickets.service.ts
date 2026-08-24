@@ -21,6 +21,7 @@ export class TicketsService {
   constructor(
     @InjectModel(Ticket.name) private ticketModel: Model<TicketDocument>,
     @InjectModel(SlaConfig.name) private slaConfigModel: Model<SlaConfigDocument>,
+    @InjectModel('User') private userModel: Model<any>, // Added user model injection for sub-assignee count incrementing if applicable
     private readonly ticketsGateway: TicketsGateway,
   ) {}
 
@@ -52,7 +53,6 @@ export class TicketsService {
       const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
       const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
 
-      // Fallback cleanly to the provided userName, avoiding generic fallback terms if possible
       const resolvedUserName = userName && userName !== 'User' ? userName : 'Ali';
       const ticketGenerator = createTicketDto.generator || `${resolvedUserName} (${userRole})`;
 
@@ -76,7 +76,6 @@ export class TicketsService {
       const createdTicket = new this.ticketModel(ticketData);
       const savedTicket = await createdTicket.save();
 
-      // Emit event scoped to company room
       this.ticketsGateway.emitTicketCreated(savedTicket, companyId);
       return savedTicket;
     } catch (error: any) {
@@ -142,6 +141,17 @@ export class TicketsService {
       }
     }
 
+    // REQUIREMENT 1: Primary Assignee Status Guard when a sub-assignee is present
+    if (updateTicketDto.status !== undefined && existingTicket.subAssignment) {
+      const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].some(r => normalizedRole.includes(r));
+      const isPrimaryAssignee = currentUserName && existingTicket.assignee && 
+        existingTicket.assignee.toLowerCase() === currentUserName.toLowerCase();
+
+      if (isPrimaryAssignee && !isManagerOrAdmin) {
+        throw new ForbiddenException('Primary assignees cannot change the ticket status once a sub-assignee is assigned.');
+      }
+    }
+
     const updateData: any = { ...updateTicketDto };
     delete updateData.slaDeadline;
 
@@ -168,8 +178,9 @@ export class TicketsService {
       }
     }
 
+    let isNewResolved = false;
     if (updateData.status !== undefined && updateData.status !== existingTicket.status) {
-      const isNewResolved = ['closed', 'resolved', 'completed', 'done'].includes(updateData.status.toLowerCase());
+      isNewResolved = ['closed', 'resolved', 'completed', 'done'].includes(updateData.status.toLowerCase());
       if (isNewResolved) {
         updateData.resolvedAt = new Date();
       } else {
@@ -183,6 +194,24 @@ export class TicketsService {
 
     if (!updatedTicket) {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
+    }
+
+    // REQUIREMENT 2: Increment resolved ticket count for sub-assignee only when transitioning to resolved/closed with both primary and sub-assignment active
+    if (isNewResolved && !isAlreadyResolved && updatedTicket.subAssignment && updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned') {
+      try {
+        await this.userModel.findOneAndUpdate(
+          { 
+            companyId, 
+            $or: [
+              { name: new RegExp(`^${updatedTicket.subAssignment}$`, 'i') }, 
+              { email: new RegExp(`^${updatedTicket.subAssignment}$`, 'i') }
+            ] 
+          },
+          { $inc: { resolvedCount: 1, completedTickets: 1 } } // Safely increments standard user metric tracking fields if present
+        );
+      } catch (counterErr: any) {
+      this.logger.warn(`Failed to increment sub-assignee resolved metrics: ${counterErr.message}`);
+    }
     }
 
     this.ticketsGateway.emitTicketUpdated(updatedTicket, companyId);
