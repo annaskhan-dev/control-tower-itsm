@@ -38,7 +38,7 @@ export class TicketsService {
     }
   }
 
-// Strictly enforces that subAssignment ALWAYS takes precedence for resolution credit if it exists
+  // Strictly enforces that subAssignment ALWAYS takes precedence for resolution credit if it exists
   private getEffectiveResolver(ticket: any, fallbackTicket?: any, updatePayload?: any): string {
     // 1. Check incoming update payload subAssignment first
     const payloadSub = updatePayload?.subAssignment;
@@ -192,18 +192,27 @@ export class TicketsService {
       }
     }
 
+    // Fixed Sub-Assignment and Timestamp Management
     if (updateData.subAssignment !== undefined) {
       const isActuallySubAssigned = updateData.subAssignment !== 'Unassigned' && updateData.subAssignment !== '' && updateData.subAssignment !== null;
 
       if (isActuallySubAssigned) {
         const isNewSubAssignment = updateData.subAssignment !== existingTicket.subAssignment;
         if (isNewSubAssignment || !existingTicket.subAssignmentAt) {
-          updateData.subAssignmentAt = new Date();
+          // If a new sub-assignee is picked or timestamp didn't exist, use the incoming payload time or current time
+          updateData.subAssignmentAt = updateData.subAssignmentAt ? new Date(updateData.subAssignmentAt) : new Date();
+        } else {
+          // Preserve existing subAssignmentAt so duration calculation stops accurately
+          updateData.subAssignmentAt = existingTicket.subAssignmentAt;
         }
       } else {
         updateData.subAssignment = null;
         updateData.subAssignmentAt = null;
       }
+    } else if (existingTicket.subAssignment) {
+      // Retain existing subAssignment and its timestamp on partial status-only updates
+      updateData.subAssignment = existingTicket.subAssignment;
+      updateData.subAssignmentAt = existingTicket.subAssignmentAt;
     }
 
     let isNewResolved = false;
@@ -216,11 +225,6 @@ export class TicketsService {
       }
     }
 
-    // Ensure subAssignment is retained safely if not explicitly sent in a status-only patch update payload
-    if (updateData.subAssignment === undefined && existingTicket.subAssignment) {
-      updateData.subAssignment = existingTicket.subAssignment;
-    }
-
     const updatedTicket = await this.ticketModel
       .findOneAndUpdate({ ...baseQuery, companyId }, updateData, { new: true, runValidators: true })
       .exec();
@@ -230,7 +234,6 @@ export class TicketsService {
     }
 
     if (isNewResolved && !isAlreadyResolved) {
-      // Pass updateTicketDto to ensure subAssignment context is evaluated directly
       const targetUser = this.getEffectiveResolver(updatedTicket, existingTicket, updateTicketDto);
 
       if (targetUser && targetUser !== 'Unassigned') {
