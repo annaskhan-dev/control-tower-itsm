@@ -211,17 +211,18 @@ export class TicketsService {
     }
 
     if (isNewResolved && !isAlreadyResolved) {
-      // Pass both the updated ticket and existing ticket to guarantee subAssignment is caught
       const targetUser = this.getEffectiveResolver(updatedTicket, existingTicket);
 
       if (targetUser && targetUser !== 'Unassigned') {
         try {
+          // FIXED: Now checks name, email, or role so titles like "Shipper" match user records successfully
           await this.userModel.findOneAndUpdate(
             { 
               companyId, 
               $or: [
                 { name: new RegExp(`^${targetUser}$`, 'i') }, 
-                { email: new RegExp(`^${targetUser}$`, 'i') }
+                { email: new RegExp(`^${targetUser}$`, 'i') },
+                { role: new RegExp(`^${targetUser}$`, 'i') }
               ] 
             },
             { $inc: { resolvedCount: 1, completedTickets: 1 } }
