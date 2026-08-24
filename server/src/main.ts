@@ -30,6 +30,7 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization, x-company-id',
     credentials: true,
+    optionsSuccessStatus: 204, // Ensures preflight requests resolve correctly across all browsers
   });
 
   const port = parseInt(process.env.PORT || '5000', 10);
