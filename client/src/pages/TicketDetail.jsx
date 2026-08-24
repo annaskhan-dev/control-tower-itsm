@@ -98,6 +98,16 @@ export const TicketDetail = () => {
     return assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
   }, [ticket]);
 
+  // Check if current user is the primary assignee
+  const currentUserName = (user?.name || user?.username || "").trim().toLowerCase();
+  
+  let rawAssigneeObj = ticket?.assignee || ticket?.assignedTo || ticket?.assigned_to || "";
+  if (typeof rawAssigneeObj === "object" && rawAssigneeObj !== null) {
+    rawAssigneeObj = rawAssigneeObj.name || rawAssigneeObj.fullName || rawAssigneeObj.email || "";
+  }
+  const primaryAssigneeName = (typeof rawAssigneeObj === "string" ? rawAssigneeObj : "").trim().toLowerCase();
+  const isCurrentUserPrimaryAssigned = primaryAssigneeName !== "" && currentUserName === primaryAssigneeName;
+
   // Check if ticket has a sub-assignment active
   const hasSubAssignment = useMemo(() => {
     if (!ticket) return false;
@@ -110,8 +120,6 @@ export const TicketDetail = () => {
   }, [ticket]);
 
   // Check if current user is the sub-assignee
-  const currentUserName = (user?.name || user?.username || "").trim().toLowerCase();
-  
   let rawSubAssigneeObj = ticket?.subAssignment || ticket?.sub_assignment || ticket?.subAssignedTo || ticket?.sub_assigned_to || "";
   if (typeof rawSubAssigneeObj === "object" && rawSubAssigneeObj !== null) {
     rawSubAssigneeObj = rawSubAssigneeObj.name || rawSubAssigneeObj.fullName || rawSubAssigneeObj.email || "";
@@ -119,8 +127,8 @@ export const TicketDetail = () => {
   const subAssigneeName = (typeof rawSubAssigneeObj === "string" ? rawSubAssigneeObj : "").trim().toLowerCase();
   const isCurrentUserSubAssigned = subAssigneeName !== "" && currentUserName === subAssigneeName;
 
-  // Requirement Check: When a ticket is sub-assigned, status is locked only if user is restricted AND not the sub-assignee
-  const isStatusLockedBySubAssignment = hasSubAssignment && isRestricted && !isCurrentUserSubAssigned;
+  // Requirement Check: Lock status if sub-assigned AND the current user is the primary assignee (or a restricted user who isn't the sub-assignee)
+  const isStatusLockedBySubAssignment = hasSubAssignment && (isCurrentUserPrimaryAssigned || (isRestricted && !isCurrentUserSubAssigned));
 
   useEffect(() => {
     if (ticket) {
