@@ -39,12 +39,20 @@ export class TicketsService {
   }
 
   // Strictly enforces sub-assignment priority over primary assignee when checking resolver credit
-  private getEffectiveResolver(ticket: any, fallbackTicket?: any): string {
+  private getEffectiveResolver(ticket: any, fallbackTicket?: any, updatePayload?: any): string {
+    // 1. Check incoming update payload first if provided
+    const payloadSub = updatePayload?.subAssignment;
+    if (payloadSub !== undefined && payloadSub !== null && payloadSub !== 'Unassigned' && String(payloadSub).trim() !== '') {
+      return String(payloadSub).trim();
+    }
+
+    // 2. Check current ticket or fallback ticket subAssignment
     const sub = ticket?.subAssignment || fallbackTicket?.subAssignment;
     if (sub && typeof sub === 'string' && sub !== 'Unassigned' && sub.trim() !== '' && sub !== 'null') {
       return sub.trim();
     }
 
+    // 3. Fallback to primary assignee ONLY if no sub-assignment exists anywhere
     const assignee = ticket?.assignee || ticket?.assignedTo || fallbackTicket?.assignee || fallbackTicket?.assignedTo;
     if (assignee && typeof assignee === 'string' && assignee !== 'Unassigned' && assignee.trim() !== '' && assignee !== 'null') {
       return assignee.trim();
@@ -216,7 +224,8 @@ export class TicketsService {
     }
 
     if (isNewResolved && !isAlreadyResolved) {
-      const targetUser = this.getEffectiveResolver(updatedTicket, existingTicket);
+      // Pass updateTicketDto to ensure subAssignment context is evaluated directly
+      const targetUser = this.getEffectiveResolver(updatedTicket, existingTicket, updateTicketDto);
 
       if (targetUser && targetUser !== 'Unassigned') {
         try {
