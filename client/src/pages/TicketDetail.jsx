@@ -127,8 +127,8 @@ export const TicketDetail = () => {
   const subAssigneeName = (typeof rawSubAssigneeObj === "string" ? rawSubAssigneeObj : "").trim().toLowerCase();
   const isCurrentUserSubAssigned = subAssigneeName !== "" && currentUserName === subAssigneeName;
 
-  // Requirement Check: Lock status if sub-assigned AND the current user is the primary assignee (or a restricted user who isn't the sub-assignee)
-  const isStatusLockedBySubAssignment = hasSubAssignment && (isCurrentUserPrimaryAssigned || (isRestricted && !isCurrentUserSubAssigned));
+  // Requirement Check: Lock status if sub-assigned AND the user is NOT the sub-assignee and NOT a manager/admin
+  const isStatusLockedBySubAssignment = hasSubAssignment && !isCurrentUserSubAssigned && !isManagerOrAdmin;
 
   useEffect(() => {
     if (ticket) {
@@ -232,7 +232,7 @@ export const TicketDetail = () => {
   const handleUpdate = async (updatedFields) => {
     if (!ticket) return;
 
-    // Permanent fix: Prevent sending requests if status is locked by sub-assignment rules
+    // Prevent sending requests if status is locked by sub-assignment rules
     if ('status' in updatedFields && isStatusLockedBySubAssignment) {
       alert("Action blocked: Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.");
       return;
