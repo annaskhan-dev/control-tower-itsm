@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
@@ -153,14 +153,14 @@ export const TicketDetail = () => {
   }, [ticket, companyUsers]);
 
   // Duration formatting helper synchronized with TicketList
-  const formatDuration = (ms) => {
+  const formatDuration = useCallback((ms) => {
     if (ms === null || ms === undefined || isNaN(ms)) return "—";
     if (ms < 60000) return "Just now";
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
     if (hours === 0 && mins === 0) return "Just now";
     return `${hours}h ${mins}m`;
-  };
+  }, []);
 
   // Computed timing metrics synchronized with backend & TicketList logic
   const calculatedMetrics = useMemo(() => {
@@ -219,7 +219,7 @@ export const TicketDetail = () => {
       subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
       finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
     };
-  }, [ticket, now]);
+  }, [ticket, now, formatDuration]);
 
   const calculateDeadline = (category, priority) => {
     const rule = slaConfigs.find(
