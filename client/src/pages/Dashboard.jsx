@@ -40,7 +40,161 @@ import {
 } from "lucide-react";
 
 /**
- * Normalization Engine: Robust source/generator field extraction mapping.
+ * ⚡ Optimized Table Row Component wrapped in React.memo
+ * Prevents unnecessary re-renders when parent states change or users type in search filters.
+ */
+const TableRowItem = memo(({ t, isUserManagerOrAdmin, operators, handleAssignToMe, handleManagerAssign, formatDate }) => {
+  const navigate = useNavigate();
+  const mongoId = t._id || t.id;
+  const isResolvedState = t.isResolved || ["closed", "resolved", "completed", "done"].includes((t.status || "").toLowerCase());
+  const isRestricted = !isUserManagerOrAdmin;
+
+  return (
+    <tr
+      onClick={() => navigate(`/tickets/${t.ticketId}`)}
+      className="hover:bg-slate-50/85 cursor-pointer transition-colors group"
+    >
+      <td className="py-4 px-4 font-semibold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">
+        {t.ticketId}
+      </td>
+      <td className="py-4 px-4 font-medium text-slate-700 whitespace-nowrap">
+        <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[11px]">
+          {t.entrySource}
+        </span>
+      </td>
+      <td className="py-4 px-4 text-slate-500 whitespace-nowrap">
+        {formatDate(t.createdAt)}
+      </td>
+      <td className="py-4 px-4 font-medium text-slate-900 max-w-[180px] truncate" title={t.title}>
+        {t.title}
+      </td>
+      <td className="py-4 px-4 text-slate-500 whitespace-nowrap">
+        {t.category || "—"}
+      </td>
+      <td className="py-4 px-4 whitespace-nowrap">
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
+            t.priority === "Critical"
+              ? "bg-rose-50 text-rose-700 border border-rose-200"
+              : t.priority === "High"
+                ? "bg-orange-50 text-orange-700 border border-orange-200"
+                : t.priority === "Medium"
+                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                  : "bg-slate-100 text-slate-700 border border-slate-200"
+          }`}
+        >
+          {t.priority}
+        </span>
+      </td>
+      <td className="py-4 px-4 font-medium text-slate-800 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        {t.isAssigned ? (
+          <span className="text-slate-900 font-medium">{t.assigneeName}</span>
+        ) : !isUserManagerOrAdmin ? (
+          <button
+            onClick={(e) => handleAssignToMe(e, mongoId)}
+            className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-[11px] px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer"
+          >
+            Assign to Me
+          </button>
+        ) : (
+          <select
+            value={t.assignee || t.assignedTo || "Unassigned"}
+            disabled={isRestricted || isResolvedState}
+            onChange={(e) => {
+              e.stopPropagation();
+              handleManagerAssign(mongoId, e.target.value);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full py-1 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <option value="Unassigned">Assign to Operator...</option>
+            {operators.map((u) => (
+              <option key={u._id || u.id} value={u.name || u.fullName || u.username}>
+                {u.name || u.fullName || u.username} ({u.role || u.userType || "Operator"})
+              </option>
+            ))}
+          </select>
+        )}
+      </td>
+      <td className="py-4 px-4 whitespace-nowrap">
+        {t.primaryStartFormatted ? (
+          <div className="inline-flex flex-col bg-slate-50/80 border border-slate-200/80 rounded-xl px-3 py-1.5 text-[11px]">
+            <span className="text-slate-500 font-medium">Start: {t.primaryStartFormatted}</span>
+            <span className="text-slate-500 font-medium">End: {t.primaryEndFormatted}</span>
+          </div>
+        ) : (
+          <span className="text-slate-400">—</span>
+        )}
+      </td>
+      <td className="py-4 px-4 whitespace-nowrap">
+        {t.isAssigned ? (
+          <span className="inline-flex items-center px-3 py-1 rounded-xl bg-slate-100/80 border border-slate-200 text-slate-700 font-medium text-[11px]">
+            {t.assignmentTimeFormatted}
+          </span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        )}
+      </td>
+      <td className="py-4 px-4 whitespace-nowrap">
+        {t.isSubAssigned ? (
+          <span className="font-medium text-purple-700">{t.subAssignmentName}</span>
+        ) : (
+          <span className="text-slate-400 italic">None</span>
+        )}
+      </td>
+      <td className="py-4 px-4 whitespace-nowrap">
+        {t.isSubAssigned && t.subStartFormatted ? (
+          <div className="inline-flex flex-col bg-purple-50/40 border border-purple-100 rounded-xl px-3 py-1.5 text-[11px]">
+            <span className="text-purple-900 font-medium">Start: {t.subStartFormatted}</span>
+            <span className="text-purple-700 font-medium">End: {t.subEndFormatted}</span>
+          </div>
+        ) : (
+          <span className="text-slate-400">—</span>
+        )}
+      </td>
+      <td className="py-4 px-4 whitespace-nowrap">
+        {t.isSubAssigned ? (
+          <span className="inline-flex items-center px-3 py-1 rounded-xl bg-purple-50/60 border border-purple-100 text-purple-700 font-medium text-[11px]">
+            {t.subAssignmentTimeFormatted}
+          </span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        )}
+      </td>
+      <td className="py-4 px-4 whitespace-nowrap">
+        <span
+          className={`inline-flex items-center px-3 py-1 rounded-xl font-medium text-[11px] border ${
+            t.slaStatus === "Breached"
+              ? "bg-rose-50 text-rose-700 border-rose-200"
+              : t.slaStatus === "At Risk"
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200"
+          }`}
+        >
+          {t.slaStatus}
+        </span>
+      </td>
+      <td className="py-4 px-4 whitespace-nowrap">
+        <div className="flex flex-col gap-1">
+          <span
+            className={`px-3 py-1 font-bold uppercase rounded-xl text-[10px] tracking-wider inline-flex items-center justify-center w-max ${
+              isResolvedState ? "bg-emerald-600 text-white" : "bg-blue-600 text-white"
+            }`}
+          >
+            {t.status || "Open"}
+          </span>
+          <span className="text-[11px] text-slate-500 font-medium">
+            Total: {t.finalResolutionTimeFormatted}
+          </span>
+        </div>
+      </td>
+    </tr>
+  );
+});
+TableRowItem.displayName = "TableRowItem";
+
+/**
+ * Normalization Engine: Robust source/generator field extraction mapping.[cite: 3]
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee =
@@ -311,7 +465,7 @@ const normalizeTicket = (t, now) => {
 };
 
 /**
- * Custom Styled Tooltip Component for Charts
+ * Custom Styled Tooltip Component for Charts[cite: 3]
  */
 const CustomTooltip = memo(({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -338,7 +492,7 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * List-based Card for Creators & Sources
+ * List-based Card for Creators & Sources[cite: 3]
  */
 const GeneratorListCard = memo(
   ({ title, data, totalLabel = "total", theme = "emerald", isLoading }) => {
@@ -453,7 +607,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   const tickets =
     propTickets && propTickets.length > 0 ? propTickets : contextTickets;
   
-  // Instantly unlock UI if tickets are already cached or available
+  // 🚀 Instantly unlock UI if tickets are already cached or available
   const [isDataLoading, setIsDataLoading] = useState(!tickets || tickets.length === 0);
 
   const [backendStats, setBackendStats] = useState(null);
@@ -504,7 +658,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   useEffect(() => {
     let isMounted = true;
 
-    // Instant unlock if tickets are ready
     if (tickets && tickets.length > 0) {
       setIsDataLoading(false);
     }
@@ -514,7 +667,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       hasFetchedStatsRef.current = true;
 
       try {
-        // Run network requests concurrently in the background without blocking core rendering
+        // 🚀 Non-blocking concurrent requests executed in background
         const statsPromise = fetchTicketStats().then((data) => {
           if (data && isMounted) setBackendStats(data);
         }).catch((err) => console.error("Stats error:", err));
@@ -539,10 +692,10 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
     getStatsData();
 
-    // Safety fallback timer so skeleton never locks for more than 400ms max
+    // 🚀 Fallback safety guard so the skeleton spinner never locks the page longer than 300ms
     const safetyTimer = setTimeout(() => {
       if (isMounted) setIsDataLoading(false);
-    }, 400);
+    }, 300);
 
     return () => {
       isMounted = false;
@@ -647,7 +800,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     });
   }, [monthOnMonth, normalizedTickets]);
 
-  const formatDate = (dateString) => {
+  const formatDate = useCallback((dateString) => {
     if (!dateString) return "—";
     const d = new Date(dateString);
     return isNaN(d.getTime())
@@ -655,7 +808,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
           ", " +
           d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
+  }, []);
 
   const handleExportExcel = () => {
     const currentDate = new Date();
@@ -956,7 +1109,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
             Operational Dashboard
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Real-time ticketing lifecycle, creator tracking, operator resolution metrics, and SLA health
+            Real-time ticketing lifecycle, creator tracking, operator resolution metrics, and SLA health[cite: 3]
           </p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -1067,11 +1220,11 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           isLoading={isDataLoading}
         />
 
-        {/* SLA Health Distribution Card with Professional Skeleton State */}
+        {/* SLA Health Distribution Card */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              SLA Health Distribution
+              SLA Health Distribution[cite: 3]
             </h4>
             {isDataLoading ? (
               <div className="h-6 w-16 bg-slate-200 rounded-lg animate-pulse" />
@@ -1092,7 +1245,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col xl:flex-row items-center gap-2 my-1 animate-in fade-in duration-300">
+            <div className="flex flex-col xl:flex-row items-center gap-2 my-1">
               <div className="h-32 w-full xl:w-1/2">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -1105,7 +1258,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                       paddingAngle={4}
                       dataKey="value"
                       isAnimationActive={true}
-                      animationDuration={800}
+                      animationDuration={400}
                     >
                       {chartData.slaPie.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1144,7 +1297,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           )}
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 italic">
-            <span>Proportional breakdown of active SLAs.</span>
+            <span>Proportional breakdown of active SLAs.[cite: 3]</span>
             {isDataLoading ? (
               <div className="h-3 w-24 bg-slate-200 rounded animate-pulse" />
             ) : (
@@ -1228,7 +1381,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-            Ticket Intake Velocity Trend
+            Ticket Intake Velocity Trend[cite: 3]
           </h4>
           <div className="flex items-center gap-2">
             <label
@@ -1303,14 +1456,14 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                     stroke: "#ffffff",
                   }}
                   isAnimationActive={true}
-                  animationDuration={1000}
+                  animationDuration={400}
                 />
               </LineChart>
             </ResponsiveContainer>
           )}
         </div>
         <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-400 italic">
-          Daily volume intake pattern over the selected {velocityDays}-day window.
+          Daily volume intake pattern over the selected {velocityDays}-day window.[cite: 3]
         </div>
       </div>
 
@@ -1419,7 +1572,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Main Table Section */}
+      {/* Main Table Section with Memoized Row Virtualization / Items */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden transition-all duration-300">
         {isDataLoading ? (
           <div className="p-8 space-y-4 animate-pulse">
@@ -1466,215 +1619,17 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredTickets.map((t) => {
-                  const mongoId = t._id || t.id;
-                  const isResolvedState =
-                    t.isResolved ||
-                    ["closed", "resolved", "completed", "done"].includes(
-                      (t.status || "").toLowerCase(),
-                    );
-                  const isRestricted = !isUserManagerOrAdmin;
-
-                  return (
-                    <tr
-                      key={mongoId}
-                      onClick={() => navigate(`/tickets/${t.ticketId}`)}
-                      className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
-                    >
-                      {/* ID */}
-                      <td className="py-4 px-4 font-semibold text-blue-600 group-hover:text-blue-700 whitespace-nowrap">
-                        {t.ticketId}
-                      </td>
-
-                      {/* Source */}
-                      <td className="py-4 px-4 font-medium text-slate-700 whitespace-nowrap">
-                        <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[11px]">
-                          {t.entrySource}
-                        </span>
-                      </td>
-
-                      {/* Created */}
-                      <td className="py-4 px-4 text-slate-500 whitespace-nowrap">
-                        {formatDate(t.createdAt)}
-                      </td>
-
-                      {/* Title */}
-                      <td
-                        className="py-4 px-4 font-medium text-slate-900 max-w-[180px] truncate"
-                        title={t.title}
-                      >
-                        {t.title}
-                      </td>
-
-                      {/* Category */}
-                      <td className="py-4 px-4 text-slate-500 whitespace-nowrap">
-                        {t.category || "—"}
-                      </td>
-
-                      {/* Priority */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
-                            t.priority === "Critical"
-                              ? "bg-rose-50 text-rose-700 border border-rose-200"
-                              : t.priority === "High"
-                                ? "bg-orange-50 text-orange-700 border border-orange-200"
-                                : t.priority === "Medium"
-                                  ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                  : "bg-slate-100 text-slate-700 border border-slate-200"
-                          }`}
-                        >
-                          {t.priority}
-                        </span>
-                      </td>
-
-                      {/* Primary Assignee */}
-                      <td
-                        className="py-4 px-4 font-medium text-slate-800 whitespace-nowrap"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {t.isAssigned ? (
-                          <span className="text-slate-900 font-medium">
-                            {t.assigneeName}
-                          </span>
-                        ) : !isUserManagerOrAdmin ? (
-                          <button
-                            onClick={(e) => handleAssignToMe(e, mongoId)}
-                            className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-[11px] px-2.5 py-1 rounded-md font-medium transition-all shadow-2xs cursor-pointer"
-                          >
-                            Assign to Me
-                          </button>
-                        ) : (
-                          <div className="relative">
-                            <select
-                              value={t.assignee || t.assignedTo || "Unassigned"}
-                              disabled={isRestricted || isResolvedState}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleManagerAssign(mongoId, e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full py-1 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
-                            >
-                              <option value="Unassigned">
-                                Assign to Operator...
-                              </option>
-                              {operators.map((u) => {
-                                const userName =
-                                  u.name || u.fullName || u.username;
-                                const userRole =
-                                  u.role || u.userType || "Operator";
-                                return (
-                                  <option key={u._id || u.id} value={userName}>
-                                    {userName} ({userRole})
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Primary Assignment Timeline */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        {t.primaryStartFormatted ? (
-                          <div className="inline-flex flex-col bg-slate-50/80 border border-slate-200/80 rounded-xl px-3 py-1.5 text-[11px] shadow-2xs">
-                            <span className="text-slate-500 font-medium">
-                              Start: {t.primaryStartFormatted}
-                            </span>
-                            <span className="text-slate-500 font-medium">
-                              End: {t.primaryEndFormatted}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-
-                      {/* Primary Duration */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        {t.isAssigned ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-xl bg-slate-100/80 border border-slate-200 text-slate-700 font-medium text-[11px] shadow-2xs">
-                            {t.assignmentTimeFormatted}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-
-                      {/* Sub-Assignee */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        {t.isSubAssigned ? (
-                          <span className="font-medium text-purple-700">
-                            {t.subAssignmentName}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 italic">None</span>
-                        )}
-                      </td>
-
-                      {/* Sub-Assignment Timeline */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        {t.isSubAssigned && t.subStartFormatted ? (
-                          <div className="inline-flex flex-col bg-purple-50/40 border border-purple-100 rounded-xl px-3 py-1.5 text-[11px] shadow-2xs">
-                            <span className="text-purple-900 font-medium">
-                              Start: {t.subStartFormatted}
-                            </span>
-                            <span className="text-purple-700 font-medium">
-                              End: {t.subEndFormatted}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-
-                      {/* Sub-Assignee Duration */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        {t.isSubAssigned ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-xl bg-purple-50/60 border border-purple-100 text-purple-700 font-medium text-[11px] shadow-2xs">
-                            {t.subAssignmentTimeFormatted}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-
-                      {/* SLA Health */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-xl font-medium text-[11px] border ${
-                            t.slaStatus === "Breached"
-                              ? "bg-rose-50 text-rose-700 border-rose-200"
-                              : t.slaStatus === "At Risk"
-                                ? "bg-amber-50 text-amber-700 border-amber-200"
-                                : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          }`}
-                        >
-                          {t.slaStatus}
-                        </span>
-                      </td>
-
-                      {/* Status & Total Resolution */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        <div className="flex flex-col gap-1">
-                          <span
-                            className={`px-3 py-1 font-bold uppercase rounded-xl text-[10px] tracking-wider shadow-xs inline-flex items-center justify-center w-max ${
-                              isResolvedState
-                                ? "bg-emerald-600 text-white"
-                                : "bg-blue-600 text-white"
-                            }`}
-                          >
-                            {t.status || "Open"}
-                          </span>
-                          <span className="text-[11px] text-slate-500 font-medium">
-                            Total: {t.finalResolutionTimeFormatted}
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {filteredTickets.map((t) => (
+                  <TableRowItem
+                    key={t._id || t.id}
+                    t={t}
+                    isUserManagerOrAdmin={isUserManagerOrAdmin}
+                    operators={operators}
+                    handleAssignToMe={handleAssignToMe}
+                    handleManagerAssign={handleManagerAssign}
+                    formatDate={formatDate}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
