@@ -38,6 +38,19 @@ export class TicketsService {
     }
   }
 
+  // Helper to extract the actual person who resolved/worked on the ticket (prioritizing sub-assignment)
+  private getEffectiveResolver(ticket: any): string {
+    const sub = ticket.subAssignment || ticket.subAssignee;
+    if (sub && typeof sub === 'string' && sub !== 'Unassigned' && sub.trim() !== '') {
+      return sub.trim();
+    }
+    const assignee = ticket.assignee || ticket.assignedTo;
+    if (assignee && typeof assignee === 'string' && assignee !== 'Unassigned' && assignee.trim() !== '') {
+      return assignee.trim();
+    }
+    return 'Unassigned';
+  }
+
   async create(
     createTicketDto: CreateTicketDto, 
     companyId: string, 
@@ -195,13 +208,11 @@ export class TicketsService {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
     }
 
-    // FIXED: Attribute user record increment strictly to subAssignment if present, otherwise primary assignee
+    // FIXED: Use getEffectiveResolver to correctly give credit to sub-assignee
     if (isNewResolved && !isAlreadyResolved) {
-      const targetUser = (updatedTicket.subAssignment && updatedTicket.subAssignment !== 'Unassigned' && updatedTicket.subAssignment.trim() !== '')
-        ? updatedTicket.subAssignment.trim()
-        : (updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned' ? updatedTicket.assignee.trim() : null);
+      const targetUser = this.getEffectiveResolver(updatedTicket);
 
-      if (targetUser) {
+      if (targetUser && targetUser !== 'Unassigned') {
         try {
           await this.userModel.findOneAndUpdate(
             { 
@@ -318,20 +329,13 @@ export class TicketsService {
       return acc;
     }, {});
 
-    // FIXED: Properly attribute resolved count to sub-assignee instead of falling back to Admin/primary assignee
+    // FIXED: Use getEffectiveResolver to aggregate stats accurately by sub-assignee
     const resolvedByOperatorStats = tickets.reduce((acc: any, ticket) => {
       const status = (ticket.status || '').toLowerCase();
       const isResolved = ['resolved', 'closed', 'completed', 'done'].includes(status);
       
       if (isResolved) {
-        let resolvedBy = 'Unassigned';
-
-        if (ticket.subAssignment && ticket.subAssignment !== 'Unassigned' && ticket.subAssignment.trim() !== '') {
-          resolvedBy = ticket.subAssignment.trim();
-        } else if (ticket.assignee && ticket.assignee !== 'Unassigned' && ticket.assignee.trim() !== '') {
-          resolvedBy = ticket.assignee.trim();
-        }
-
+        const resolvedBy = this.getEffectiveResolver(ticket);
         acc[resolvedBy] = (acc[resolvedBy] || 0) + 1;
       }
       return acc;
