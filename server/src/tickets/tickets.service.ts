@@ -38,21 +38,27 @@ export class TicketsService {
     }
   }
 
-  // Strictly enforces sub-assignment priority over primary assignee when checking resolver credit
+// Strictly enforces that subAssignment ALWAYS takes precedence for resolution credit if it exists
   private getEffectiveResolver(ticket: any, fallbackTicket?: any, updatePayload?: any): string {
-    // 1. Check incoming update payload first if provided
+    // 1. Check incoming update payload subAssignment first
     const payloadSub = updatePayload?.subAssignment;
-    if (payloadSub !== undefined && payloadSub !== null && payloadSub !== 'Unassigned' && String(payloadSub).trim() !== '') {
-      return String(payloadSub).trim();
+    if (payloadSub && typeof payloadSub === 'string' && payloadSub !== 'Unassigned' && payloadSub.trim() !== '' && payloadSub !== 'null') {
+      return payloadSub.trim();
     }
 
-    // 2. Check current ticket or fallback ticket subAssignment
-    const sub = ticket?.subAssignment || fallbackTicket?.subAssignment;
-    if (sub && typeof sub === 'string' && sub !== 'Unassigned' && sub.trim() !== '' && sub !== 'null') {
-      return sub.trim();
+    // 2. Check the updated ticket document's subAssignment
+    const ticketSub = ticket?.subAssignment;
+    if (ticketSub && typeof ticketSub === 'string' && ticketSub !== 'Unassigned' && ticketSub.trim() !== '' && ticketSub !== 'null') {
+      return ticketSub.trim();
     }
 
-    // 3. Fallback to primary assignee ONLY if no sub-assignment exists anywhere
+    // 3. Check fallback ticket subAssignment
+    const fallbackSub = fallbackTicket?.subAssignment;
+    if (fallbackSub && typeof fallbackSub === 'string' && fallbackSub !== 'Unassigned' && fallbackSub.trim() !== '' && fallbackSub !== 'null') {
+      return fallbackSub.trim();
+    }
+
+    // 4. ONLY if no sub-assignment exists anywhere, fallback to primary assignee
     const assignee = ticket?.assignee || ticket?.assignedTo || fallbackTicket?.assignee || fallbackTicket?.assignedTo;
     if (assignee && typeof assignee === 'string' && assignee !== 'Unassigned' && assignee.trim() !== '' && assignee !== 'null') {
       return assignee.trim();

@@ -260,7 +260,7 @@ export const TicketDetail = () => {
     }
 
     if ('subAssignment' in payload) {
-      const finalVal = subAssignment === "custom" ? customSubAssignment : payload.subAssignment;
+      const finalVal = payload.subAssignment === "custom" ? customSubAssignment : payload.subAssignment;
       payload.subAssignment = finalVal;
       
       if (finalVal && !ticket.subAssignment) {
@@ -282,8 +282,7 @@ export const TicketDetail = () => {
         payload.resolvedAt = null;
       }
 
-      // FIX: Ensure active subAssignment is explicitly carried over on status updates
-      // so the backend resolver helper gives resolution credit to the sub-assignee[cite: 1]
+      // Ensure active subAssignment is explicitly carried over on status updates[cite: 1]
       if (!payload.subAssignment && ticket.subAssignment) {
         payload.subAssignment = ticket.subAssignment;
       }
@@ -388,7 +387,10 @@ export const TicketDetail = () => {
                   <UserPlus size={16} className="text-blue-600" /> Sub Assignment
                 </h3>
                 <button
-                  onClick={() => handleUpdate({ subAssignment })}
+                  onClick={() => {
+                    const finalSubValue = subAssignment === "custom" ? customSubAssignment : subAssignment;
+                    handleUpdate({ subAssignment: finalSubValue });
+                  }}
                   disabled={isUpdating || isRestricted || !isPrimaryAssigned || isResolvedState}
                   className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer"
                 >
