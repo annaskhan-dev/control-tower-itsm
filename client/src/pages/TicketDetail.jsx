@@ -98,6 +98,20 @@ export const TicketDetail = () => {
     return assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
   }, [ticket]);
 
+  // Check if ticket has a sub-assignment active
+  const hasSubAssignment = useMemo(() => {
+    if (!ticket) return false;
+    let rawSub = ticket.subAssignment || ticket.sub_assignment || ticket.subAssignedTo || ticket.sub_assigned_to || "";
+    if (typeof rawSub === "object" && rawSub !== null) {
+      rawSub = rawSub.name || rawSub.fullName || rawSub.email || "";
+    }
+    const subName = typeof rawSub === "string" ? rawSub.trim() : "";
+    return subName !== "" && subName.toLowerCase() !== "unassigned";
+  }, [ticket]);
+
+  // Requirement Check: When a ticket is sub-assigned, primary assignees cannot change status
+  const isStatusLockedBySubAssignment = hasSubAssignment && isRestricted;
+
   useEffect(() => {
     if (ticket) {
       setDescription(ticket.description || "");
@@ -470,11 +484,21 @@ export const TicketDetail = () => {
                 )}
               </div>
 
+              {/* Status Section with Sub-Assignment Lock */}
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Status</label>
-                <select disabled={!canEditStatus} value={ticket.status || "Open"} onChange={(e) => handleUpdate({ status: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed">
+                <select 
+                  disabled={!canEditStatus || isStatusLockedBySubAssignment} 
+                  value={ticket.status || "Open"} 
+                  onChange={(e) => handleUpdate({ status: e.target.value })} 
+                  title={isStatusLockedBySubAssignment ? "Primary assignees cannot change ticket status once sub-assigned" : ""}
+                  className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                >
                   {["Open", "In Progress", "Resolved", "Closed"].map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
+                {isStatusLockedBySubAssignment && (
+                  <span className="text-[9px] text-amber-600 mt-0.5 block">Status change locked because ticket is sub-assigned.</span>
+                )}
               </div>
 
               <div>
