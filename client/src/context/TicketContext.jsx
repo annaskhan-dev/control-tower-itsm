@@ -4,7 +4,7 @@ import React, {
   useState, 
   useCallback, 
   useMemo, 
-   useRef 
+  useRef 
 } from "react";
 import { useAuth } from "./AuthContext";
 import axiosInstance from "../api/axiosInstance";
@@ -61,7 +61,22 @@ export const TicketProvider = ({ children }) => {
 
   const updateTicket = useCallback(async (id, updatedFields) => {
     try {
-      const response = await axiosInstance.patch(`/tickets/${id}`, updatedFields);
+      // Automatically track sub-assignment timestamps if sub-assignment fields change
+      let payload = { ...updatedFields };
+      if (
+        (payload.subAssignment !== undefined || payload.sub_assignment !== undefined || 
+         payload.subAssignedTo !== undefined || payload.sub_assigned_to !== undefined) &&
+        !payload.subAssignmentAt && !payload.sub_assigned_at && !payload.subAssignedAt
+      ) {
+        const val = payload.subAssignment ?? payload.sub_assignment ?? payload.subAssignedTo ?? payload.sub_assigned_to;
+        if (val && val.toLowerCase() !== "unassigned" && val !== "") {
+          payload.subAssignmentAt = new Date().toISOString();
+        } else {
+          payload.subAssignmentAt = null;
+        }
+      }
+
+      const response = await axiosInstance.patch(`/tickets/${id}`, payload);
       const updatedTicket = response.data.ticket || response.data;
       updateLocalTicket(id, updatedTicket);
       return updatedTicket;

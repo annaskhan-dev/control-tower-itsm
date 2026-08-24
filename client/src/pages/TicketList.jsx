@@ -70,7 +70,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
     e.stopPropagation();
     try {
       const currentUserName = user?.name || user?.username || user?.fullName || "Operator";
-      await updateTicket(mongoId, { assignee: currentUserName });
+      await updateTicket(mongoId, { 
+        assignee: currentUserName,
+        assignedAt: new Date().toISOString()
+      });
       fetchTickets(queue, true);
     } catch (err) {
       console.error("Failed to assign ticket to self", err);
@@ -81,7 +84,11 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   const handleManagerAssign = useCallback(async (mongoId, selectedOperatorName) => {
     if (!selectedOperatorName) return;
     try {
-      await updateTicket(mongoId, { assignee: selectedOperatorName });
+      const payload = {
+        assignee: selectedOperatorName,
+        assignedAt: selectedOperatorName === "Unassigned" ? null : new Date().toISOString()
+      };
+      await updateTicket(mongoId, payload);
       fetchTickets(queue, true);
     } catch (err) {
       console.error("Failed to assign ticket", err);
@@ -97,14 +104,15 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  const formatDuration = (ms) => {
+  // Synchronized with TicketDetail formatDuration logic[cite: 1]
+  const formatDuration = useCallback((ms) => {
     if (ms === null || ms === undefined || isNaN(ms)) return "—";
-    if (ms < 60000) return "< 1m"; 
+    if (ms < 60000) return "Just now";
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours === 0 && mins === 0) return "< 1m";
+    if (hours === 0 && mins === 0) return "Just now";
     return `${hours}h ${mins}m`;
-  };
+  }, []);
 
   const ticketData = useMemo(() => {
     if (!tickets) return [];
@@ -153,7 +161,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at || (isSubAssigned ? (t.updatedAt || t.createdAt) : null);
       const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
 
-      // 1. Primary Assignment Timeline Calculation
+      // 1. Primary Assignment Timeline Calculation (Synchronized with TicketDetail)[cite: 1]
       let primaryAssignmentMs = 0;
       let primaryStartFormatted = isAssigned ? formatDate(assignedAtRaw || t.createdAt) : "—";
       let primaryEndFormatted = isAssigned ? (isResolved ? "Resolved" : "Active") : "—";
@@ -168,9 +176,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         }
       }
 
+      // SLA Active Time anchored strictly to assignedAt matching detail component[cite: 1]
       const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
-      // 2. Sub-Assignment Timeline Calculation
+      // 2. Sub-Assignment Timeline Calculation (Synchronized with TicketDetail)[cite: 1]
       let subAssignmentTimeMs = 0;
       let subStartFormatted = "—";
       let subEndFormatted = "—";
@@ -208,7 +217,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
       };
     });
-  }, [tickets, now]);
+  }, [tickets, now, formatDuration]);
 
   const priorityCounts = useMemo(() => {
     const base = ticketData.filter((t) => {
