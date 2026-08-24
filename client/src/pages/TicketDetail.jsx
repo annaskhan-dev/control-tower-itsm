@@ -231,6 +231,13 @@ export const TicketDetail = () => {
 
   const handleUpdate = async (updatedFields) => {
     if (!ticket) return;
+
+    // Permanent fix: Prevent sending requests if status is locked by sub-assignment rules
+    if ('status' in updatedFields && isStatusLockedBySubAssignment) {
+      alert("Action blocked: Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.");
+      return;
+    }
+
     let payload = { ...updatedFields };
 
     if (payload.category) {
@@ -282,7 +289,8 @@ export const TicketDetail = () => {
       await axiosInstance.patch(`/tickets/${ticket._id}`, payload);
       await fetchTickets();
     } catch (err) {
-      alert("Update failed. Check your permissions.");
+      const errorMsg = err.response?.data?.message || "Update failed. Check your permissions.";
+      alert(errorMsg);
       await fetchTickets();
     } finally {
       setIsUpdating(false);
