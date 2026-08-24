@@ -101,8 +101,8 @@ export class TicketsController {
 
     const enrichedTicketDto = {
       ...createTicketDto,
-      generator: formattedSource, // Forces correct format: "Hamza (Operator)"
-      source: formattedSource,    // Synchronizes source field mapping
+      generator: formattedSource,
+      source: formattedSource,
     };
 
     this.logger.debug(`[POST /tickets] Creating ticket by user: ${userName}, role: ${userRole}, generator: ${enrichedTicketDto.generator}`);
@@ -192,13 +192,18 @@ export class TicketsController {
     const currentUserName = this.extractUserName(req.user);
     const userRole = req.user.role;
 
-    // Requirement 1: When a ticket is sub-assigned, primary assignees cannot change the status
+    // Requirement: When a ticket is sub-assigned, primary assignees cannot change status, 
+    // but the assigned sub-assignee, Managers, and Super Admins can.
     const hasSubAssignment = Boolean(existingTicket.subAssignment);
     const isTryingToChangeStatus = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
     const isManagerOrAdmin = ['Manager', 'Super Admin'].includes(userRole);
 
-    if (hasSubAssignment && isTryingToChangeStatus && !isManagerOrAdmin) {
-      // If the current user is the primary assignee (or someone other than manager/admin), prevent status change
+    // Dynamically check if the current user is the sub-assignee assigned to this ticket
+    const isSubAssignee = existingTicket.subAssignment && 
+      existingTicket.subAssignment.trim().toLowerCase() === currentUserName.trim().toLowerCase();
+
+    // Block status change only if sub-assigned, trying to change status, AND user is NOT manager/admin and NOT the sub-assignee
+    if (hasSubAssignment && isTryingToChangeStatus && !isManagerOrAdmin && !isSubAssignee) {
       throw new BadRequestException('Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.');
     }
 
