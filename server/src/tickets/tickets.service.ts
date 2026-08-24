@@ -195,20 +195,27 @@ export class TicketsService {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
     }
 
-    if (isNewResolved && !isAlreadyResolved && updatedTicket.subAssignment && updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned') {
-      try {
-        await this.userModel.findOneAndUpdate(
-          { 
-            companyId, 
-            $or: [
-              { name: new RegExp(`^${updatedTicket.subAssignment}$`, 'i') }, 
-              { email: new RegExp(`^${updatedTicket.subAssignment}$`, 'i') }
-            ] 
-          },
-          { $inc: { resolvedCount: 1, completedTickets: 1 } }
-        );
-      } catch (counterErr: any) {
-        this.logger.warn(`Failed to increment sub-assignee resolved metrics: ${counterErr.message}`);
+    // FIXED: Attribute user record increment strictly to subAssignment if present, otherwise primary assignee
+    if (isNewResolved && !isAlreadyResolved) {
+      const targetUser = (updatedTicket.subAssignment && updatedTicket.subAssignment !== 'Unassigned' && updatedTicket.subAssignment.trim() !== '')
+        ? updatedTicket.subAssignment.trim()
+        : (updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned' ? updatedTicket.assignee.trim() : null);
+
+      if (targetUser) {
+        try {
+          await this.userModel.findOneAndUpdate(
+            { 
+              companyId, 
+              $or: [
+                { name: new RegExp(`^${targetUser}$`, 'i') }, 
+                { email: new RegExp(`^${targetUser}$`, 'i') }
+              ] 
+            },
+            { $inc: { resolvedCount: 1, completedTickets: 1 } }
+          );
+        } catch (counterErr: any) {
+          this.logger.warn(`Failed to increment user resolved metrics for ${targetUser}: ${counterErr.message}`);
+        }
       }
     }
 
@@ -311,16 +318,19 @@ export class TicketsService {
       return acc;
     }, {});
 
-    // Compute resolved ticket breakdown by operator correctly assigning resolved tickets to sub-assignee if present
+    // FIXED: Properly attribute resolved count to sub-assignee instead of falling back to Admin/primary assignee
     const resolvedByOperatorStats = tickets.reduce((acc: any, ticket) => {
       const status = (ticket.status || '').toLowerCase();
       const isResolved = ['resolved', 'closed', 'completed', 'done'].includes(status);
       
       if (isResolved) {
-        // If subAssignment exists, attribute to sub-assignee; otherwise attribute to primary assignee
-        const resolvedBy = (ticket.subAssignment && ticket.subAssignment !== 'Unassigned' && ticket.subAssignment.trim() !== '')
-          ? ticket.subAssignment.trim()
-          : (ticket.assignee && ticket.assignee !== 'Unassigned' ? ticket.assignee.trim() : 'Unassigned');
+        let resolvedBy = 'Unassigned';
+
+        if (ticket.subAssignment && ticket.subAssignment !== 'Unassigned' && ticket.subAssignment.trim() !== '') {
+          resolvedBy = ticket.subAssignment.trim();
+        } else if (ticket.assignee && ticket.assignee !== 'Unassigned' && ticket.assignee.trim() !== '') {
+          resolvedBy = ticket.assignee.trim();
+        }
 
         acc[resolvedBy] = (acc[resolvedBy] || 0) + 1;
       }
@@ -332,7 +342,7 @@ export class TicketsService {
       open: tickets.filter((t) => (t.status || '').toLowerCase() === 'open').length,
       resolved: tickets.filter((t) => ['resolved', 'closed', 'completed', 'done'].includes((t.status || '').toLowerCase())).length,
       byCategory: categoryStats,
-      resolvedByOperator: resolvedByOperatorStats, // Added operator-specific resolved breakdown for the dashboard widget
+      resolvedByOperator: resolvedByOperatorStats,
     };
   }
 
