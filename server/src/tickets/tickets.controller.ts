@@ -42,7 +42,6 @@ export class TicketsController {
 
   constructor(private readonly ticketsService: TicketsService) {}
 
-  // Helper method updated to prioritize exact user name / full name / username first
   private extractUserName(user: AuthenticatedRequest['user']): string {
     if (user?.name) return user.name;
     if (user?.fullName) return user.fullName;
@@ -178,26 +177,24 @@ export class TicketsController {
     }
 
     const currentStatus = (existingTicket.status || '').toLowerCase();
-    const isAlreadyResolved = ['closed', 'resolved', 'completed', 'done'].includes(currentStatus);
+    const isAlreadyResolved = ['resolved', 'completed', 'done'].includes(currentStatus);
 
-    // Rule: Once a ticket is resolved/closed, it cannot be modified or opened again
+    // Rule: Once a ticket is resolved, it cannot be modified or opened again
     if (isAlreadyResolved) {
       const isTryingToChangeStatus = updateTicketDto.status !== undefined && 
-        !['closed', 'resolved', 'completed', 'done'].includes(updateTicketDto.status.toLowerCase());
+        !['resolved', 'completed', 'done'].includes(updateTicketDto.status.toLowerCase());
 
       const isChangingCategory = updateTicketDto.category !== undefined && updateTicketDto.category !== existingTicket.category;
       const isChangingSubAssignment = 'subAssignment' in updateTicketDto && updateTicketDto.subAssignment !== existingTicket.subAssignment;
 
       if (isTryingToChangeStatus || isChangingCategory || isChangingSubAssignment) {
-        throw new BadRequestException('Once a ticket has been resolved or closed, it cannot be reopened or modified.');
+        throw new BadRequestException('Once a ticket has been resolved, it cannot be reopened or modified.');
       }
     }
 
     const currentUserName = this.extractUserName(req.user);
     const userRole = req.user.role;
 
-    // Rule: When a ticket is sub-assigned, primary assignees cannot change status, 
-    // but the assigned sub-assignee, Managers, and Super Admins can.
     const hasSubAssignment = Boolean(existingTicket.subAssignment);
     const isTryingToChangeStatus = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
     const isManagerOrAdmin = ['Manager', 'Super Admin'].includes(userRole);

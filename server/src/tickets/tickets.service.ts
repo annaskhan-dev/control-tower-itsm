@@ -38,7 +38,7 @@ export class TicketsService {
     }
   }
 
-  // FIXED: Strictly enforces sub-assignment priority over primary assignee when checking resolver credit
+  // Strictly enforces sub-assignment priority over primary assignee when checking resolver credit
   private getEffectiveResolver(ticket: any, fallbackTicket?: any): string {
     const sub = ticket?.subAssignment || fallbackTicket?.subAssignment;
     if (sub && typeof sub === 'string' && sub !== 'Unassigned' && sub.trim() !== '' && sub !== 'null') {
@@ -145,14 +145,14 @@ export class TicketsService {
     if (!existingTicket) throw new NotFoundException(`Ticket with ID ${id} not found`);
 
     const currentStatus = (existingTicket.status || '').toLowerCase();
-    const isAlreadyResolved = ['closed', 'resolved', 'completed', 'done'].includes(currentStatus);
+    const isAlreadyResolved = ['resolved', 'completed', 'done'].includes(currentStatus);
 
     if (isAlreadyResolved) {
       const isChangingCategory = updateTicketDto.category !== undefined && updateTicketDto.category !== existingTicket.category;
       const isChangingSubAssignment = updateTicketDto.subAssignment !== undefined && updateTicketDto.subAssignment !== existingTicket.subAssignment;
 
       if (isChangingCategory || isChangingSubAssignment) {
-        throw new BadRequestException('Cannot modify category or sub-assignment once a ticket is resolved or closed.');
+        throw new BadRequestException('Cannot modify category or sub-assignment once a ticket is resolved.');
       }
     }
 
@@ -194,22 +194,17 @@ export class TicketsService {
 
     let isNewResolved = false;
     if (updateData.status !== undefined && updateData.status !== existingTicket.status) {
-      isNewResolved = ['closed', 'resolved', 'completed', 'done'].includes(updateData.status.toLowerCase());
+      isNewResolved = ['resolved', 'completed', 'done'].includes(updateData.status.toLowerCase());
       if (isNewResolved) {
         updateData.resolvedAt = new Date();
-
-        if (!updateData.subAssignment && existingTicket.subAssignment) {
-          updateData.subAssignment = existingTicket.subAssignment;
-        }
       } else {
         updateData.resolvedAt = null;
       }
     }
 
-    if (isNewResolved && !isAlreadyResolved) {
-      if (!updateData.subAssignment && existingTicket.subAssignment) {
-        updateData.subAssignment = existingTicket.subAssignment;
-      }
+    // Ensure subAssignment is retained safely if not explicitly sent in a status-only patch update payload
+    if (updateData.subAssignment === undefined && existingTicket.subAssignment) {
+      updateData.subAssignment = existingTicket.subAssignment;
     }
 
     const updatedTicket = await this.ticketModel
@@ -345,7 +340,7 @@ export class TicketsService {
 
     const resolvedByOperatorStats = tickets.reduce((acc: any, ticket) => {
       const status = (ticket.status || '').toLowerCase();
-      const isResolved = ['resolved', 'closed', 'completed', 'done'].includes(status);
+      const isResolved = ['resolved', 'completed', 'done'].includes(status);
 
       if (isResolved) {
         const resolvedBy = this.getEffectiveResolver(ticket);
@@ -357,7 +352,7 @@ export class TicketsService {
     return {
       total: tickets.length,
       open: tickets.filter((t) => (t.status || '').toLowerCase() === 'open').length,
-      resolved: tickets.filter((t) => ['resolved', 'closed', 'completed', 'done'].includes((t.status || '').toLowerCase())).length,
+      resolved: tickets.filter((t) => ['resolved', 'completed', 'done'].includes((t.status || '').toLowerCase())).length,
       byCategory: categoryStats,
       resolvedByOperator: resolvedByOperatorStats,
     };
