@@ -63,28 +63,6 @@ export class Ticket extends Document {
 
 export const TicketSchema = SchemaFactory.createForClass(Ticket);
 
-// PERMANENT FIX: Pre-save hook using modern Mongoose syntax (no parameters needed)
-TicketSchema.pre('save', function () {
-  if (this.subAssignment && this.subAssignment !== 'Unassigned' && this.subAssignment.trim() !== '') {
-    this.assignee = this.subAssignment.trim();
-  }
-});
-
-// PERMANENT FIX: Pre-update hook to catch updates and keep assignee synced with sub-assignment
-TicketSchema.pre('findOneAndUpdate', function () {
-  const update: any = this.getUpdate();
-  if (update) {
-    const sub = update.subAssignment || update.$set?.subAssignment;
-    if (sub && sub !== 'Unassigned' && typeof sub === 'string' && sub.trim() !== '') {
-      if (update.$set) {
-        update.$set.assignee = sub.trim();
-      } else {
-        update.assignee = sub.trim();
-      }
-    }
-  }
-});
-
 // Compound indexes to accelerate dashboard queries, telemetry rollups, and queue filtering
 TicketSchema.index({ companyId: 1, status: 1 });
 TicketSchema.index({ companyId: 1, createdAt: -1 });
