@@ -27,7 +27,7 @@ export class TicketsService {
 
   private authorize(userRole: string, allowedRoles: string[]) {
     if (userRole === 'Super Admin') return;
-    
+
     const normalizedUserRole = userRole.replace(/\s+/g, '_').toLowerCase();
     const isAllowed = allowedRoles.some(
       role => role.replace(/\s+/g, '_').toLowerCase() === normalizedUserRole
@@ -44,12 +44,12 @@ export class TicketsService {
     if (sub && typeof sub === 'string' && sub !== 'Unassigned' && sub.trim() !== '' && sub !== 'null') {
       return sub.trim();
     }
-    
+
     const assignee = ticket?.assignee || ticket?.assignedTo || fallbackTicket?.assignee || fallbackTicket?.assignedTo;
     if (assignee && typeof assignee === 'string' && assignee !== 'Unassigned' && assignee.trim() !== '' && assignee !== 'null') {
       return assignee.trim();
     }
-    
+
     return 'Unassigned';
   }
 
@@ -128,7 +128,7 @@ export class TicketsService {
       if (updateTicketDto.category !== undefined) {
         throw new ForbiddenException('You are not allowed to update Category.');
       }
-      
+
       if (updateTicketDto.assignee !== undefined) {
         if (normalizedRole === 'operator') {
           if (currentUserName && updateTicketDto.assignee !== currentUserName) {
@@ -180,7 +180,7 @@ export class TicketsService {
 
     if (updateData.subAssignment !== undefined) {
       const isActuallySubAssigned = updateData.subAssignment !== 'Unassigned' && updateData.subAssignment !== '' && updateData.subAssignment !== null;
-      
+
       if (isActuallySubAssigned) {
         const isNewSubAssignment = updateData.subAssignment !== existingTicket.subAssignment;
         if (isNewSubAssignment || !existingTicket.subAssignmentAt) {
@@ -197,7 +197,7 @@ export class TicketsService {
       isNewResolved = ['closed', 'resolved', 'completed', 'done'].includes(updateData.status.toLowerCase());
       if (isNewResolved) {
         updateData.resolvedAt = new Date();
-        
+
         // FIX: Ensure active subAssignment isn't accidentally overwritten with null if only status is patched
         if (!updateData.subAssignment && existingTicket.subAssignment) {
           updateData.subAssignment = existingTicket.subAssignment;
@@ -295,7 +295,7 @@ export class TicketsService {
     if (search) {
       query.title = { $regex: search, $options: 'i' };
     }
-    
+
     const tickets = await this.ticketModel.find(query).sort({ createdAt: -1 }).exec();
     return tickets.map((t: any) => {
       const ticketObj = t.toObject ? t.toObject() : t;
@@ -348,14 +348,14 @@ export class TicketsService {
     const resolvedByOperatorStats = tickets.reduce((acc: any, ticket) => {
       const status = (ticket.status || '').toLowerCase();
       const isResolved = ['resolved', 'closed', 'completed', 'done'].includes(status);
-      
+
       if (isResolved) {
         const resolvedBy = this.getEffectiveResolver(ticket);
         acc[resolvedBy] = (acc[resolvedBy] || 0) + 1;
       }
       return acc;
     }, {});
-    
+
     return {
       total: tickets.length,
       open: tickets.filter((t) => (t.status || '').toLowerCase() === 'open').length,

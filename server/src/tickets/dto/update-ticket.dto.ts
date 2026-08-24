@@ -21,10 +21,9 @@ export class UpdateTicketDto extends PartialType(CreateTicketDto) {
   @IsString()
   category?: string;
 
-  // Validate subAssignment if it's being provided and has a value
+  // Allows skipping validation if the field is empty, null, or undefined (useful for clearing values)
   @ValidateIf((o) => o.subAssignment !== undefined && o.subAssignment !== null && o.subAssignment !== '')
   @IsString()
-  @IsOptional()
   subAssignment?: string;
 
   @IsOptional()
