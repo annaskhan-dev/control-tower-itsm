@@ -341,7 +341,7 @@ CustomTooltip.displayName = "CustomTooltip";
  * List-based Card for Creators & Sources
  */
 const GeneratorListCard = memo(
-  ({ title, data, totalLabel = "total", theme = "emerald" }) => {
+  ({ title, data, totalLabel = "total", theme = "emerald", isLoading }) => {
     const totalValue = useMemo(
       () => data.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0),
       [data],
@@ -361,6 +361,30 @@ const GeneratorListCard = memo(
     };
 
     const currentTheme = themeStyles[theme] || themeStyles.emerald;
+
+    if (isLoading) {
+      return (
+        <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs flex flex-col justify-between h-72 animate-pulse">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="h-4 bg-slate-200 rounded w-36" />
+              <div className="h-6 bg-slate-200 rounded-lg w-20" />
+            </div>
+          </div>
+          <div className="my-2 flex-1 space-y-3 py-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="h-3.5 bg-slate-200 rounded w-28" />
+                <div className="h-5 bg-slate-200 rounded-lg w-14" />
+              </div>
+            ))}
+          </div>
+          <div className="pt-2 border-t border-slate-100">
+            <div className="h-3 bg-slate-100 rounded w-48" />
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between h-72">
@@ -428,7 +452,9 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
   const tickets =
     propTickets && propTickets.length > 0 ? propTickets : contextTickets;
-  const loading = contextLoading && (!tickets || tickets.length === 0);
+  
+  // Independent loading states for smooth UI feedback
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
   const [backendStats, setBackendStats] = useState(null);
   const [activeTimes, setActiveTimes] = useState([]);
@@ -498,6 +524,11 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         }
       } catch (err) {
         console.error("Error fetching dashboard analytics:", err);
+      } finally {
+        if (isMounted) {
+          // Add a tiny smooth buffer for gorgeous skeleton transition
+          setTimeout(() => setIsDataLoading(false), 350);
+        }
       }
     };
     getStatsData();
@@ -903,16 +934,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     user,
   ]);
 
-  if (loading)
-    return (
-      <div className="h-96 flex flex-col items-center justify-center gap-3 animate-in fade-in duration-300">
-        <Loader2 className="animate-spin text-blue-600" size={36} />
-        <p className="text-xs font-medium text-slate-500 animate-pulse">
-          Loading dashboard metrics...
-        </p>
-      </div>
-    );
-
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 font-sans text-slate-800 p-4 sm:p-6 overflow-x-hidden animate-in fade-in duration-300">
       {/* Header */}
@@ -999,9 +1020,13 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 {item.label}
               </p>
-              <h3 className="text-xl font-bold text-slate-900 mt-0.5">
-                {item.val}
-              </h3>
+              {isDataLoading ? (
+                <div className="h-6 w-8 bg-slate-200 rounded animate-pulse mt-1" />
+              ) : (
+                <h3 className="text-xl font-bold text-slate-900 mt-0.5">
+                  {item.val}
+                </h3>
+              )}
             </div>
             <div
               className={`p-2.5 rounded-xl transition-all ${selectedTab === item.tab ? "bg-blue-50 text-blue-600" : "bg-slate-50 text-slate-600"}`}
@@ -1019,79 +1044,101 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           data={chartData.generator}
           totalLabel="tickets"
           theme="blue"
+          isLoading={isDataLoading}
         />
         <GeneratorListCard
           title="RESOLVED TICKETS BY OPERATOR"
           data={chartData.operatorResolved}
           totalLabel="resolved"
           theme="emerald"
+          isLoading={isDataLoading}
         />
 
+        {/* SLA Health Distribution Card with Professional Skeleton State */}
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               SLA Health Distribution
             </h4>
-            <span className="text-xs font-bold px-2.5 py-1 bg-rose-50 text-rose-700 rounded-lg border border-rose-100">
-              Risk: {stats.slaRisk}
-            </span>
+            {isDataLoading ? (
+              <div className="h-6 w-16 bg-slate-200 rounded-lg animate-pulse" />
+            ) : (
+              <span className="text-xs font-bold px-2.5 py-1 bg-rose-50 text-rose-700 rounded-lg border border-rose-100">
+                Risk: {stats.slaRisk}
+              </span>
+            )}
           </div>
 
-          <div className="flex flex-col xl:flex-row items-center gap-2 my-1">
-            <div className="h-32 w-full xl:w-1/2">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartData.slaPie}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={36}
-                    outerRadius={54}
-                    paddingAngle={4}
-                    dataKey="value"
-                    isAnimationActive={true}
-                    animationDuration={800}
+          {isDataLoading ? (
+            <div className="flex flex-col xl:flex-row items-center gap-4 my-3 animate-pulse">
+              <div className="h-32 w-32 rounded-full bg-slate-200 shrink-0 mx-auto" />
+              <div className="w-full flex flex-col gap-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-7 bg-slate-100 rounded-lg w-full" />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col xl:flex-row items-center gap-2 my-1 animate-in fade-in duration-300">
+              <div className="h-32 w-full xl:w-1/2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData.slaPie}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={36}
+                      outerRadius={54}
+                      paddingAngle={4}
+                      dataKey="value"
+                      isAnimationActive={true}
+                      animationDuration={800}
+                    >
+                      {chartData.slaPie.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="w-full xl:w-1/2 flex flex-col gap-1.5 text-xs">
+                {chartData.slaPie.map((item, idx) => (
+                  <div
+                    key={`sla-point-${idx}`}
+                    className="flex items-center justify-between bg-slate-50/80 p-1.5 rounded-lg border border-slate-100 transition-all"
                   >
-                    {chartData.slaPie.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="w-full xl:w-1/2 flex flex-col gap-1.5 text-xs">
-              {chartData.slaPie.map((item, idx) => (
-                <div
-                  key={`sla-point-${idx}`}
-                  className="flex items-center justify-between bg-slate-50/80 p-1.5 rounded-lg border border-slate-100 transition-all"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="font-semibold text-slate-700">
-                      {item.name}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="font-semibold text-slate-700">
+                        {item.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 font-bold">
+                      <span className="text-slate-900">{item.value}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        ({item.percentage}%)
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 font-bold">
-                    <span className="text-slate-900">{item.value}</span>
-                    <span className="text-[10px] text-slate-400 font-normal">
-                      ({item.percentage}%)
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 italic">
             <span>Proportional breakdown of active SLAs.</span>
-            <span className="font-medium text-slate-500">
-              Total Monitored: {stats.total}
-            </span>
+            {isDataLoading ? (
+              <div className="h-3 w-24 bg-slate-200 rounded animate-pulse" />
+            ) : (
+              <span className="font-medium text-slate-500">
+                Total Monitored: {stats.total}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -1110,7 +1157,16 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
               </tr>
             </thead>
             <tbody>
-              {activeTimes.length > 0 ? (
+              {isDataLoading ? (
+                [1, 2].map((i) => (
+                  <tr key={i} className="border-b animate-pulse">
+                    <td className="p-3"><div className="h-4 bg-slate-200 rounded w-32" /></td>
+                    <td className="p-3"><div className="h-4 bg-slate-200 rounded w-24" /></td>
+                    <td className="p-3"><div className="h-4 bg-slate-200 rounded w-20" /></td>
+                    <td className="p-3"><div className="h-4 bg-slate-200 rounded w-28" /></td>
+                  </tr>
+                ))
+              ) : activeTimes.length > 0 ? (
                 activeTimes.map((item, index) => (
                   <tr key={index} className="border-b hover:bg-gray-50 transition-colors">
                     <td className="p-3 font-medium text-gray-900">{item.name}</td>
@@ -1133,16 +1189,25 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6 transition-all duration-300">
         <h3 className="text-lg font-semibold text-gray-800 mb-3">Month-on-Month Ticket Breakdown</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {fullYearMonths.map((row, index) => (
-            <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col justify-between transition-all hover:shadow-xs">
-              <div>
-                <span className="text-sm font-bold text-gray-700">Period: {row.period}</span>
-                <p className="text-xs text-gray-500 mt-1">
-                  Created: <span className="font-semibold text-blue-600">{row.ticketsCreated}</span> | Resolved: <span className="font-semibold text-green-600">{row.ticketsResolved}</span>
-                </p>
+          {isDataLoading ? (
+            [1, 2, 3].map((i) => (
+              <div key={i} className="p-4 bg-gray-50 rounded-xl border border-gray-100 h-20 animate-pulse flex flex-col justify-center gap-2">
+                <div className="h-4 bg-slate-200 rounded w-28" />
+                <div className="h-3 bg-slate-200 rounded w-40" />
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            fullYearMonths.map((row, index) => (
+              <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col justify-between transition-all hover:shadow-xs">
+                <div>
+                  <span className="text-sm font-bold text-gray-700">Period: {row.period}</span>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Created: <span className="font-semibold text-blue-600">{row.ticketsCreated}</span> | Resolved: <span className="font-semibold text-green-600">{row.ticketsResolved}</span>
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -1178,52 +1243,58 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           </div>
         </div>
         <div className="h-32 w-full mt-3">
-          <ResponsiveContainer width="100%" height="100%" debounce={100}>
-            <LineChart
-              data={chartData.trend}
-              margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="#f1f5f9"
-              />
-              <XAxis
-                dataKey="day"
-                stroke="#94a3b8"
-                fontSize={10}
-                tickLine={false}
-                axisLine={{ stroke: "#e2e8f0" }}
-              />
-              <YAxis
-                stroke="#94a3b8"
-                fontSize={10}
-                tickLine={false}
-                axisLine={{ stroke: "#e2e8f0" }}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Line
-                type="monotone"
-                dataKey="tickets"
-                stroke="#10b981"
-                strokeWidth={3}
-                dot={{
-                  r: 4,
-                  fill: "#10b981",
-                  strokeWidth: 2,
-                  stroke: "#ffffff",
-                }}
-                activeDot={{
-                  r: 6,
-                  fill: "#059669",
-                  strokeWidth: 2,
-                  stroke: "#ffffff",
-                }}
-                isAnimationActive={true}
-                animationDuration={1000}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {isDataLoading ? (
+            <div className="w-full h-full bg-slate-100 rounded-xl animate-pulse flex items-center justify-center">
+              <span className="text-xs text-slate-400 font-medium">Loading velocity analytics...</span>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%" debounce={100}>
+              <LineChart
+                data={chartData.trend}
+                margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#f1f5f9"
+                />
+                <XAxis
+                  dataKey="day"
+                  stroke="#94a3b8"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={{ stroke: "#e2e8f0" }}
+                />
+                <YAxis
+                  stroke="#94a3b8"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={{ stroke: "#e2e8f0" }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="tickets"
+                  stroke="#10b981"
+                  strokeWidth={3}
+                  dot={{
+                    r: 4,
+                    fill: "#10b981",
+                    strokeWidth: 2,
+                    stroke: "#ffffff",
+                  }}
+                  activeDot={{
+                    r: 6,
+                    fill: "#059669",
+                    strokeWidth: 2,
+                    stroke: "#ffffff",
+                  }}
+                  isAnimationActive={true}
+                  animationDuration={1000}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
         <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-400 italic">
           Daily volume intake pattern over the selected {velocityDays}-day window.
@@ -1335,9 +1406,15 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Main Table Section Styled Based on Screenshot Layout */}
+      {/* Main Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden transition-all duration-300">
-        {filteredTickets.length === 0 ? (
+        {isDataLoading ? (
+          <div className="p-8 space-y-4 animate-pulse">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-10 bg-slate-100 rounded-xl w-full" />
+            ))}
+          </div>
+        ) : filteredTickets.length === 0 ? (
           <div className="p-16 text-center text-xs text-slate-400 italic flex flex-col items-center gap-2">
             <svg
               className="w-9 h-9 text-slate-300"
