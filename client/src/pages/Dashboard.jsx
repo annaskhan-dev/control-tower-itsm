@@ -453,8 +453,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   const tickets =
     propTickets && propTickets.length > 0 ? propTickets : contextTickets;
   
-  // Independent loading states for smooth UI feedback
-  const [isDataLoading, setIsDataLoading] = useState(true);
+  // Instantly unlock UI if tickets are already cached or available
+  const [isDataLoading, setIsDataLoading] = useState(!tickets || tickets.length === 0);
 
   const [backendStats, setBackendStats] = useState(null);
   const [activeTimes, setActiveTimes] = useState([]);
@@ -503,39 +503,52 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
   useEffect(() => {
     let isMounted = true;
+
+    // Instant unlock if tickets are ready
+    if (tickets && tickets.length > 0) {
+      setIsDataLoading(false);
+    }
+
     const getStatsData = async () => {
       if (hasFetchedStatsRef.current) return;
       hasFetchedStatsRef.current = true;
 
       try {
-        const data = await fetchTicketStats();
-        if (data && isMounted) {
-          setBackendStats(data);
-        }
+        // Run network requests concurrently in the background without blocking core rendering
+        const statsPromise = fetchTicketStats().then((data) => {
+          if (data && isMounted) setBackendStats(data);
+        }).catch((err) => console.error("Stats error:", err));
 
-        const activeRes = await api.get('/reports/active-time');
-        if (activeRes.data && isMounted) {
-          setActiveTimes(activeRes.data);
-        }
+        const activeResPromise = api.get('/reports/active-time').then((activeRes) => {
+          if (activeRes.data && isMounted) setActiveTimes(activeRes.data);
+        }).catch((err) => console.error("Active time error:", err));
 
-        const momRes = await api.get('/reports/month-on-month');
-        if (momRes.data && isMounted) {
-          setMonthOnMonth(momRes.data);
-        }
+        const momResPromise = api.get('/reports/month-on-month').then((momRes) => {
+          if (momRes.data && isMounted) setMonthOnMonth(momRes.data);
+        }).catch((err) => console.error("MoM error:", err));
+
+        await Promise.allSettled([statsPromise, activeResPromise, momResPromise]);
       } catch (err) {
         console.error("Error fetching dashboard analytics:", err);
       } finally {
         if (isMounted) {
-          // Add a tiny smooth buffer for gorgeous skeleton transition
-          setTimeout(() => setIsDataLoading(false), 350);
+          setIsDataLoading(false);
         }
       }
     };
+
     getStatsData();
+
+    // Safety fallback timer so skeleton never locks for more than 400ms max
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) setIsDataLoading(false);
+    }, 400);
+
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimer);
     };
-  }, []);
+  }, [tickets]);
 
   useEffect(() => {
     const fetchOperatorsList = async () => {
