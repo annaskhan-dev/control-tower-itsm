@@ -38,15 +38,15 @@ export class TicketsService {
     }
   }
 
-  // FIXED: Strictly checks subAssignment first from either the updated ticket or fallback to existing record
+  // FIXED: Strictly enforces sub-assignment priority over primary assignee when checking resolver credit
   private getEffectiveResolver(ticket: any, fallbackTicket?: any): string {
     const sub = ticket?.subAssignment || fallbackTicket?.subAssignment;
-    if (sub && typeof sub === 'string' && sub !== 'Unassigned' && sub.trim() !== '') {
+    if (sub && typeof sub === 'string' && sub !== 'Unassigned' && sub.trim() !== '' && sub !== 'null') {
       return sub.trim();
     }
     
     const assignee = ticket?.assignee || ticket?.assignedTo || fallbackTicket?.assignee || fallbackTicket?.assignedTo;
-    if (assignee && typeof assignee === 'string' && assignee !== 'Unassigned' && assignee.trim() !== '') {
+    if (assignee && typeof assignee === 'string' && assignee !== 'Unassigned' && assignee.trim() !== '' && assignee !== 'null') {
       return assignee.trim();
     }
     
@@ -198,7 +198,7 @@ export class TicketsService {
       if (isNewResolved) {
         updateData.resolvedAt = new Date();
         
-        // CRITICAL FIX: Ensure subAssignment is preserved if the incoming update only changes status
+        // Ensure subAssignment isn't accidentally overwritten with null if only status is patched
         if (!updateData.subAssignment && existingTicket.subAssignment) {
           updateData.subAssignment = existingTicket.subAssignment;
         }
