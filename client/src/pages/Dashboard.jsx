@@ -11,7 +11,6 @@ import { fetchTicketStats } from "../api/axiosInstance";
 import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
 import api, { fetchActiveTimeStats, fetchMonthOnMonthReport } from "../services/api";
-import axios from 'axios';
 import {
   XAxis,
   YAxis,
@@ -488,16 +487,13 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           setBackendStats(data);
         }
 
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
-        const baseUrl = 'https://control-tower-itsm-production.up.railway.app';
-
-        const activeRes = await axios.get(`${baseUrl}/reports/active-time`, { headers });
+        // Use pre-configured api instance to prevent path structure conflicts
+        const activeRes = await api.get('/reports/active-time');
         if (activeRes.data && isMounted) {
           setActiveTimes(activeRes.data);
         }
 
-        const momRes = await axios.get(`${baseUrl}/reports/month-on-month`, { headers });
+        const momRes = await api.get('/reports/month-on-month');
         if (momRes.data && isMounted) {
           setMonthOnMonth(momRes.data);
         }
