@@ -21,7 +21,7 @@ export class TicketsService {
   constructor(
     @InjectModel(Ticket.name) private ticketModel: Model<TicketDocument>,
     @InjectModel(SlaConfig.name) private slaConfigModel: Model<SlaConfigDocument>,
-    @InjectModel('User') private userModel: Model<any>, // Added user model injection for sub-assignee count incrementing if applicable
+    @InjectModel('User') private userModel: Model<any>,
     private readonly ticketsGateway: TicketsGateway,
   ) {}
 
@@ -141,7 +141,6 @@ export class TicketsService {
       }
     }
 
-    // REQUIREMENT 1: Primary Assignee Status Guard when a sub-assignee is present
     if (updateTicketDto.status !== undefined && existingTicket.subAssignment) {
       const isManagerOrAdmin = ['manager', 'super_admin', 'admin'].some(r => normalizedRole.includes(r));
       const isPrimaryAssignee = currentUserName && existingTicket.assignee && 
@@ -196,7 +195,6 @@ export class TicketsService {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
     }
 
-    // REQUIREMENT 2: Increment resolved ticket count for sub-assignee only when transitioning to resolved/closed with both primary and sub-assignment active
     if (isNewResolved && !isAlreadyResolved && updatedTicket.subAssignment && updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned') {
       try {
         await this.userModel.findOneAndUpdate(
@@ -207,11 +205,11 @@ export class TicketsService {
               { email: new RegExp(`^${updatedTicket.subAssignment}$`, 'i') }
             ] 
           },
-          { $inc: { resolvedCount: 1, completedTickets: 1 } } // Safely increments standard user metric tracking fields if present
+          { $inc: { resolvedCount: 1, completedTickets: 1 } }
         );
       } catch (counterErr: any) {
-      this.logger.warn(`Failed to increment sub-assignee resolved metrics: ${counterErr.message}`);
-    }
+        this.logger.warn(`Failed to increment sub-assignee resolved metrics: ${counterErr.message}`);
+      }
     }
 
     this.ticketsGateway.emitTicketUpdated(updatedTicket, companyId);
@@ -312,12 +310,29 @@ export class TicketsService {
       acc[cat] = (acc[cat] || 0) + 1;
       return acc;
     }, {});
+
+    // Compute resolved ticket breakdown by operator correctly assigning resolved tickets to sub-assignee if present
+    const resolvedByOperatorStats = tickets.reduce((acc: any, ticket) => {
+      const status = (ticket.status || '').toLowerCase();
+      const isResolved = ['resolved', 'closed', 'completed', 'done'].includes(status);
+      
+      if (isResolved) {
+        // If subAssignment exists, attribute to sub-assignee; otherwise attribute to primary assignee
+        const resolvedBy = (ticket.subAssignment && ticket.subAssignment !== 'Unassigned' && ticket.subAssignment.trim() !== '')
+          ? ticket.subAssignment.trim()
+          : (ticket.assignee && ticket.assignee !== 'Unassigned' ? ticket.assignee.trim() : 'Unassigned');
+
+        acc[resolvedBy] = (acc[resolvedBy] || 0) + 1;
+      }
+      return acc;
+    }, {});
     
     return {
       total: tickets.length,
       open: tickets.filter((t) => (t.status || '').toLowerCase() === 'open').length,
       resolved: tickets.filter((t) => ['resolved', 'closed', 'completed', 'done'].includes((t.status || '').toLowerCase())).length,
       byCategory: categoryStats,
+      resolvedByOperator: resolvedByOperatorStats, // Added operator-specific resolved breakdown for the dashboard widget
     };
   }
 
