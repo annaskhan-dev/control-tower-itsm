@@ -34,7 +34,7 @@ export const TicketDetail = () => {
   const [slaConfigs, setSlaConfigs] = useState([]);
   const [now, setNow] = useState(new Date());
 
-  // Update current time every minute for live duration calculations matching TicketList[cite: 1, 2]
+  // Update current time every minute for live duration calculations matching TicketList[cite: 3]
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(interval);
@@ -73,7 +73,7 @@ export const TicketDetail = () => {
   const canEditStatus = canEditField(user?.role, "status");
   const canEditCategory = canEditField(user?.role, "category");
 
-  // Check if current user is restricted (i.e. not Manager or Super Admin)[cite: 1, 2]
+  // Check if current user is restricted (i.e. not Manager or Super Admin)[cite: 3]
   const userRoleStr = (user?.role || "").toLowerCase();
   const isManagerOrAdmin = ["manager", "super admin", "admin"].some(r => userRoleStr.includes(r));
   const isRestricted = !isManagerOrAdmin;
@@ -87,7 +87,7 @@ export const TicketDetail = () => {
 
   const isResolvedState = ["closed", "resolved", "completed", "done"].includes((ticket?.status || "").toLowerCase());
 
-  // Compute if primary assignee is present[cite: 1, 2]
+  // Compute if primary assignee is present[cite: 3]
   const isPrimaryAssigned = useMemo(() => {
     if (!ticket) return false;
     let rawAssignee = ticket.assignee || ticket.assignedTo || ticket.assigned_to || "Unassigned";
@@ -98,7 +98,7 @@ export const TicketDetail = () => {
     return assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
   }, [ticket]);
 
-  // Check if current user is the primary assignee[cite: 1, 2]
+  // Check if current user is the primary assignee[cite: 3]
   const currentUserName = (user?.name || user?.username || "").trim().toLowerCase();
   
   let rawAssigneeObj = ticket?.assignee || ticket?.assignedTo || ticket?.assigned_to || "";
@@ -108,7 +108,7 @@ export const TicketDetail = () => {
   const primaryAssigneeName = (typeof rawAssigneeObj === "string" ? rawAssigneeObj : "").trim().toLowerCase();
   const isCurrentUserPrimaryAssigned = primaryAssigneeName !== "" && currentUserName === primaryAssigneeName;
 
-  // Check if ticket has a sub-assignment active[cite: 1, 2]
+  // Check if ticket has a sub-assignment active[cite: 3]
   const hasSubAssignment = useMemo(() => {
     if (!ticket) return false;
     let rawSub = ticket.subAssignment || ticket.sub_assignment || ticket.subAssignedTo || ticket.sub_assigned_to || "";
@@ -119,7 +119,7 @@ export const TicketDetail = () => {
     return subName !== "" && subName.toLowerCase() !== "unassigned";
   }, [ticket]);
 
-  // Check if current user is the sub-assignee[cite: 1, 2]
+  // Check if current user is the sub-assignee[cite: 3]
   let rawSubAssigneeObj = ticket?.subAssignment || ticket?.sub_assignment || ticket?.subAssignedTo || ticket?.sub_assigned_to || "";
   if (typeof rawSubAssigneeObj === "object" && rawSubAssigneeObj !== null) {
     rawSubAssigneeObj = rawSubAssigneeObj.name || rawSubAssigneeObj.fullName || rawSubAssigneeObj.email || "";
@@ -127,7 +127,7 @@ export const TicketDetail = () => {
   const subAssigneeName = (typeof rawSubAssigneeObj === "string" ? rawSubAssigneeObj : "").trim().toLowerCase();
   const isCurrentUserSubAssigned = subAssigneeName !== "" && currentUserName === subAssigneeName;
 
-  // Requirement Check: Lock status if sub-assigned AND the user is NOT the sub-assignee and NOT a manager/admin[cite: 1, 2]
+  // Requirement Check: Lock status if sub-assigned AND the user is NOT the sub-assignee and NOT a manager/admin[cite: 3]
   const isStatusLockedBySubAssignment = hasSubAssignment && !isCurrentUserSubAssigned && !isManagerOrAdmin;
 
   useEffect(() => {
@@ -152,7 +152,7 @@ export const TicketDetail = () => {
     }
   }, [ticket, companyUsers]);
 
-  // Duration formatting helper synchronized with TicketList[cite: 1, 2]
+  // Duration formatting helper synchronized with TicketList[cite: 3]
   const formatDuration = useCallback((ms) => {
     if (ms === null || ms === undefined || isNaN(ms)) return "—";
     if (ms < 60000) return "Just now";
@@ -162,7 +162,7 @@ export const TicketDetail = () => {
     return `${hours}h ${mins}m`;
   }, []);
 
-  // Computed timing metrics synchronized with backend & TicketList logic[cite: 1, 2]
+  // Computed timing metrics synchronized with backend & TicketList logic[cite: 3]
   const calculatedMetrics = useMemo(() => {
     if (!ticket) return {};
 
@@ -171,7 +171,7 @@ export const TicketDetail = () => {
     const resolvedAtTime = isResolved ? (resolvedAtRaw ? new Date(resolvedAtRaw).getTime() : now.getTime()) : null;
     const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
-    // Parse Assignee safely[cite: 1, 2]
+    // Parse Assignee safely[cite: 3]
     let rawAssignee = ticket.assignee || ticket.assignedTo || ticket.assigned_to || "Unassigned";
     if (typeof rawAssignee === "object" && rawAssignee !== null) {
       rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
@@ -179,7 +179,7 @@ export const TicketDetail = () => {
     const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
     const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
 
-    // Parse Sub-Assignee safely[cite: 1, 2]
+    // Parse Sub-Assignee safely[cite: 3]
     let rawSubAssignee = ticket.subAssignment || ticket.sub_assignment || ticket.subAssignedTo || ticket.sub_assigned_to || "";
     if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
       rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || "";
@@ -194,26 +194,30 @@ export const TicketDetail = () => {
     const subAssignedAtRaw = ticket.subAssignmentAt || ticket.sub_assigned_at || ticket.subAssignedAt || ticket.sub_assignment_at;
     const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
 
-    // Fixed: Sub-assignment is officially active if a name exists OR a timestamp exists
+    // Sub-assignment is officially active if a name exists OR a timestamp exists[cite: 3]
     const isSubAssigned = hasSubName || subAssignedAtTime !== null;
 
-    // Primary Assignment Time (Stops instantly when subAssignmentAt is present)
+    // Bulletproof Primary Assignment Time: stops immediately when sub-assigned using fallback options if needed[cite: 3]
     let primaryAssignmentMs = 0;
     if (isAssigned) {
-      const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
+      const subAssignmentFallbackTime = subAssignedAtTime 
+        ? subAssignedAtTime 
+        : (isSubAssigned ? new Date(ticket.updatedAt || ticket.createdAt || now).getTime() : null);
+
+      const primaryEndTime = (isSubAssigned && subAssignmentFallbackTime) ? subAssignmentFallbackTime : currentOrResolveTime;
       primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
     }
 
-    // SLA Active Time (anchored strictly to assignedAt)[cite: 1, 2]
+    // SLA Active Time (anchored strictly to assignedAt)[cite: 3]
     const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
-    // Sub-Assignment Execution Time[cite: 1, 2]
+    // Sub-Assignment Execution Time[cite: 3]
     let subAssignmentTimeMs = 0;
     if (isSubAssigned && subAssignedAtTime) {
       subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subAssignedAtTime);
     }
 
-    // Total Resolution Time[cite: 1, 2]
+    // Total Resolution Time[cite: 3]
     const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
     return {
@@ -235,7 +239,7 @@ export const TicketDetail = () => {
   const handleUpdate = async (updatedFields) => {
     if (!ticket) return;
 
-    // Prevent sending requests if status is locked by sub-assignment rules[cite: 1, 2]
+    // Prevent sending requests if status is locked by sub-assignment rules[cite: 3]
     if ('status' in updatedFields && isStatusLockedBySubAssignment) {
       alert("Action blocked: Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.");
       return;
@@ -252,7 +256,7 @@ export const TicketDetail = () => {
     const newPriority = payload.priority || ticket.priority;
     payload.slaDeadline = calculateDeadline(newCategory, newPriority);
 
-    // Track Primary Assignee timestamp modifications[cite: 1, 2]
+    // Track Primary Assignee timestamp modifications[cite: 3]
     if ('assignee' in payload) {
       const oldAssignee = ticket.assignee || "Unassigned";
       if (payload.assignee !== oldAssignee && payload.assignee !== "Unassigned") {
@@ -285,7 +289,7 @@ export const TicketDetail = () => {
         payload.resolvedAt = null;
       }
 
-      // Ensure active subAssignment is explicitly carried over on status updates[cite: 1, 2]
+      // Ensure active subAssignment is explicitly carried over on status updates[cite: 3]
       if (!payload.subAssignment && ticket.subAssignment) {
         payload.subAssignment = ticket.subAssignment;
       }
@@ -330,7 +334,7 @@ export const TicketDetail = () => {
     <div className="h-full bg-slate-50 overflow-y-auto p-6">
       <div className="max-w-5xl mx-auto">
         
-        {/* Header with Back Button[cite: 1, 2] */}
+        {/* Header with Back Button[cite: 3] */}
         <div className="flex items-center gap-4 mb-6">
           <button 
             onClick={() => navigate(-1)} 
@@ -343,7 +347,7 @@ export const TicketDetail = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Left Column: Description Panel & Sub Assignment[cite: 1, 2] */}
+          {/* Left Column: Description Panel & Sub Assignment[cite: 3] */}
           <div className="lg:col-span-2 space-y-6">
             <div 
               className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${!canEditDesc ? 'cursor-not-allowed' : ''}`}
@@ -378,7 +382,7 @@ export const TicketDetail = () => {
               />
             </div>
 
-            {/* Sub Assignment Panel with restriction indicator[cite: 1, 2] */}
+            {/* Sub Assignment Panel with restriction indicator[cite: 3] */}
             <div 
               className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${isRestricted || !isPrimaryAssigned || isResolvedState ? 'cursor-not-allowed' : ''}`}
               title={
@@ -467,14 +471,14 @@ export const TicketDetail = () => {
             </div>
           </div>
 
-          {/* Right Column: Properties & Live Durations[cite: 1, 2] */}
+          {/* Right Column: Properties & Live Durations[cite: 3] */}
           <div className="space-y-4">
             <div className="bg-white border border-slate-200 rounded-xl shadow-xs p-5 space-y-4">
               <h3 className="text-xs font-bold flex items-center gap-2 text-slate-700">
                 <ShieldAlert size={14} className="text-blue-600" /> Properties
               </h3>
 
-              {/* Creator / Entry Generator Info[cite: 1, 2] */}
+              {/* Creator / Entry Generator Info[cite: 3] */}
               <div className="pb-2 border-b border-slate-100">
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
                   <Cpu size={10} /> Created By / Generator
@@ -484,7 +488,7 @@ export const TicketDetail = () => {
                 </div>
               </div>
 
-              {/* Primary Assignee Panel with Manager/Admin Restriction[cite: 1, 2] */}
+              {/* Primary Assignee Panel with Manager/Admin Restriction[cite: 3] */}
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
@@ -523,7 +527,7 @@ export const TicketDetail = () => {
                 )}
               </div>
 
-              {/* Status Section with Sub-Assignment Lock[cite: 1, 2] */}
+              {/* Status Section with Sub-Assignment Lock[cite: 3] */}
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Status</label>
                 <select 
@@ -545,7 +549,7 @@ export const TicketDetail = () => {
                 <input disabled value={ticket.priority || "Medium"} className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-500 cursor-not-allowed" />
               </div>
 
-              {/* Category with restriction hover & disabled states[cite: 1, 2] */}
+              {/* Category with restriction hover & disabled states[cite: 3] */}
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Category</label>
                 <select 
@@ -574,7 +578,7 @@ export const TicketDetail = () => {
                 </div>
               </div>
 
-              {/* Synchronized Active Duration Trackers[cite: 1, 2] */}
+              {/* Synchronized Active Duration Trackers[cite: 3] */}
               <div className="pt-2 border-t border-slate-100 space-y-2">
                 <div>
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Primary Assignment Duration</span>

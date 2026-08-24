@@ -194,7 +194,7 @@ const TableRowItem = memo(({ t, isUserManagerOrAdmin, operators, handleAssignToM
 TableRowItem.displayName = "TableRowItem";
 
 /**
- * Normalization Engine: Robust source/generator field extraction mapping.[cite: 3]
+ * Normalization Engine: Robust source/generator field extraction mapping[cite: 3].
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee =
@@ -904,16 +904,15 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
       if (isClosed) {
         closedCount++;
+        // 🛠️ Fixed to track all resolved tickets across operators or fallback correctly so total matches
+        const operatorKey = t.isAssigned && t.assigneeName ? t.assigneeName : "Unassigned / Other";
+        operatorResolvedMap[operatorKey] = (operatorResolvedMap[operatorKey] || 0) + 1;
       } else {
         openCount++;
       }
 
       if (t.isAssigned) {
         assignedCount++;
-        if (isClosed) {
-          operatorResolvedMap[t.assigneeName] =
-            (operatorResolvedMap[t.assigneeName] || 0) + 1;
-        }
       } else {
         unassignedCount++;
       }
