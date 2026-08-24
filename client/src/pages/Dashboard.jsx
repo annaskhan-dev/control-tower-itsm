@@ -569,6 +569,46 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     [tickets, now],
   );
 
+  // Generate full year months dynamically (Jan - Dec) matching current year or latest tickets
+  const fullYearMonths = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const monthsList = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    // Build a map of existing backend data by period string (e.g. "August 2026")
+    const dataMap = {};
+    if (Array.isArray(monthOnMonth)) {
+      monthOnMonth.forEach((item) => {
+        const periodKey = item.period || `${item.month}, ${item.year}`;
+        dataMap[periodKey] = item;
+      });
+    }
+
+    // Also compute counts directly from tickets if needed or supplement
+    return monthsList.map((mName, index) => {
+      const periodStr = `${mName} ${currentYear}`;
+      
+      // Filter tickets belonging to this specific month & year if backend list is sparse
+      const monthTickets = normalizedTickets.filter((t) => {
+        const d = new Date(t.createdAt);
+        return !isNaN(d.getTime()) && d.getMonth() === index && d.getFullYear() === currentYear;
+      });
+
+      const resolvedCount = monthTickets.filter((t) => t.isResolved).length;
+      const createdCount = monthTickets.length;
+
+      const existingData = dataMap[periodStr] || dataMap[`${mName} ${currentYear}`];
+
+      return {
+        period: periodStr,
+        ticketsCreated: existingData ? existingData.ticketsCreated : createdCount,
+        ticketsResolved: existingData ? existingData.ticketsResolved : resolvedCount,
+      };
+    });
+  }, [monthOnMonth, normalizedTickets]);
+
   const formatDate = (dateString) => {
     if (!dateString) return "—";
     const d = new Date(dateString);
@@ -1093,27 +1133,17 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       {/* Month-on-Month Tickets Breakdown Card */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-3">Month-on-Month Ticket Breakdown</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {monthOnMonth.length > 0 ? (
-            monthOnMonth.map((row, index) => (
-              <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col justify-between">
-                <div>
-                  <span className="text-sm font-bold text-gray-700">Period: {row.period || `${row.month}, ${row.year}`}</span>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Created: <span className="font-semibold text-blue-600">{row.ticketsCreated}</span> | Resolved: <span className="font-semibold text-green-600">{row.ticketsResolved}</span>
-                  </p>
-                </div>
-                <div className="mt-3 text-xs text-slate-500 border-t border-slate-200/60 pt-2">
-                  <span className="font-semibold text-slate-700">Operators/Users:</span>{" "}
-                  {row.operators && row.operators.filter(Boolean).length > 0
-                    ? row.operators.filter(Boolean).join(", ")
-                    : "None assigned"}
-                </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {fullYearMonths.map((row, index) => (
+            <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col justify-between">
+              <div>
+                <span className="text-sm font-bold text-gray-700">Period: {row.period}</span>
+                <p className="text-xs text-gray-500 mt-1">
+                  Created: <span className="font-semibold text-blue-600">{row.ticketsCreated}</span> | Resolved: <span className="font-semibold text-green-600">{row.ticketsResolved}</span>
+                </p>
               </div>
-            ))
-          ) : (
-            <p className="text-sm text-gray-400 p-2">No month-on-month data recorded yet.</p>
-          )}
+            </div>
+          ))}
         </div>
       </div>
 
