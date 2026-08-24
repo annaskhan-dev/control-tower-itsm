@@ -5,8 +5,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { SessionLog, SessionLogDocument } from '../schemas/session-log.schema';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 
@@ -14,6 +15,7 @@ import { JwtService } from '@nestjs/jwt';
 export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(SessionLog.name) private sessionLogModel: Model<SessionLogDocument>, // Added SessionLog Model
     private jwtService: JwtService,
   ) {}
 
@@ -72,6 +74,12 @@ export class AuthService {
       user.fullName?.trim() || 
       (email ? email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1) : 'User');
 
+    // Record login session for active time calculations
+    await this.sessionLogModel.create({
+      userId: user._id,
+      loginAt: new Date(),
+    });
+
     const payload = {
       sub: user._id.toString(),
       companyId: user.companyId.toString(),
@@ -85,5 +93,22 @@ export class AuthService {
       user: result,
       access_token: this.jwtService.sign(payload),
     };
+  }
+
+  // Added logout method to close the open session and log active duration
+  async logout(userId: string) {
+    const activeSession = await this.sessionLogModel.findOne({ 
+      userId: new Types.ObjectId(userId), 
+      logoutAt: { $exists: false } 
+    }).sort({ loginAt: -1 });
+
+    if (activeSession) {
+      const logoutTime = new Date();
+      activeSession.logoutAt = logoutTime;
+      activeSession.durationMs = logoutTime.getTime() - new Date(activeSession.loginAt).getTime();
+      await activeSession.save();
+    }
+
+    return { message: 'Logged out successfully' };
   }
 }

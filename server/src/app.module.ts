@@ -10,6 +10,11 @@ import { TicketsModule } from './tickets/tickets.module';
 import { RoadAlertsModule } from './road-alerts/road-alerts.module';
 import { UsersModule } from './users/users.module';
 
+// 1. Import Schemas and Analytics Controller
+import { SessionLog, SessionLogSchema } from './schemas/session-log.schema';
+import { Ticket, TicketSchema } from './tickets/schemas/ticket.schema'; // Added Ticket schema import
+import { AnalyticsController } from '../controllers/analytics.controller';
+
 @Module({
   imports: [
     // 1. ConfigModule MUST be the first import to load variables globally
@@ -26,6 +31,12 @@ import { UsersModule } from './users/users.module';
       }),
       inject: [ConfigService],
     }),
+
+    // 3. Register SessionLog and Ticket schemas for dependency injection
+    MongooseModule.forFeature([
+      { name: SessionLog.name, schema: SessionLogSchema },
+      { name: Ticket.name, schema: TicketSchema },
+    ]),
     
     AuthModule,
     DriverSupportModule,
@@ -33,7 +44,10 @@ import { UsersModule } from './users/users.module';
     RoadAlertsModule,
     UsersModule,
   ],
-  controllers: [AppController],
+  controllers: [
+    AppController,
+    AnalyticsController, // 4. Added AnalyticsController here
+  ],
   providers: [AppService],
 })
 export class AppModule {

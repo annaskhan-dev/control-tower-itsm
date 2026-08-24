@@ -33,4 +33,22 @@ api.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
+// --- Auth Logout Helper Function ---
+export const logoutUser = async (userId) => {
+  const response = await api.post('/auth/logout', { userId });
+  return response.data;
+};
+
+// --- New Analytics Helper Functions ---
+export const fetchActiveTimeStats = async () => {
+  const response = await api.get('/analytics/active-time');
+  return response.data;
+};
+
+export const fetchMonthOnMonthReport = async () => {
+  const response = await api.get('/analytics/month-on-month');
+  return response.data;
+};
+// -------------------------------------
+
 export default api;

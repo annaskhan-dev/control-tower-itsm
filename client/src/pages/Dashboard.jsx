@@ -10,7 +10,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { fetchTicketStats } from "../api/axiosInstance";
 import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
-import api from "../services/api";
+import api, { fetchActiveTimeStats, fetchMonthOnMonthReport } from "../services/api";
 import {
   XAxis,
   YAxis,
@@ -431,6 +431,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   const loading = contextLoading && (!tickets || tickets.length === 0);
 
   const [backendStats, setBackendStats] = useState(null);
+  const [activeTimeStatsData, setActiveTimeStatsData] = useState([]);
+  const [momReportData, setMomReportData] = useState([]);
   const [now, setNow] = useState(() => new Date());
 
   const [velocityDays, setVelocityDays] = useState(7);
@@ -483,6 +485,16 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         const data = await fetchTicketStats();
         if (data && isMounted) {
           setBackendStats(data);
+        }
+
+        const activeTimeRes = await fetchActiveTimeStats();
+        if (activeTimeRes && isMounted) {
+          setActiveTimeStatsData(activeTimeRes);
+        }
+
+        const momRes = await fetchMonthOnMonthReport();
+        if (momRes && isMounted) {
+          setMomReportData(momRes);
         }
       } catch (err) {
         console.error("Failed to load backend stats:", err);
@@ -1336,7 +1348,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         </span>
                       </td>
 
-                      {/* Primary Assignee (Styled text matching screenshot) */}
+                      {/* Primary Assignee */}
                       <td
                         className="py-4 px-4 font-medium text-slate-800 whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
@@ -1383,7 +1395,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         )}
                       </td>
 
-                      {/* Primary Assignment Timeline (Boxed start/end matching screenshot design) */}
+                      {/* Primary Assignment Timeline */}
                       <td className="py-4 px-4 whitespace-nowrap">
                         {t.primaryStartFormatted ? (
                           <div className="inline-flex flex-col bg-slate-50/80 border border-slate-200/80 rounded-xl px-3 py-1.5 text-[11px] shadow-2xs">
@@ -1399,7 +1411,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         )}
                       </td>
 
-                      {/* Primary Duration (Pill badge styling) */}
+                      {/* Primary Duration */}
                       <td className="py-4 px-4 whitespace-nowrap">
                         {t.isAssigned ? (
                           <span className="inline-flex items-center px-3 py-1 rounded-xl bg-slate-100/80 border border-slate-200 text-slate-700 font-medium text-[11px] shadow-2xs">
@@ -1410,7 +1422,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         )}
                       </td>
 
-                      {/* Sub-Assignee (Styled purple/colored text matching screenshot) */}
+                      {/* Sub-Assignee */}
                       <td className="py-4 px-4 whitespace-nowrap">
                         {t.isSubAssigned ? (
                           <span className="font-medium text-purple-700">
@@ -1421,7 +1433,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         )}
                       </td>
 
-                      {/* Sub-Assignment Timeline (Light purple boxed style matching screenshot) */}
+                      {/* Sub-Assignment Timeline */}
                       <td className="py-4 px-4 whitespace-nowrap">
                         {t.isSubAssigned && t.subStartFormatted ? (
                           <div className="inline-flex flex-col bg-purple-50/40 border border-purple-100 rounded-xl px-3 py-1.5 text-[11px] shadow-2xs">
@@ -1437,7 +1449,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         )}
                       </td>
 
-                      {/* Sub-Assignee Duration (Light purple pill styling matching screenshot) */}
+                      {/* Sub-Assignee Duration */}
                       <td className="py-4 px-4 whitespace-nowrap">
                         {t.isSubAssigned ? (
                           <span className="inline-flex items-center px-3 py-1 rounded-xl bg-purple-50/60 border border-purple-100 text-purple-700 font-medium text-[11px] shadow-2xs">
@@ -1463,7 +1475,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                         </span>
                       </td>
 
-                      {/* Status & Total Resolution (Rounded pill badge + Total subtext matching screenshot) */}
+                      {/* Status & Total Resolution */}
                       <td className="py-4 px-4 whitespace-nowrap">
                         <div className="flex flex-col gap-1">
                           <span
