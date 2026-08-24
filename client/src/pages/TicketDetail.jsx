@@ -185,16 +185,19 @@ export const TicketDetail = () => {
       rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || "";
     }
     const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
-    const isSubAssigned = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned" && subAssignmentName !== null;
+    const hasSubName = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned" && subAssignmentName !== null;
 
     const createdAtTime = new Date(ticket.createdAt || ticket.created_at || ticket.timestamp || now).getTime();
     const assignedAtRaw = ticket.assignedAt || ticket.assigned_at || ticket.assignmentTime;
     const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
 
-    const subAssignedAtRaw = ticket.subAssignmentAt || ticket.sub_assigned_at || ticket.subAssignedAt || ticket.sub_assignment_at || (isSubAssigned ? (ticket.updatedAt || ticket.createdAt) : null);
+    const subAssignedAtRaw = ticket.subAssignmentAt || ticket.sub_assigned_at || ticket.subAssignedAt || ticket.sub_assignment_at;
     const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
 
-    // Primary Assignment Time[cite: 1, 2]
+    // Fixed: Sub-assignment is officially active if a name exists OR a timestamp exists
+    const isSubAssigned = hasSubName || subAssignedAtTime !== null;
+
+    // Primary Assignment Time (Stops instantly when subAssignmentAt is present)
     let primaryAssignmentMs = 0;
     if (isAssigned) {
       const primaryEndTime = (isSubAssigned && subAssignedAtTime) ? subAssignedAtTime : currentOrResolveTime;
