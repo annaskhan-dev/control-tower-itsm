@@ -38,7 +38,7 @@ export class TicketsService {
     }
   }
 
-  // Helper to extract the actual person who resolved/worked on the ticket (prioritizing sub-assignment)
+  // FIXED: Prioritize sub-assignment first so the sub-assignee gets the credit
   private getEffectiveResolver(ticket: any): string {
     const sub = ticket.subAssignment || ticket.subAssignee;
     if (sub && typeof sub === 'string' && sub !== 'Unassigned' && sub.trim() !== '') {
@@ -208,7 +208,6 @@ export class TicketsService {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
     }
 
-    // FIXED: Use getEffectiveResolver to correctly give credit to sub-assignee
     if (isNewResolved && !isAlreadyResolved) {
       const targetUser = this.getEffectiveResolver(updatedTicket);
 
@@ -329,7 +328,6 @@ export class TicketsService {
       return acc;
     }, {});
 
-    // FIXED: Use getEffectiveResolver to aggregate stats accurately by sub-assignee
     const resolvedByOperatorStats = tickets.reduce((acc: any, ticket) => {
       const status = (ticket.status || '').toLowerCase();
       const isResolved = ['resolved', 'closed', 'completed', 'done'].includes(status);
