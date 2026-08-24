@@ -577,7 +577,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       "July", "August", "September", "October", "November", "December"
     ];
 
-    // Build a map of existing backend data by period string (e.g. "August 2026")
     const dataMap = {};
     if (Array.isArray(monthOnMonth)) {
       monthOnMonth.forEach((item) => {
@@ -586,11 +585,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       });
     }
 
-    // Also compute counts directly from tickets if needed or supplement
     return monthsList.map((mName, index) => {
       const periodStr = `${mName} ${currentYear}`;
-      
-      // Filter tickets belonging to this specific month & year if backend list is sparse
       const monthTickets = normalizedTickets.filter((t) => {
         const d = new Date(t.createdAt);
         return !isNaN(d.getTime()) && d.getMonth() === index && d.getFullYear() === currentYear;
@@ -598,7 +594,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
       const resolvedCount = monthTickets.filter((t) => t.isResolved).length;
       const createdCount = monthTickets.length;
-
       const existingData = dataMap[periodStr] || dataMap[`${mName} ${currentYear}`];
 
       return {
@@ -1106,8 +1101,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
               <tr>
                 <th className="p-3">User / Operator</th>
                 <th className="p-3">Role</th>
-                <th className="p-3">Total Active Hours</th>
-                <th className="p-3">Avg Hours / Session</th>
+                <th className="p-3">Total Active Hours (Login/Logout)</th>
+                <th className="p-3">Monthly Average Active Hours</th>
               </tr>
             </thead>
             <tbody>
@@ -1117,12 +1112,12 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                     <td className="p-3 font-medium text-gray-900">{item.name}</td>
                     <td className="p-3">{item.role}</td>
                     <td className="p-3">{item.totalActiveHours ? item.totalActiveHours.toFixed(2) : 0} hrs</td>
-                    <td className="p-3">{item.averageActiveHoursPerSession ? item.averageActiveHoursPerSession.toFixed(2) : 0} hrs</td>
+                    <td className="p-3">{item.monthlyAverageActiveHours ? item.monthlyAverageActiveHours.toFixed(2) : 0} hrs / mo</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="4" className="p-4 text-center text-gray-400">No session active data available yet.</td>
+                  <td colSpan="4" className="p-4 text-center text-gray-400">No login/logout session activity records found.</td>
                 </tr>
               )}
             </tbody>
