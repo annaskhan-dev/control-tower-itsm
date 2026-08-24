@@ -38,7 +38,7 @@ export class TicketsService {
     }
   }
 
-  // FIXED: Properly prioritize sub-assignment for metrics/resolution credit without altering primary assignee
+  // FIXED: Strictly prioritize sub-assignment first so resolution credit goes to the sub-assignee (e.g., Ali)
   private getEffectiveResolver(ticket: any): string {
     const sub = ticket.subAssignment;
     if (sub && typeof sub === 'string' && sub !== 'Unassigned' && sub.trim() !== '') {
