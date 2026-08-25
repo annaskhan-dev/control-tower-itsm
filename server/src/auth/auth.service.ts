@@ -78,6 +78,7 @@ export class AuthService {
     await this.sessionLogModel.create({
       userId: user._id,
       loginAt: new Date(),
+      durationMs: 0, // Initialize duration to 0 on login
     });
 
     const payload = {
@@ -95,19 +96,28 @@ export class AuthService {
     };
   }
 
-  // Updated logout method to safely handle object/string conversion for userId
+  // Updated logout method to safely handle session duration accumulation and updates
   async logout(userId: string) {
     const objectId = typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
 
+    // Find the latest active session log for this user where durationMs is still 0 or unfinalized
     const activeSession = await this.sessionLogModel.findOne({ 
       userId: objectId, 
-      logoutAt: { $exists: false } 
+      $or: [
+        { durationMs: { $in: [null, 0] } },
+        { logoutAt: { $exists: false } }
+      ]
     }).sort({ loginAt: -1 });
 
     if (activeSession) {
       const logoutTime = new Date();
+      const loginTime = new Date(activeSession.loginAt);
+      const calculatedDuration = logoutTime.getTime() - loginTime.getTime();
+
       activeSession.logoutAt = logoutTime;
-      activeSession.durationMs = logoutTime.getTime() - new Date(activeSession.loginAt).getTime();
+      // Accumulate or set the duration in milliseconds
+      activeSession.durationMs = (activeSession.durationMs || 0) + calculatedDuration;
+      
       await activeSession.save();
     }
 

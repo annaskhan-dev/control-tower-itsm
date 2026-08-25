@@ -2,8 +2,7 @@ import { Controller, Post, Body, HttpCode, HttpStatus, Req, UseGuards } from '@n
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto'; 
-// Optional: import your JwtAuthGuard or request interface if you implement a logout endpoint here as well
-// import { JwtAuthGuard } from './jwt-auth.guard'; 
+import { JwtAuthGuard } from './jwt-auth.guard'; // Ensure this path matches your project structure
 
 @Controller('auth')
 export class AuthController {
@@ -29,9 +28,11 @@ export class AuthController {
 
   // Logout Route to handle ending the session for active time calculation
   @Post('logout')
+  @UseGuards(JwtAuthGuard) // Protects the route and populates req.user from the JWT
   @HttpCode(HttpStatus.OK)
-  async logout(@Body() body: { userId: string }) {
-    // If you pass userId or extract it from a Bearer token guard req.user:
-    return await this.authService.logout(body.userId);
+  async logout(@Req() req) {
+    // Safely extract the userId from the authenticated token payload
+    const userId = req.user.userId || req.user._id;
+    return await this.authService.logout(userId);
   }
 }

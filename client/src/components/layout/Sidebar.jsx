@@ -27,18 +27,18 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user, mobileOpen, setMob
   const handleLogoutClick = async (e) => {
     e.preventDefault();
     
-    // Call backend logout endpoint if user ID is available
-    if (user?.id || user?._id) {
-      try {
-        const userId = user.id || user._id;
-        await fetch(`/api/auth/logout`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId }),
-        });
-      } catch (error) {
-        console.error('Failed to register logout on backend:', error);
-      }
+    // Call backend logout endpoint securely using the Bearer token
+    try {
+      const token = localStorage.getItem('access_token');
+      await fetch(`/auth/logout`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+      });
+    } catch (error) {
+      console.error('Failed to register logout on backend:', error);
     }
 
     localStorage.clear();
