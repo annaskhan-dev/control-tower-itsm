@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Req, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Req, UseGuards, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto'; 
@@ -31,8 +31,13 @@ export class AuthController {
   @UseGuards(JwtAuthGuard) // Protects the route and populates req.user from the JWT
   @HttpCode(HttpStatus.OK)
   async logout(@Req() req) {
-    // Safely extract the userId from the authenticated token payload
-    const userId = req.user.userId || req.user._id;
+    // Safely extract the userId from the authenticated token payload ('sub' is standard for JWT subject/ID)
+    const userId = req.user.sub || req.user.userId || req.user._id;
+    
+    if (!userId) {
+      throw new BadRequestException('User ID not found in token payload');
+    }
+
     return await this.authService.logout(userId);
   }
 }
