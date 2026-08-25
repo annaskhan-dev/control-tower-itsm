@@ -44,30 +44,63 @@ export class ReportsService {
       {
         $match: { durationMs: { $exists: true, $ne: null } }
       },
+      // Step 1: Group by User and Month to calculate active duration per month
       {
         $group: {
-          _id: '$userId',
-          totalActiveMs: { $sum: '$durationMs' },
-          averageSessionMs: { $avg: '$durationMs' },
+          _id: {
+            userId: '$userId',
+            month: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }
+          },
+          monthlyActiveMs: { $sum: '$durationMs' }
+        }
+      },
+      // Step 2: Group by User to accumulate total overall time and calculate monthly average
+      {
+        $group: {
+          _id: '$_id.userId',
+          totalOverallMs: { $sum: '$monthlyActiveMs' },
+          avgMonthlyActiveMs: { $avg: '$monthlyActiveMs' },
           sessionCount: { $sum: 1 }
         }
       },
+      // Step 3: Lookup user details securely handling both ObjectIds and string identifiers
       {
         $lookup: {
           from: 'users',
-          localField: '_id',
-          foreignField: '_id',
+          let: { searchId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $or: [
+                    { $eq: ['$_id', '$$searchId'] },
+                    { $eq: [{ $toString: '$_id' }, { $toString: '$$searchId' }] },
+                    { $eq: ['$name', '$$searchId'] },
+                    { $eq: ['$username', '$$searchId'] }
+                  ]
+                }
+              }
+            }
+          ],
           as: 'user'
         }
       },
-      { $unwind: '$user' },
+      {
+        $unwind: {
+          path: '$user',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      // Step 4: Project fields matching your frontend UI keys
       {
         $project: {
-          name: '$user.name',
+          name: {
+            $ifNull: ['$user.name', { $ifNull: ['$user.username', '$_id'] }]
+          },
           email: '$user.email',
-          role: '$user.role',
-          totalActiveHours: { $divide: ['$totalActiveMs', 3600000] },
-          averageActiveHoursPerSession: { $divide: ['$averageSessionMs', 3600000] },
+          role: { $ifNull: ['$user.role', { $ifNull: ['$user.userType', 'Operator'] }] },
+          totalActiveHours: { $divide: ['$totalOverallMs', 3600000] },
+          monthlyAverageActiveHours: { $divide: ['$avgMonthlyActiveMs', 3600000] },
           sessionCount: 1
         }
       }
