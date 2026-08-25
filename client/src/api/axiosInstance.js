@@ -54,10 +54,22 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-// Added helper function to resolve build error in Dashboard.jsx
+// Helper function to fetch ticket stats (used in Dashboard.jsx)
 export const fetchTicketStats = async () => {
   const response = await axiosInstance.get('/tickets/stats');
   return response.data;
+};
+
+// Added helper function to safely hit the correct backend logout route (/api/auth/logout)
+export const logoutUser = async () => {
+  try {
+    await axiosInstance.post('/auth/logout');
+  } catch (error) {
+    console.error("Logout request failed, cleaning up locally anyway:", error);
+  } finally {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+  }
 };
 
 export default axiosInstance;
