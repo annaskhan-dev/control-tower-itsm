@@ -817,18 +817,24 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   }, []);
 
   const handleExportExcel = () => {
-    const currentDate = new Date();
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(currentDate.getMonth() - 1);
+    const targetMonthName = selectedMomMonth; // Uses the month selected from the dropdown filter
+    const monthsMap = {
+      January: 0, February: 1, March: 2, April: 3, May: 4, June: 5,
+      July: 6, August: 7, September: 8, October: 9, November: 10, December: 11
+    };
+    const targetMonthIndex = monthsMap[targetMonthName];
+    const currentYear = new Date().getFullYear();
 
-    const recentTickets = normalizedTickets.filter((t) => {
-      if (!t.createdAt) return true;
+    // Filter tickets precisely matching the selected month and year
+    const monthFilteredTickets = normalizedTickets.filter((t) => {
+      if (!t.createdAt) return false;
       const ticketDate = new Date(t.createdAt);
-      return isNaN(ticketDate.getTime()) || ticketDate >= oneMonthAgo;
+      if (isNaN(ticketDate.getTime())) return false;
+      return ticketDate.getMonth() === targetMonthIndex && ticketDate.getFullYear() === currentYear;
     });
 
-    if (recentTickets.length === 0) {
-      alert("No ticket data found to export for the last month.");
+    if (monthFilteredTickets.length === 0) {
+      alert(`No ticket data found to export for ${targetMonthName} ${currentYear}.`);
       return;
     }
 
@@ -849,7 +855,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       "Status & Total Resolution",
     ];
 
-    const csvRows = recentTickets.map((t) => {
+    const csvRows = monthFilteredTickets.map((t) => {
       const createdAtFormatted = t.createdAt
         ? new Date(t.createdAt).toLocaleString()
         : "";
@@ -879,7 +885,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `comprehensive_tickets_report_last_month_${currentDate.toISOString().slice(0, 10)}.csv`,
+      `tickets_report_${targetMonthName.toLowerCase()}_${currentYear}.csv`,
     );
     document.body.appendChild(link);
     link.click();
@@ -1167,8 +1173,9 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           <button
             onClick={handleExportExcel}
             className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-xs flex items-center gap-2 cursor-pointer justify-center flex-1 sm:flex-none"
+            title={`Export data for ${selectedMomMonth}`}
           >
-            <Download size={16} /> Export to Excel
+            <Download size={16} /> Export {selectedMomMonth} to Excel
           </button>
         </div>
       </div>
