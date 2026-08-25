@@ -15,12 +15,24 @@ export class AnalyticsController {
   async getActiveTimeStats() {
     return await this.sessionLogModel.aggregate([
       {
+        $addFields: {
+          // If durationMs is 0, compute time elapsed from loginAt to now dynamically
+          effectiveDuration: {
+            $cond: {
+              if: { $gt: ["$durationMs", 0] },
+              then: "$durationMs",
+              else: { $subtract: [new Date(), "$loginAt"] }
+            }
+          }
+        }
+      },
+      {
         $group: {
           _id: {
             userId: "$userId",
             yearMonth: { $dateToString: { format: "%Y-%m", date: "$loginAt" } }
           },
-          totalMonthMs: { $sum: "$durationMs" }
+          totalMonthMs: { $sum: "$effectiveDuration" }
         }
       },
       {
