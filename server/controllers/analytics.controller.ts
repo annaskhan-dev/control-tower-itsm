@@ -38,8 +38,16 @@ export class AnalyticsController {
       {
         $lookup: {
           from: "users",
-          localField: "_id.userId",
-          foreignField: "_id",
+          let: { searchUserId: "$_id.userId" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $eq: ["$_id", { $toObjectId: "$$searchUserId" }]
+                }
+              }
+            }
+          ],
           as: "userInfo"
         }
       },
