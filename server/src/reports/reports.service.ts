@@ -85,18 +85,14 @@ export class ReportsService {
           as: 'user'
         }
       },
+      // Strict unwind: drops any records that do not successfully match a real user profile
       {
-        $unwind: {
-          path: '$user',
-          preserveNullAndEmptyArrays: true
-        }
+        $unwind: '$user'
       },
-      // Step 4: Project fields matching your frontend UI keys
+      // Step 4: Project clean fields for your frontend UI table
       {
         $project: {
-          name: {
-            $ifNull: ['$user.name', { $ifNull: ['$user.username', '$_id'] }]
-          },
+          name: '$user.name',
           email: '$user.email',
           role: { $ifNull: ['$user.role', { $ifNull: ['$user.userType', 'Operator'] }] },
           totalActiveHours: { $divide: ['$totalOverallMs', 3600000] },
