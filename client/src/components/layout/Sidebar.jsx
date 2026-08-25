@@ -13,6 +13,7 @@ import {
   Menu, 
   X 
 } from 'lucide-react';
+import axiosInstance, { logoutUser } from '../path-to/axiosInstance'; // ⚠️ UPDATE THIS PATH to match where your axiosInstance file is located
 
 export const Sidebar = ({ onOpenCreateTicket, onLogout, user, mobileOpen, setMobileOpen }) => {
   const location = useLocation();
@@ -27,22 +28,16 @@ export const Sidebar = ({ onOpenCreateTicket, onLogout, user, mobileOpen, setMob
   const handleLogoutClick = async (e) => {
     e.preventDefault();
     
-    // Call backend logout endpoint securely using the Bearer token
+    // Safely call backend logout endpoint using the configured axios instance & helper
     try {
-      const token = localStorage.getItem('access_token');
-      await fetch(`/auth/logout`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-      });
+      await logoutUser();
     } catch (error) {
       console.error('Failed to register logout on backend:', error);
+      // Fallback cleanup if network completely fails
+      localStorage.clear();
+      sessionStorage.clear();
     }
 
-    localStorage.clear();
-    sessionStorage.clear();
     if (onLogout) onLogout();
     navigate ? navigate('/login') : (window.location.href = '/login');
   };
