@@ -13,7 +13,7 @@ import {
   Menu, 
   X 
 } from 'lucide-react';
-import axiosInstance, { logoutUser } from '../path-to/axiosInstance'; // ⚠️ UPDATE THIS PATH to match where your axiosInstance file is located
+import axiosInstance, { logoutUser } from '../../api/axiosInstance'; // ⚠️ UPDATE THIS PATH to match where your axiosInstance file is located
 
 export const Sidebar = ({ onOpenCreateTicket, onLogout, user, mobileOpen, setMobileOpen }) => {
   const location = useLocation();
