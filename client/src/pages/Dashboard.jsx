@@ -898,7 +898,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     let closedCount = 0;
     let openCount = 0;
 
-    // Build a map of operator/user name to their designated role based on fetched operators list
     const operatorRoleMap = {};
     operators.forEach((op) => {
       const opName = op.name || op.fullName || op.username;
@@ -934,7 +933,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           if (matchedRole && !operatorKeyRaw.toLowerCase().includes(matchedRole.toLowerCase())) {
             operatorKeyFormatted = `${operatorKeyRaw} (${matchedRole})`;
           } else if (!operatorKeyRaw.includes("(")) {
-            // Fallback default role tag if unmatched
             operatorKeyFormatted = `${operatorKeyRaw} (Operator)`;
           }
         }

@@ -16,12 +16,12 @@ export class AnalyticsController {
     return await this.sessionLogModel.aggregate([
       {
         $addFields: {
-          // If durationMs is 0, compute time elapsed from loginAt to now dynamically
+          // Only use stored durationMs (populated on logout); ignore open ghost sessions
           effectiveDuration: {
             $cond: {
               if: { $gt: ["$durationMs", 0] },
               then: "$durationMs",
-              else: { $subtract: [new Date(), "$loginAt"] }
+              else: 0
             }
           }
         }

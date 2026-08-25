@@ -27,7 +27,7 @@ export class AuthController {
     return await this.authService.login(loginDto.email, loginDto.password);
   }
 
-  // Example Logout Route to handle ending the session for active time calculation
+  // Logout Route to handle ending the session for active time calculation
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Body() body: { userId: string }) {

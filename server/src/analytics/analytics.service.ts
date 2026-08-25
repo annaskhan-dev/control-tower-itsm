@@ -17,7 +17,8 @@ export class AnalyticsService {
       {
         $group: {
           _id: '$userId',
-          totalActiveMs: { $sum: '$durationMs' },
+          // Only aggregates valid durationMs recorded during explicit logouts
+          totalActiveMs: { $sum: { $ifNull: ['$durationMs', 0] } },
           sessionCount: { $sum: 1 },
           lastLogin: { $max: '$loginAt' },
         },
@@ -67,7 +68,9 @@ export class AnalyticsService {
                 { 
                   $or: [
                     { $eq: ['$status', 'Resolved'] },
+                    { $eq: ['$status', 'resolved'] },
                     { $eq: ['$status', 'closed'] },
+                    { $eq: ['$status', 'Closed'] },
                     { $eq: ['$status', 'Resolved/Closed'] }
                   ] 
                 }, 

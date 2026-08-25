@@ -15,7 +15,7 @@ import { JwtService } from '@nestjs/jwt';
 export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
-    @InjectModel(SessionLog.name) private sessionLogModel: Model<SessionLogDocument>, // Added SessionLog Model
+    @InjectModel(SessionLog.name) private sessionLogModel: Model<SessionLogDocument>,
     private jwtService: JwtService,
   ) {}
 
@@ -84,7 +84,7 @@ export class AuthService {
       sub: user._id.toString(),
       companyId: user.companyId.toString(),
       role: user.role,
-      name: extractedName, // Guaranteed to contain a valid name string
+      name: extractedName,
     };
 
     const { password: userPassword, ...result } = user;
@@ -95,10 +95,12 @@ export class AuthService {
     };
   }
 
-  // Added logout method to close the open session and log active duration
+  // Updated logout method to safely handle object/string conversion for userId
   async logout(userId: string) {
+    const objectId = typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
+
     const activeSession = await this.sessionLogModel.findOne({ 
-      userId: new Types.ObjectId(userId), 
+      userId: objectId, 
       logoutAt: { $exists: false } 
     }).sort({ loginAt: -1 });
 
