@@ -194,7 +194,7 @@ const TableRowItem = memo(({ t, isUserManagerOrAdmin, operators, handleAssignToM
 TableRowItem.displayName = "TableRowItem";
 
 /**
- * Normalization Engine: Robust source/generator field extraction mapping[cite: 3].
+ * Normalization Engine: Robust source/generator field extraction mapping.
  */
 const normalizeTicket = (t, now) => {
   let rawAssignee =
@@ -465,7 +465,7 @@ const normalizeTicket = (t, now) => {
 };
 
 /**
- * Custom Styled Tooltip Component for Charts[cite: 3]
+ * Custom Styled Tooltip Component for Charts
  */
 const CustomTooltip = memo(({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -492,7 +492,7 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * List-based Card for Creators & Sources[cite: 3]
+ * List-based Card for Creators & Sources
  */
 const GeneratorListCard = memo(
   ({ title, data, totalLabel = "total", theme = "emerald", isLoading }) => {
@@ -1120,7 +1120,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
             Operational Dashboard
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Real-time ticketing lifecycle, creator tracking, operator resolution metrics, and SLA health[cite: 3]
+            Real-time ticketing lifecycle, creator tracking, operator resolution metrics, and SLA health
           </p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -1235,7 +1235,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              SLA Health Distribution[cite: 3]
+              SLA Health Distribution
             </h4>
             {isDataLoading ? (
               <div className="h-6 w-16 bg-slate-200 rounded-lg animate-pulse" />
@@ -1308,7 +1308,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           )}
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 italic">
-            <span>Proportional breakdown of active SLAs.[cite: 3]</span>
+            <span>Proportional breakdown of active SLAs.</span>
             {isDataLoading ? (
               <div className="h-3 w-24 bg-slate-200 rounded animate-pulse" />
             ) : (
@@ -1348,8 +1348,12 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                   <tr key={index} className="border-b hover:bg-gray-50 transition-colors">
                     <td className="p-3 font-medium text-gray-900">{item.name}</td>
                     <td className="p-3">{item.role}</td>
-                    <td className="p-3">{item.totalActiveHours ? item.totalActiveHours.toFixed(2) : 0} hrs</td>
-                    <td className="p-3">{item.monthlyAverageActiveHours ? item.monthlyAverageActiveHours.toFixed(2) : 0} hrs / mo</td>
+                    <td className="p-3">
+                      {item.totalOverallMs ? (item.totalOverallMs / (1000 * 60 * 60)).toFixed(2) : (item.totalActiveHours ? item.totalActiveHours.toFixed(2) : 0)} hrs
+                    </td>
+                    <td className="p-3">
+                      {item.avgMonthlyActiveMs ? (item.avgMonthlyActiveMs / (1000 * 60 * 60)).toFixed(2) : (item.monthlyAverageActiveHours ? item.monthlyAverageActiveHours.toFixed(2) : 0)} hrs / mo
+                    </td>
                   </tr>
                 ))
               ) : (
@@ -1417,7 +1421,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-            Ticket Intake Velocity Trend[cite: 3]
+            Ticket Intake Velocity Trend
           </h4>
           <div className="flex items-center gap-2">
             <label
@@ -1499,7 +1503,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           )}
         </div>
         <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-400 italic">
-          Daily volume intake pattern over the selected {velocityDays}-day window.[cite: 3]
+          Daily volume intake pattern over the selected {velocityDays}-day window.
         </div>
       </div>
 
