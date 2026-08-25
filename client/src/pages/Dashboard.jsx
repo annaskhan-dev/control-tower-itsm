@@ -620,7 +620,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [operators, setOperators] = useState([]);
   
-  // Filter state for Month-on-Month breakdown (defaults to current month name e.g., "August")
   const currentYearStr = new Date().getFullYear().toString();
   const currentMonthName = new Date().toLocaleString("en-US", { month: "long" });
   const [selectedMomMonth, setSelectedMomMonth] = useState(currentMonthName);
@@ -899,6 +898,16 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     let closedCount = 0;
     let openCount = 0;
 
+    // Build a map of operator/user name to their designated role based on fetched operators list
+    const operatorRoleMap = {};
+    operators.forEach((op) => {
+      const opName = op.name || op.fullName || op.username;
+      const opRole = op.role || op.userType || "Operator";
+      if (opName) {
+        operatorRoleMap[opName.toLowerCase()] = opRole;
+      }
+    });
+
     normalizedTickets.forEach((t) => {
       const src = t.entrySource || "Direct System";
       generatorMap[src] = (generatorMap[src] || 0) + 1;
@@ -911,14 +920,26 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
       if (isClosed) {
         closedCount++;
-        let operatorKey = "Unassigned / Other";
+        let operatorKeyRaw = "Unassigned / Other";
         if (t.isSubAssigned && t.subAssignmentName && t.subAssignmentName !== "None") {
-          operatorKey = t.subAssignmentName;
+          operatorKeyRaw = t.subAssignmentName;
         } else if (t.isAssigned && t.assigneeName) {
-          operatorKey = t.assigneeName;
+          operatorKeyRaw = t.assigneeName;
         }
         
-        operatorResolvedMap[operatorKey] = (operatorResolvedMap[operatorKey] || 0) + 1;
+        let operatorKeyFormatted = operatorKeyRaw;
+        if (operatorKeyRaw !== "Unassigned / Other") {
+          const lowerName = operatorKeyRaw.toLowerCase();
+          const matchedRole = operatorRoleMap[lowerName];
+          if (matchedRole && !operatorKeyRaw.toLowerCase().includes(matchedRole.toLowerCase())) {
+            operatorKeyFormatted = `${operatorKeyRaw} (${matchedRole})`;
+          } else if (!operatorKeyRaw.includes("(")) {
+            // Fallback default role tag if unmatched
+            operatorKeyFormatted = `${operatorKeyRaw} (Operator)`;
+          }
+        }
+
+        operatorResolvedMap[operatorKeyFormatted] = (operatorResolvedMap[operatorKeyFormatted] || 0) + 1;
       } else {
         openCount++;
       }
@@ -952,7 +973,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       byPriorityResolved: priorityResolvedMap,
       slaHealth: slaHealthMap,
     };
-  }, [normalizedTickets, backendStats]);
+  }, [normalizedTickets, backendStats, operators]);
 
   const chartData = useMemo(() => {
     const daysCount = Math.max(1, Math.min(30, Number(velocityDays) || 7));
