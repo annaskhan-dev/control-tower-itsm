@@ -16,6 +16,7 @@ import { UsersModule } from './users/users.module';
 import { SessionLog, SessionLogSchema } from './schemas/session-log.schema';
 import { Ticket, TicketSchema } from './tickets/schemas/ticket.schema';
 import { AnalyticsController } from '../controllers/analytics.controller';
+import { AuthController } from './auth/auth.controller'; // Explicitly imported if needed globally, or ensure AuthModule exports it
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { AnalyticsController } from '../controllers/analytics.controller';
   controllers: [
     AppController,
     AnalyticsController,
+    AuthController, // Added explicitly here to guarantee the routes register properly
   ],
   providers: [AppService],
 })
