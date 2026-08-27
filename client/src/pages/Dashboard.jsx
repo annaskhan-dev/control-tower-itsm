@@ -706,22 +706,26 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       clearTimeout(safetyTimer);
     };
   }, [tickets]);
-
-  useEffect(() => {
+useEffect(() => {
     const fetchOperatorsList = async () => {
       try {
         const response = await api.get("/users");
         const allUsers = response.data || [];
+        
+        // Filter out Admins AND Shippers completely from the assignment dropdown
         const filteredOps = allUsers.filter((u) => {
           const r = (u.role || u.userType || "")
             .replace(/\s+/g, "_")
             .toLowerCase();
-          return (
-            r.includes("operator") ||
-            r.includes("transporter") ||
-            !r.includes("admin")
-          );
+          const name = (u.name || u.fullName || u.username || "").toLowerCase();
+
+          const isAdminRole = r.includes("admin");
+          const isShipperRole = r.includes("shipper") || name.includes("shipper");
+
+          // Only keep operators/transporters/managers who are NOT admins and NOT shippers
+          return !isAdminRole && !isShipperRole;
         });
+
         setOperators(filteredOps);
       } catch (err) {
         console.error("Failed to fetch operators list", err);
