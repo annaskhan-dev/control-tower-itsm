@@ -711,7 +711,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       clearTimeout(safetyTimer);
     };
   }, [tickets]);
-useEffect(() => {
+
+  useEffect(() => {
     const fetchOperatorsList = async () => {
       try {
         const response = await api.get("/users");
@@ -727,7 +728,6 @@ useEffect(() => {
           const isAdminRole = r.includes("admin");
           const isShipperRole = r.includes("shipper") || name.includes("shipper");
 
-          // Only keep operators/transporters/managers who are NOT admins and NOT shippers
           return !isAdminRole && !isShipperRole;
         });
 
@@ -829,7 +829,7 @@ useEffect(() => {
   }, []);
 
   const handleExportExcel = () => {
-    const targetMonthName = excelExportMonth; // Uses the dedicated excel report month filter
+    const targetMonthName = excelExportMonth;
     const monthsMap = {
       January: 0, February: 1, March: 2, April: 3, May: 4, June: 5,
       July: 6, August: 7, September: 8, October: 9, November: 10, December: 11
@@ -837,7 +837,6 @@ useEffect(() => {
     const targetMonthIndex = monthsMap[targetMonthName];
     const currentYear = new Date().getFullYear();
 
-    // Filter tickets precisely matching the selected month and year
     const monthFilteredTickets = normalizedTickets.filter((t) => {
       if (!t.createdAt) return false;
       const ticketDate = new Date(t.createdAt);
@@ -890,7 +889,6 @@ useEffect(() => {
       ].join(",");
     });
 
-    // Added BOM prefix (\uFEFF) so Excel properly detects UTF-8 encoding and avoids corrupted characters
     const csvContent = "\uFEFF" + [headers.join(","), ...csvRows].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -937,7 +935,6 @@ useEffect(() => {
           t.status.toLowerCase(),
         );
 
-      // Track primary and sub-assigned workload counts per operator
       const formatOperatorName = (rawName) => {
         if (!rawName || rawName === "Unassigned" || rawName === "Null" || rawName === "None") return null;
         const lowerName = rawName.toLowerCase();
@@ -1313,8 +1310,8 @@ useEffect(() => {
         ))}
       </div>
 
-      {/* Widgets Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Widgets Grid: Redesigned to 2 Boxes per Row on medium+ screens */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <GeneratorListCard
           title="TICKETS CREATED BY ROLE / SOURCE"
           data={chartData.generator}
@@ -1362,8 +1359,8 @@ useEffect(() => {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col xl:flex-row items-center gap-2 my-1">
-              <div className="h-32 w-full xl:w-1/2">
+            <div className="flex flex-col xl:flex-row items-center justify-around gap-4 my-2">
+              <div className="h-36 w-36 relative flex items-center justify-center shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -1386,13 +1383,13 @@ useEffect(() => {
                 </ResponsiveContainer>
               </div>
 
-              <div className="w-full xl:w-1/2 flex flex-col gap-1.5 text-xs">
+              <div className="w-full xl:w-1/2 flex flex-col gap-2 text-xs">
                 {chartData.slaPie.map((item, idx) => (
                   <div
                     key={`sla-point-${idx}`}
-                    className="flex items-center justify-between bg-slate-50/80 p-1.5 rounded-lg border border-slate-100 transition-all"
+                    className="flex items-center justify-between bg-slate-50/80 px-3 py-2 rounded-xl border border-slate-100 transition-all"
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       <span
                         className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: item.color }}
@@ -1401,9 +1398,9 @@ useEffect(() => {
                         {item.name}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 font-bold">
+                    <div className="flex items-center gap-1.5 font-bold">
                       <span className="text-slate-900">{item.value}</span>
-                      <span className="text-[10px] text-slate-400 font-normal">
+                      <span className="text-[11px] text-slate-400 font-normal">
                         ({item.percentage}%)
                       </span>
                     </div>
@@ -1413,7 +1410,7 @@ useEffect(() => {
             </div>
           )}
 
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 italic">
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 italic">
             <span>Proportional breakdown of active SLAs.</span>
             {isDataLoading ? (
               <div className="h-3 w-24 bg-slate-200 rounded animate-pulse" />
