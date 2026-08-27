@@ -424,7 +424,7 @@ const normalizeTicket = (t, now) => {
     : null;
 
   const formatDuration = (ms) => {
-    if (ms === null || ms === undefined || isNaN(ms)) return "—";
+    if (ms === null || ms === undefined || isNaN(ms)) return "Null";
     if (ms < 60000) return "0h 1m";
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
@@ -438,7 +438,7 @@ const normalizeTicket = (t, now) => {
     title: t.title || t.subject || t.name || t.description || "Untitled Ticket",
     entrySource: rawSourceStr,
     assigneeName,
-    subAssignmentName: isSubAssigned ? subAssignmentName : "None",
+    subAssignmentName: isSubAssigned ? subAssignmentName : "Null",
     subAssignmentAt: subAssignedAtRaw,
     status: t.status || "Open",
     createdAt: t.createdAt || t.created_at || new Date().toISOString(),
@@ -452,12 +452,12 @@ const normalizeTicket = (t, now) => {
     primaryEndFormatted,
     assignmentTimeFormatted: isAssigned
       ? formatDuration(primaryAssignmentMs)
-      : "—",
+      : "Null",
     subStartFormatted,
     subEndFormatted,
     subAssignmentTimeFormatted: isSubAssigned
       ? formatDuration(subAssignmentTimeMs)
-      : "—",
+      : "Null",
     finalResolutionTimeFormatted: isResolved
       ? formatDuration(finalResolutionTimeMs)
       : "Pending",
@@ -623,6 +623,9 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   const currentYearStr = new Date().getFullYear().toString();
   const currentMonthName = new Date().toLocaleString("en-US", { month: "long" });
   const [selectedMomMonth, setSelectedMomMonth] = useState(currentMonthName);
+
+  // Dedicated state for Excel report month filter
+  const [excelExportMonth, setExcelExportMonth] = useState(currentMonthName);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000);
@@ -817,7 +820,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   }, []);
 
   const handleExportExcel = () => {
-    const targetMonthName = selectedMomMonth; // Uses the month selected from the dropdown filter
+    const targetMonthName = excelExportMonth; // Uses the dedicated excel report month filter
     const monthsMap = {
       January: 0, February: 1, March: 2, April: 3, May: 4, June: 5,
       July: 6, August: 7, September: 8, October: 9, November: 10, December: 11
@@ -868,17 +871,18 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         `"${(t.category || "").replace(/"/g, '""')}"`,
         `"${(t.priority || "").replace(/"/g, '""')}"`,
         `"${(t.assigneeName || "").replace(/"/g, '""')}"`,
-        `"${t.primaryStartFormatted ? `Start: ${t.primaryStartFormatted} End: ${t.primaryEndFormatted}` : "—"}"`,
-        `"${t.assignmentTimeFormatted || "Unassigned"}"`,
+        `"${t.primaryStartFormatted ? `Start: ${t.primaryStartFormatted} End: ${t.primaryEndFormatted}` : "Null"}"`,
+        `"${t.assignmentTimeFormatted || "Null"}"`,
         `"${(t.subAssignmentName || "").replace(/"/g, '""')}"`,
-        `"${t.subStartFormatted ? `Start: ${t.subStartFormatted} End: ${t.subEndFormatted}` : "—"}"`,
-        `"${t.subAssignmentTimeFormatted || "—"}"`,
+        `"${t.subStartFormatted ? `Start: ${t.subStartFormatted} End: ${t.subEndFormatted}` : "Null"}"`,
+        `"${t.subAssignmentTimeFormatted || "Null"}"`,
         `"${(t.slaStatus || "").replace(/"/g, '""')}"`,
         `"${(t.status || "").replace(/"/g, '""')} (Total: ${t.finalResolutionTimeFormatted})"`,
       ].join(",");
     });
 
-    const csvContent = [headers.join(","), ...csvRows].join("\n");
+    // Added BOM prefix (\uFEFF) so Excel properly detects UTF-8 encoding and avoids corrupted characters
+    const csvContent = "\uFEFF" + [headers.join(","), ...csvRows].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -926,7 +930,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       if (isClosed) {
         closedCount++;
         let operatorKeyRaw = "Unassigned / Other";
-        if (t.isSubAssigned && t.subAssignmentName && t.subAssignmentName !== "None") {
+        if (t.isSubAssigned && t.subAssignmentName && t.subAssignmentName !== "Null" && t.subAssignmentName !== "None") {
           operatorKeyRaw = t.subAssignmentName;
         } else if (t.isAssigned && t.assigneeName) {
           operatorKeyRaw = t.assigneeName;
@@ -1148,7 +1152,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
             Real-time ticketing lifecycle, creator tracking, operator resolution metrics, and SLA health
           </p>
         </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           {onOpenCreateTicket && (
             <button
               onClick={onOpenCreateTicket}
@@ -1170,12 +1174,35 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
               Add Ticket
             </button>
           )}
+
+          {/* Month Filter Selector for Excel Export */}
+          <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs">
+            <label htmlFor="excel-month-filter" className="text-xs font-medium text-slate-500">
+              Export Month:
+            </label>
+            <select
+              id="excel-month-filter"
+              value={excelExportMonth}
+              onChange={(e) => setExcelExportMonth(e.target.value)}
+              className="text-xs font-bold bg-transparent text-slate-800 focus:outline-none cursor-pointer"
+            >
+              {[
+                "January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"
+              ].map((m) => (
+                <option key={`export-${m}`} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={handleExportExcel}
             className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-xs flex items-center gap-2 cursor-pointer justify-center flex-1 sm:flex-none"
-            title={`Export data for ${selectedMomMonth}`}
+            title={`Export data for ${excelExportMonth}`}
           >
-            <Download size={16} /> Export {selectedMomMonth} to Excel
+            <Download size={16} /> Export {excelExportMonth} to Excel
           </button>
         </div>
       </div>
