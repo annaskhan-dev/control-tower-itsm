@@ -512,6 +512,11 @@ const GeneratorListCard = memo(
         badgeBg: "bg-blue-50 text-blue-700 border-blue-100",
         itemBadgeBg: "bg-blue-50 text-blue-700 border-blue-100/60",
       },
+      purple: {
+        iconColor: "text-purple-600",
+        badgeBg: "bg-purple-50 text-purple-700 border-purple-100",
+        itemBadgeBg: "bg-purple-50 text-purple-700 border-purple-100/60",
+      },
     };
 
     const currentTheme = themeStyles[theme] || themeStyles.emerald;
@@ -903,6 +908,7 @@ useEffect(() => {
   const stats = useMemo(() => {
     let generatorMap = {};
     let operatorResolvedMap = {};
+    let operatorAssignmentWorkloadMap = {};
     let priorityMap = { Critical: 0, High: 0, Medium: 0, Low: 0 };
     let priorityResolvedMap = { Critical: 0, High: 0, Medium: 0, Low: 0 };
     let slaHealthMap = { "On Track": 0, "At Risk": 0, Breached: 0 };
@@ -931,6 +937,39 @@ useEffect(() => {
           t.status.toLowerCase(),
         );
 
+      // Track primary and sub-assigned workload counts per operator
+      const formatOperatorName = (rawName) => {
+        if (!rawName || rawName === "Unassigned" || rawName === "Null" || rawName === "None") return null;
+        const lowerName = rawName.toLowerCase();
+        const matchedRole = operatorRoleMap[lowerName];
+        if (matchedRole && !rawName.toLowerCase().includes(matchedRole.toLowerCase())) {
+          return `${rawName} (${matchedRole})`;
+        } else if (!rawName.includes("(")) {
+          return `${rawName} (Operator)`;
+        }
+        return rawName;
+      };
+
+      if (t.isAssigned && t.assigneeName) {
+        const primaryOpFormatted = formatOperatorName(t.assigneeName);
+        if (primaryOpFormatted) {
+          if (!operatorAssignmentWorkloadMap[primaryOpFormatted]) {
+            operatorAssignmentWorkloadMap[primaryOpFormatted] = { primary: 0, subAssigned: 0 };
+          }
+          operatorAssignmentWorkloadMap[primaryOpFormatted].primary += 1;
+        }
+      }
+
+      if (t.isSubAssigned && t.subAssignmentName) {
+        const subOpFormatted = formatOperatorName(t.subAssignmentName);
+        if (subOpFormatted) {
+          if (!operatorAssignmentWorkloadMap[subOpFormatted]) {
+            operatorAssignmentWorkloadMap[subOpFormatted] = { primary: 0, subAssigned: 0 };
+          }
+          operatorAssignmentWorkloadMap[subOpFormatted].subAssigned += 1;
+        }
+      }
+
       if (isClosed) {
         closedCount++;
         let operatorKeyRaw = "Unassigned / Other";
@@ -940,17 +979,7 @@ useEffect(() => {
           operatorKeyRaw = t.assigneeName;
         }
         
-        let operatorKeyFormatted = operatorKeyRaw;
-        if (operatorKeyRaw !== "Unassigned / Other") {
-          const lowerName = operatorKeyRaw.toLowerCase();
-          const matchedRole = operatorRoleMap[lowerName];
-          if (matchedRole && !operatorKeyRaw.toLowerCase().includes(matchedRole.toLowerCase())) {
-            operatorKeyFormatted = `${operatorKeyRaw} (${matchedRole})`;
-          } else if (!operatorKeyRaw.includes("(")) {
-            operatorKeyFormatted = `${operatorKeyRaw} (Operator)`;
-          }
-        }
-
+        let operatorKeyFormatted = formatOperatorName(operatorKeyRaw) || operatorKeyRaw;
         operatorResolvedMap[operatorKeyFormatted] = (operatorResolvedMap[operatorKeyFormatted] || 0) + 1;
       } else {
         openCount++;
@@ -981,6 +1010,7 @@ useEffect(() => {
       slaRisk: (slaHealthMap["Breached"] || 0) + (slaHealthMap["At Risk"] || 0),
       byGenerator: generatorMap,
       byOperatorResolved: operatorResolvedMap,
+      byOperatorWorkload: operatorAssignmentWorkloadMap,
       byPriority: priorityMap,
       byPriorityResolved: priorityResolvedMap,
       slaHealth: slaHealthMap,
@@ -1025,6 +1055,17 @@ useEffect(() => {
       }))
       .filter((d) => d.count > 0);
 
+    const operatorWorkloadEntries = Object.entries(
+      stats.byOperatorWorkload || {},
+    )
+      .map(([name, counts]) => ({
+        name,
+        count: `Assigned: ${counts.primary} | Sub-assigned: ${counts.subAssigned}`,
+        rawPrimary: counts.primary,
+        rawSub: counts.subAssigned,
+      }))
+      .filter((d) => d.rawPrimary > 0 || d.rawSub > 0);
+
     const totalSlaCount = Math.max(
       1,
       (stats.slaHealth["On Track"] || 0) +
@@ -1065,6 +1106,7 @@ useEffect(() => {
     return {
       generator: generatorEntries,
       operatorResolved: operatorResolvedEntries,
+      operatorWorkload: operatorWorkloadEntries,
       trend,
       slaPie: slaPieEntries,
     };
@@ -1272,7 +1314,7 @@ useEffect(() => {
       </div>
 
       {/* Widgets Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <GeneratorListCard
           title="TICKETS CREATED BY ROLE / SOURCE"
           data={chartData.generator}
@@ -1285,6 +1327,13 @@ useEffect(() => {
           data={chartData.operatorResolved}
           totalLabel="resolved"
           theme="emerald"
+          isLoading={isDataLoading}
+        />
+        <GeneratorListCard
+          title="OPERATOR ASSIGNED & SUB-ASSIGNED"
+          data={chartData.operatorWorkload}
+          totalLabel=""
+          theme="purple"
           isLoading={isDataLoading}
         />
 
