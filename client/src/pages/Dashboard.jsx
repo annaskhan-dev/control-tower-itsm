@@ -496,10 +496,15 @@ CustomTooltip.displayName = "CustomTooltip";
  */
 const GeneratorListCard = memo(
   ({ title, data, totalLabel = "total", theme = "emerald", isLoading }) => {
-    const totalValue = useMemo(
-      () => data.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0),
-      [data],
-    );
+    // FIX: Properly compute total regardless of whether item.count is a number or formatted string object
+    const totalValue = useMemo(() => {
+      return data.reduce((acc, curr) => {
+        if (curr.rawPrimary !== undefined) {
+          return acc + (Number(curr.rawPrimary) || 0) + (Number(curr.rawSub) || 0);
+        }
+        return acc + (Number(curr.count) || 0);
+      }, 0);
+    }, [data]);
 
     const themeStyles = {
       emerald: {
@@ -1310,7 +1315,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         ))}
       </div>
 
-      {/* Widgets Grid: Redesigned to 2 Boxes per Row on medium+ screens */}
+      {/* Widgets Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <GeneratorListCard
           title="TICKETS CREATED BY ROLE / SOURCE"
@@ -1715,7 +1720,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Main Table Section with Memoized Row Virtualization / Items */}
+      {/* Main Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden transition-all duration-300">
         {isDataLoading ? (
           <div className="p-8 space-y-4 animate-pulse">
