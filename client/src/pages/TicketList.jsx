@@ -54,7 +54,11 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         const allUsers = response.data || [];
         const filteredOps = allUsers.filter(u => {
           const r = (u.role || u.userType || "").replace(/\s+/g, "_").toLowerCase();
-          return r.includes('operator') || r.includes('transporter') || !r.includes('admin');
+          // Exclude admins and explicitly exclude shippers from receiving task assignments
+          const isShipper = r.includes('shipper');
+          const isAdminRole = r.includes('admin');
+          const isEligible = (r.includes('operator') || r.includes('transporter') || r.includes('sales') || r.includes('manager')) && !isAdminRole && !isShipper;
+          return isEligible;
         });
         setOperators(filteredOps);
       } catch (err) {
@@ -104,7 +108,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  // Synchronized with TicketDetail formatDuration logic
   const formatDuration = useCallback((ms) => {
     if (ms === null || ms === undefined || isNaN(ms)) return "—";
     if (ms < 60000) return "Just now";
@@ -161,12 +164,10 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at || (isSubAssigned ? (t.updatedAt || t.createdAt) : null);
       const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
 
-      // Hardened Fallback Logic for Sub-Assignment Time to prevent desynchronization
       const subAssignmentFallbackTime = t.subAssignmentAt 
         ? new Date(t.subAssignmentAt).getTime() 
         : (isSubAssigned ? new Date(t.updatedAt || t.createdAt || Date.now()).getTime() : null);
 
-      // 1. Primary Assignment Timeline Calculation (Synchronized with TicketDetail)
       let primaryAssignmentMs = 0;
       let primaryStartFormatted = isAssigned ? formatDate(assignedAtRaw || t.createdAt) : "—";
       let primaryEndFormatted = isAssigned ? (isResolved ? "Resolved" : "Active") : "—";
@@ -181,10 +182,8 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         }
       }
 
-      // SLA Active Time anchored strictly to assignedAt matching detail component
       const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
-      // 2. Sub-Assignment Timeline Calculation (Synchronized with TicketDetail)
       let subAssignmentTimeMs = 0;
       let subStartFormatted = "—";
       let subEndFormatted = "—";
