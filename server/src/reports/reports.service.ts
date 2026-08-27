@@ -85,15 +85,18 @@ export class ReportsService {
           as: 'user'
         }
       },
-      // Strict unwind: drops any records that do not successfully match a real user profile
+      // Safe unwind: preserves records even if user details are temporarily missing during initial login sync
       {
-        $unwind: '$user'
+        $unwind: {
+          path: '$user',
+          preserveNullAndEmptyArrays: true
+        }
       },
-      // Step 4: Project clean fields for your frontend UI table
+      // Step 4: Project clean fields for your frontend UI table with safe fallbacks
       {
         $project: {
-          name: '$user.name',
-          email: '$user.email',
+          name: { $ifNull: ['$user.name', 'Unknown User'] },
+          email: { $ifNull: ['$user.email', 'N/A'] },
           role: { $ifNull: ['$user.role', { $ifNull: ['$user.userType', 'Operator'] }] },
           totalActiveHours: { $divide: ['$totalOverallMs', 3600000] },
           monthlyAverageActiveHours: { $divide: ['$avgMonthlyActiveMs', 3600000] },
