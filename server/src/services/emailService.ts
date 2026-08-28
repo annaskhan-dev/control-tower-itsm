@@ -1,11 +1,12 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, connection } from 'mongoose';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import { Ticket } from '../tickets/schemas/ticket.schema';
 
 @Injectable()
-export class EmailService implements OnApplicationBootstrap {
+export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private isSyncing = false;
 
@@ -23,45 +24,16 @@ export class EmailService implements OnApplicationBootstrap {
     @InjectModel(Ticket.name) private ticketModel: Model<Ticket>,
   ) {}
 
-  onApplicationBootstrap() {
-    this.logger.log('[Worker] Email polling worker initialized via setInterval...');
-    
-    // Initial sync after 5 seconds to let MongoDB connection fully settle
-    setTimeout(() => {
-      this.processUnreadEmails();
-    }, 5000);
-
-    // Poll every 30 seconds safely using native Node timers
-    setInterval(() => {
-      this.processUnreadEmails();
-    }, 30000);
-  }
-
-  async getAccessToken(): Promise<string> {
-    const tokenResponse = await this.msalClient.acquireTokenByClientCredential({
-      scopes: ['https://graph.microsoft.com/.default'],
-    });
-    if (!tokenResponse?.accessToken) {
-      throw new Error('Could not acquire Microsoft Graph access token.');
+  // Cron job runs every 30 seconds safely using @nestjs/schedule
+  @Cron(CronExpression.EVERY_30_SECONDS)
+  async handleCronEmailSync(): Promise<void> {
+    // 1. Safety Check: Ensure Mongoose connection is fully open (readyState 1 = connected)
+    // This entirely prevents the "buffering timed out" issue on startup.
+    if (connection.readyState !== 1) {
+      this.logger.warn('[Worker] Skipping email sync: MongoDB connection is not ready yet.');
+      return;
     }
-    return tokenResponse.accessToken;
-  }
 
-  private determineCategory(subject = '', body = ''): string {
-    const text = `${subject} ${body}`.toLowerCase();
-    if (text.includes('urgent') || text.includes('critical') || text.includes('down')) {
-      return 'Critical Incident';
-    }
-    if (text.includes('login') || text.includes('password') || text.includes('access')) {
-      return 'Access Control';
-    }
-    if (text.includes('shipping') || text.includes('dock') || text.includes('logistics')) {
-      return 'Logistics Operations';
-    }
-    return process.env.DEFAULT_EMAIL_CATEGORY || 'General Support';
-  }
-
-  async processUnreadEmails(): Promise<void> {
     if (this.isSyncing) return;
     this.isSyncing = true;
 
@@ -152,5 +124,29 @@ export class EmailService implements OnApplicationBootstrap {
     } finally {
       this.isSyncing = false;
     }
+  }
+
+  async getAccessToken(): Promise<string> {
+    const tokenResponse = await this.msalClient.acquireTokenByClientCredential({
+      scopes: ['https://graph.microsoft.com/.default'],
+    });
+    if (!tokenResponse?.accessToken) {
+      throw new Error('Could not acquire Microsoft Graph access token.');
+    }
+    return tokenResponse.accessToken;
+  }
+
+  private determineCategory(subject = '', body = ''): string {
+    const text = `${subject} ${body}`.toLowerCase();
+    if (text.includes('urgent') || text.includes('critical') || text.includes('down')) {
+      return 'Critical Incident';
+    }
+    if (text.includes('login') || text.includes('password') || text.includes('access')) {
+      return 'Access Control';
+    }
+    if (text.includes('shipping') || text.includes('dock') || text.includes('logistics')) {
+      return 'Logistics Operations';
+    }
+    return process.env.DEFAULT_EMAIL_CATEGORY || 'General Support';
   }
 }

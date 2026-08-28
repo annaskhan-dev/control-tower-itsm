@@ -1,6 +1,7 @@
 import { Module, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ScheduleModule } from '@nestjs/schedule'; // <-- 1. Import Schedule Module
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LoggerMiddleware } from '../middleware/logger.middleware';
@@ -25,8 +26,11 @@ import { AuthController } from './auth/auth.controller';
       isGlobal: true,
       envFilePath: '.env',
     }),
+
+    // 2. Enable NestJS Task Scheduling (Cron jobs)
+    ScheduleModule.forRoot(),
     
-    // 2. Safely resolve environment variables post-configuration load
+    // 3. Safely resolve environment variables post-configuration load
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -36,7 +40,7 @@ import { AuthController } from './auth/auth.controller';
       inject: [ConfigService],
     }),
 
-    // 3. Register global SessionLog and Ticket schemas for dependency injection
+    // 4. Register global SessionLog and Ticket schemas for dependency injection
     MongooseModule.forFeature([
       { name: SessionLog.name, schema: SessionLogSchema },
       { name: Ticket.name, schema: TicketSchema },
