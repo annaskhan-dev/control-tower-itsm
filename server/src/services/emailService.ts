@@ -143,5 +143,5 @@ export class EmailService {
       return 'Logistics Operations';
     }
     return process.env.DEFAULT_EMAIL_CATEGORY || 'General Support';
-  }
-}
+  }}
+  

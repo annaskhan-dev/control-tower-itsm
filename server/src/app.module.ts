@@ -29,12 +29,14 @@ import { AuthController } from './auth/auth.controller';
     // 2. Enable NestJS Task Scheduling (Cron jobs)
     ScheduleModule.forRoot(),
     
-    // 3. Safely resolve environment variables post-configuration load
+    // 3. Safely resolve environment variables post-configuration load with explicit fail-fast timeouts
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         uri: configService.get<string>('MONGODB_URI') || 'mongodb://127.0.0.1:27017/control-tower-db',
         bufferCommands: false, // Disables mongoose command buffering to prevent timeout errors
+        serverSelectionTimeoutMS: 5000, // Fail fast if MongoDB Atlas is unreachable within 5 seconds
+        socketTimeoutMS: 45000,
       }),
       inject: [ConfigService],
     }),
