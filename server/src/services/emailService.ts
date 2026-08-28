@@ -1,15 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, connection } from 'mongoose';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import { Ticket } from '../tickets/schemas/ticket.schema';
 
 @Injectable()
-export class EmailService {
+export class EmailService implements OnApplicationBootstrap {
   private readonly logger = new Logger(EmailService.name);
   private isSyncing = false;
-  private isAppReady = false;
 
   private msalConfig = {
     auth: {
@@ -23,23 +21,20 @@ export class EmailService {
 
   constructor(
     @InjectModel(Ticket.name) private ticketModel: Model<Ticket>,
-  ) {
-    // Give Mongoose 8 seconds to establish stable Atlas connection before allowing cron tasks
-    setTimeout(() => {
-      this.isAppReady = true;
-      this.logger.log('[Email Worker] Initial boot delay passed. Worker is now active.');
-    }, 8000);
+  ) {}
+
+  // Triggered safely AFTER NestJS and Mongoose connections are completely ready
+  onApplicationBootstrap() {
+    this.logger.log('[Email Worker] Initializing background email sync loop...');
+    
+    // Run loop every 30 seconds safely using setInterval instead of broken cron binding
+    setInterval(async () => {
+      await this.handleEmailSync();
+    }, 30000);
   }
 
-  @Cron(CronExpression.EVERY_30_SECONDS)
-  async handleCronEmailSync(): Promise<void> {
-    if (!this.isAppReady) {
-      return; // Skip execution during the startup window
-    }
-
-    // State 1 means fully connected to MongoDB
+  async handleEmailSync(): Promise<void> {
     if (connection.readyState !== 1) {
-      this.logger.warn(`[Email Worker] Skipping sync. DB connection state is: ${connection.readyState}`);
       return;
     }
 
