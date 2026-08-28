@@ -1,7 +1,7 @@
 import { Module, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ScheduleModule } from '@nestjs/schedule'; // <-- 1. Import Schedule Module
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LoggerMiddleware } from '../middleware/logger.middleware';
@@ -15,7 +15,6 @@ import { UsersModule } from './users/users.module';
 
 // Schemas & Controllers
 import { SessionLog, SessionLogSchema } from './schemas/session-log.schema';
-import { Ticket, TicketSchema } from './tickets/schemas/ticket.schema';
 import { AnalyticsController } from '../controllers/analytics.controller';
 import { AuthController } from './auth/auth.controller';
 
@@ -40,10 +39,9 @@ import { AuthController } from './auth/auth.controller';
       inject: [ConfigService],
     }),
 
-    // 4. Register global SessionLog and Ticket schemas for dependency injection
+    // 4. Register global SessionLog schema (Ticket schema is managed inside TicketsModule)
     MongooseModule.forFeature([
       { name: SessionLog.name, schema: SessionLogSchema },
-      { name: Ticket.name, schema: TicketSchema },
     ]),
     
     AuthModule,
