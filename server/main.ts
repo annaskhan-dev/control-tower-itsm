@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { processUnreadEmails } from '../services/emailService'; // Adjust path if your file location is different
+import { AppModule } from '../server/src/app.module';
+import { processUnreadEmails } from '../server/services/emailService'; // Adjust path if your file location is different
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
