@@ -16,7 +16,7 @@ import { UsersModule } from './users/users.module';
 import { SessionLog, SessionLogSchema } from './schemas/session-log.schema';
 import { Ticket, TicketSchema } from './tickets/schemas/ticket.schema';
 import { AnalyticsController } from '../controllers/analytics.controller';
-import { AuthController } from './auth/auth.controller'; // Explicitly imported if needed globally, or ensure AuthModule exports it
+import { AuthController } from './auth/auth.controller';
 
 @Module({
   imports: [
@@ -31,6 +31,7 @@ import { AuthController } from './auth/auth.controller'; // Explicitly imported 
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         uri: configService.get<string>('MONGODB_URI') || 'mongodb://127.0.0.1:27017/control-tower-db',
+        bufferCommands: false, // Disables mongoose command buffering to prevent timeout errors
       }),
       inject: [ConfigService],
     }),
@@ -50,7 +51,7 @@ import { AuthController } from './auth/auth.controller'; // Explicitly imported 
   controllers: [
     AppController,
     AnalyticsController,
-    AuthController, // Added explicitly here to guarantee the routes register properly
+    AuthController,
   ],
   providers: [AppService],
 })
