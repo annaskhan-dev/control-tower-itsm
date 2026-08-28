@@ -110,24 +110,24 @@ export class EmailService {
             ? `INC-${emailMessage.id.substring(emailMessage.id.length - 10)}-${Math.floor(Math.random() * 1000)}`
             : `INC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-          await this.ticketModel.create({
-            ticketId: generatedTicketId,
-            title: emailMessage.subject || 'No Subject',
-            subject: emailMessage.subject || 'No Subject',
-            description: cleanDescription,
-            source: 'Email',
-            issueType: resolvedIssueType,
-            priority: 'Medium',
-            generator: senderName,
-            sender: senderName,
-            sendEmail: senderEmail,
-            senderEmail: senderEmail,
-            bodyPreview: cleanDescription,
-            receivedDateTime: emailMessage.receivedDateTime,
-            status: 'Open',
-            companyId: 'openport123',
-            outlookMessageId: emailMessage.id,
-          });
+          await (this.ticketModel as any).create({
+  ticketId: generatedTicketId,
+  title: emailMessage.subject || 'No Subject',
+  subject: emailMessage.subject || 'No Subject',
+  description: cleanDescription,
+  source: 'Email',
+  issueType: resolvedIssueType,
+  priority: 'Medium',
+  generator: senderName,
+  sender: senderName,
+  sendEmail: senderEmail,
+  senderEmail: senderEmail,
+  bodyPreview: cleanDescription,
+  receivedDateTime: emailMessage.receivedDateTime,
+  status: 'Open',
+  companyId: 'openport123',
+  outlookMessageId: emailMessage.id,
+});
           
           this.logger.log(
             `[MongoDB] Unified ticket successfully created for: "${emailMessage.subject}" under category: "${resolvedIssueType}"`,
