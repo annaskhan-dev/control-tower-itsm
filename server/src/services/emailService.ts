@@ -1,11 +1,11 @@
-const { ConfidentialClientApplication } = require('@azure/msal-node');
-const Ticket = require('../models/Ticket');
+import { ConfidentialClientApplication } from '@azure/msal-node';
+import Ticket from '../../models/Ticket';
 
 const msalConfig = {
   auth: {
-    clientId: process.env.MICROSOFT_CLIENT_ID,
-    clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
-    authority: `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID}`,
+    clientId: process.env.MICROSOFT_CLIENT_ID as string,
+    clientSecret: process.env.MICROSOFT_CLIENT_SECRET as string,
+    authority: `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID as string}`,
   },
 };
 
@@ -23,7 +23,6 @@ async function getAccessToken() {
 }
 
 // Helper function to dynamically determine category based on subject/content 
-// Admins can adjust these keyword mappings or link it to a database settings collection later.
 function determineCategory(subject = '', body = '') {
   const text = `${subject} ${body}`.toLowerCase();
   
@@ -37,11 +36,10 @@ function determineCategory(subject = '', body = '') {
     return 'Logistics Operations';
   }
   
-  // Default category defined for incoming emails if no specific keyword matches
   return process.env.DEFAULT_EMAIL_CATEGORY || 'General Support';
 }
 
-async function processUnreadEmails() {
+export async function processUnreadEmails() {
   if (isSyncing) return;
   isSyncing = true;
 
@@ -70,7 +68,7 @@ async function processUnreadEmails() {
       },
     });
 
-    const data = await response.json();
+    const data = (await response.json()) as any;
 
     if (!response.ok) {
       console.error('[Graph API Error Details]:', JSON.stringify(data, null, 2));
@@ -90,7 +88,6 @@ async function processUnreadEmails() {
         .replace(/Get Outlook for iOS/gi, '')
         .trim();
 
-      // Dynamically resolve category instead of hardcoding
       const resolvedIssueType = determineCategory(emailMessage.subject, cleanDescription);
 
       const existingTicket = await Ticket.findOne({
@@ -107,8 +104,8 @@ async function processUnreadEmails() {
           title: emailMessage.subject || 'No Subject',
           subject: emailMessage.subject || 'No Subject',
           description: cleanDescription,
-          source: 'Email', // Updated source to just "Email" as requested
-          issueType: resolvedIssueType, // Dynamic category/issueType
+          source: 'Email',
+          issueType: resolvedIssueType,
           priority: 'Medium',
           generator: senderName,
           sender: senderName,
@@ -138,7 +135,7 @@ async function processUnreadEmails() {
         body: JSON.stringify({ isRead: true }),
       });
     }
-  } catch (error:any) {
+  } catch (error: any) {
     console.error('[Email Sync Error]:', error.message);
   } finally {
     isSyncing = false;
