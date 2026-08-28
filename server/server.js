@@ -1,9 +1,11 @@
 require("dotenv").config();
-const express = "express"; // Wait, keep require("express") properly:
 const expressApp = require("express");
 const mongoose = require("mongoose");
 const cron = require("node-cron");
 const { processUnreadEmails, getAccessToken } = require("./services/emailService");
+
+// Disable Mongoose command buffering to prevent timeout errors
+mongoose.set('bufferCommands', false);
 
 const app = expressApp();
 const PORT = process.env.PORT || 3000;
@@ -23,7 +25,6 @@ mongoose
       processUnreadEmails();
 
       // Schedule cron job:
-      // Note: Standard standard cron doesn't natively support seconds unless using a 6-field pattern.
       // '*/5 * * * * *' means run every 5 seconds using node-cron.
       cron.schedule("*/5 * * * * *", () => {
         processUnreadEmails();
