@@ -76,15 +76,17 @@ export class EmailService {
       });
 
       const data = (await response.json()) as any;
+      
+      // DEBUG: Log Graph API response status and details
+      this.logger.log(`[Email Worker] Graph API Response Status: ${response.status}`);
       if (!response.ok) {
-        this.logger.error(
-          `[Graph API Error]: ${data.error?.message || response.statusText}`,
-        );
+        this.logger.error(`[Graph API Error Response]: ${JSON.stringify(data)}`);
         return;
       }
 
       if (!data.value || data.value.length === 0) {
-        return; // No unread emails found
+        this.logger.log('[Email Worker] No unread emails found in inbox.');
+        return;
       }
 
       this.logger.log(
@@ -92,6 +94,8 @@ export class EmailService {
       );
 
       for (const emailMessage of data.value) {
+        this.logger.log(`[Email Worker] Processing email: "${emailMessage.subject}" (ID: ${emailMessage.id})`);
+
         const senderEmail =
           emailMessage.from?.emailAddress?.address || 'Unknown';
         const senderName = emailMessage.from?.emailAddress?.name || 'Unknown';
@@ -110,30 +114,34 @@ export class EmailService {
         });
 
         if (!existingTicket) {
-          const generatedTicketId = emailMessage.id
-            ? `INC-${emailMessage.id.substring(emailMessage.id.length - 10)}-${Math.floor(Math.random() * 1000)}`
-            : `INC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+          try {
+            const generatedTicketId = emailMessage.id
+              ? `INC-${emailMessage.id.substring(emailMessage.id.length - 10)}-${Math.floor(Math.random() * 1000)}`
+              : `INC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-          await (this.ticketModel as any).create({
-            ticketId: generatedTicketId,
-            title: emailMessage.subject || 'No Subject',
-            subject: emailMessage.subject || 'No Subject',
-            description: cleanDescription,
-            source: 'Email',
-            issueType: resolvedIssueType,
-            priority: 'Medium',
-            generator: senderName,
-            sender: senderName,
-            senderEmail: senderEmail,
-            bodyPreview: cleanDescription,
-            receivedDateTime: emailMessage.receivedDateTime,
-            status: 'Open',
-            companyId: 'openport123',
-            outlookMessageId: emailMessage.id,
-          });
-          this.logger.log(
-            `[MongoDB] Ticket successfully created for: "${emailMessage.subject}" from ${senderEmail}`,
-          );
+            await (this.ticketModel as any).create({
+              ticketId: generatedTicketId,
+              title: emailMessage.subject || 'No Subject',
+              subject: emailMessage.subject || 'No Subject',
+              description: cleanDescription,
+              source: 'Email',
+              issueType: resolvedIssueType,
+              priority: 'Medium',
+              generator: senderName,
+              sender: senderName,
+              senderEmail: senderEmail,
+              bodyPreview: cleanDescription,
+              receivedDateTime: emailMessage.receivedDateTime,
+              status: 'Open',
+              companyId: 'openport123',
+              outlookMessageId: emailMessage.id,
+            });
+            this.logger.log(
+              `[MongoDB] Ticket successfully created for: "${emailMessage.subject}" from ${senderEmail}`,
+            );
+          } catch (dbError: any) {
+            this.logger.error(`[MongoDB Create Error]: ${dbError.message}`);
+          }
         } else {
           this.logger.log(
             `[Email Worker] Ticket already exists for message ID: ${emailMessage.id}`,
@@ -144,7 +152,7 @@ export class EmailService {
           `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}` +
           `/messages/${encodeURIComponent(emailMessage.id)}`;
 
-        await fetch(markAsReadUrl, {
+        const patchRes = await fetch(markAsReadUrl, {
           method: 'PATCH',
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -152,9 +160,14 @@ export class EmailService {
           },
           body: JSON.stringify({ isRead: true }),
         });
+
+        if (!patchRes.ok) {
+          const patchErr = await patchRes.json();
+          this.logger.error(`[Graph API Patch Error]: ${JSON.stringify(patchErr)}`);
+        }
       }
     } catch (error: any) {
-      this.logger.error(`[Email Sync Error]: ${error.message}`);
+      this.logger.error(`[Email Sync Error]: ${error.stack || error.message}`);
     } finally {
       this.isSyncing = false;
     }
