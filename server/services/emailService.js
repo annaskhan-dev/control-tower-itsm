@@ -22,6 +22,25 @@ async function getAccessToken() {
   return tokenResponse.accessToken;
 }
 
+// Helper function to dynamically determine category based on subject/content 
+// Admins can adjust these keyword mappings or link it to a database settings collection later.
+function determineCategory(subject = '', body = '') {
+  const text = `${subject} ${body}`.toLowerCase();
+  
+  if (text.includes('urgent') || text.includes('critical') || text.includes('down')) {
+    return 'Critical Incident';
+  }
+  if (text.includes('login') || text.includes('password') || text.includes('access')) {
+    return 'Access Control';
+  }
+  if (text.includes('shipping') || text.includes('dock') || text.includes('logistics')) {
+    return 'Logistics Operations';
+  }
+  
+  // Default category defined for incoming emails if no specific keyword matches
+  return process.env.DEFAULT_EMAIL_CATEGORY || 'General Support';
+}
+
 async function processUnreadEmails() {
   if (isSyncing) return;
   isSyncing = true;
@@ -52,7 +71,13 @@ async function processUnreadEmails() {
     });
 
     const data = await response.json();
-    if (!response.ok || !data.value || data.value.length === 0) {
+
+    if (!response.ok) {
+      console.error('[Graph API Error Details]:', JSON.stringify(data, null, 2));
+      return;
+    }
+
+    if (!data.value || data.value.length === 0) {
       return;
     }
 
@@ -60,18 +85,19 @@ async function processUnreadEmails() {
       const senderEmail = emailMessage.from?.emailAddress?.address || 'Unknown';
       const senderName = emailMessage.from?.emailAddress?.name || 'Unknown';
 
-      // Clean up mobile email signature text if present
       const rawDescription = emailMessage.bodyPreview || '';
       const cleanDescription = rawDescription
         .replace(/Get Outlook for iOS/gi, '')
         .trim();
 
-      // Prevent duplicate saving if message ID already exists
+      // Dynamically resolve category instead of hardcoding
+      const resolvedIssueType = determineCategory(emailMessage.subject, cleanDescription);
+
       const existingTicket = await Ticket.findOne({
         outlookMessageId: emailMessage.id,
       });
+
       if (!existingTicket) {
-        // Guaranteed safe, non-null, unique ticket ID using message id substring + random fallback
         const generatedTicketId = emailMessage.id
           ? `INC-${emailMessage.id.substring(emailMessage.id.length - 10)}-${Math.floor(Math.random() * 1000)}`
           : `INC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -80,26 +106,25 @@ async function processUnreadEmails() {
           ticketId: generatedTicketId,
           title: emailMessage.subject || 'No Subject',
           subject: emailMessage.subject || 'No Subject',
-          description: cleanDescription, // Cleaned description without signature
-          source: 'Outlook Email',
-          issueType: 'Email Support',
+          description: cleanDescription,
+          source: 'Email', // Updated source to just "Email" as requested
+          issueType: resolvedIssueType, // Dynamic category/issueType
           priority: 'Medium',
           generator: senderName,
           sender: senderName,
           sendEmail: senderEmail,
           senderEmail: senderEmail,
-          bodyPreview: cleanDescription, // Cleaned body preview without signature
+          bodyPreview: cleanDescription,
           receivedDateTime: emailMessage.receivedDateTime,
           status: 'Open',
           companyId: 'openport123',
           outlookMessageId: emailMessage.id,
         });
         console.log(
-          `[MongoDB] Unified ticket successfully created for: "${emailMessage.subject}"`,
+          `[MongoDB] Unified ticket successfully created for: "${emailMessage.subject}" under category: "${resolvedIssueType}"`,
         );
       }
 
-      // Mark email as read in Outlook
       const markAsReadUrl =
         `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}` +
         `/messages/${encodeURIComponent(emailMessage.id)}`;
