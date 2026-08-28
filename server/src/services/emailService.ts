@@ -32,7 +32,7 @@ export class EmailService {
       this.logger.log(
         `[Email Worker] Initial boot delay passed. Worker is now active (Filtering emails forward from ${this.serverStartTime.toISOString()}).`,
       );
-    }, 8000);
+    }, 5000);
   }
 
   @Cron(CronExpression.EVERY_30_SECONDS)
