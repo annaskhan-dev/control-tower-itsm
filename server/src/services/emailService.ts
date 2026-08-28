@@ -1,8 +1,8 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, connection } from 'mongoose';
+import { InjectConnection } from '@nestjs/mongoose';
+import { Connection } from 'mongoose';
 import { ConfidentialClientApplication } from '@azure/msal-node';
-import { Ticket } from '../tickets/schemas/ticket.schema';
+import { Ticket, TicketSchema } from '../tickets/schemas/ticket.schema';
 
 @Injectable()
 export class EmailService implements OnApplicationBootstrap {
@@ -20,21 +20,18 @@ export class EmailService implements OnApplicationBootstrap {
   private msalClient = new ConfidentialClientApplication(this.msalConfig);
 
   constructor(
-    @InjectModel(Ticket.name) private ticketModel: Model<Ticket>,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
-  // Triggered safely AFTER NestJS and Mongoose connections are completely ready
   onApplicationBootstrap() {
     this.logger.log('[Email Worker] Initializing background email sync loop...');
-    
-    // Run loop every 30 seconds safely using setInterval instead of broken cron binding
     setInterval(async () => {
       await this.handleEmailSync();
     }, 30000);
   }
 
   async handleEmailSync(): Promise<void> {
-    if (connection.readyState !== 1) {
+    if (this.connection.readyState !== 1) {
       return;
     }
 
@@ -42,6 +39,9 @@ export class EmailService implements OnApplicationBootstrap {
     this.isSyncing = true;
 
     try {
+      // Safely fetch model dynamically from the active connection pool
+      const ticketModel = this.connection.models.Ticket || this.connection.model(Ticket.name, TicketSchema);
+
       const accessToken = await this.getAccessToken();
       const email = process.env.OUTLOOK_EMAIL;
 
@@ -76,16 +76,16 @@ export class EmailService implements OnApplicationBootstrap {
         const cleanDescription = rawDescription.replace(/Get Outlook for iOS/gi, '').trim();
         const resolvedIssueType = this.determineCategory(emailMessage.subject, cleanDescription);
 
-        const existingTicket = await this.ticketModel.findOne({
+        const existingTicket = await ticketModel.findOne({
           outlookMessageId: emailMessage.id,
-        });
+        }).exec();
 
         if (!existingTicket) {
           const generatedTicketId = emailMessage.id
             ? `INC-${emailMessage.id.substring(emailMessage.id.length - 10)}-${Math.floor(Math.random() * 1000)}`
             : `INC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-          await (this.ticketModel as any).create({
+          await ticketModel.create({
             ticketId: generatedTicketId,
             title: emailMessage.subject || 'No Subject',
             subject: emailMessage.subject || 'No Subject',
