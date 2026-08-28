@@ -9,6 +9,7 @@ import { Ticket } from '../tickets/schemas/ticket.schema';
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private isSyncing = false;
+  private isAppReady = false;
 
   private msalConfig = {
     auth: {
@@ -22,11 +23,21 @@ export class EmailService {
 
   constructor(
     @InjectModel(Ticket.name) private ticketModel: Model<Ticket>,
-  ) {}
+  ) {
+    // Give Mongoose 8 seconds to establish stable Atlas connection before allowing cron tasks
+    setTimeout(() => {
+      this.isAppReady = true;
+      this.logger.log('[Email Worker] Initial boot delay passed. Worker is now active.');
+    }, 8000);
+  }
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async handleCronEmailSync(): Promise<void> {
-    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+    if (!this.isAppReady) {
+      return; // Skip execution during the startup window
+    }
+
+    // State 1 means fully connected to MongoDB
     if (connection.readyState !== 1) {
       this.logger.warn(`[Email Worker] Skipping sync. DB connection state is: ${connection.readyState}`);
       return;
@@ -72,7 +83,7 @@ export class EmailService {
 
         const existingTicket = await this.ticketModel.findOne({
           outlookMessageId: emailMessage.id,
-        }).maxTimeMS(5000); // 5-second explicit timeout safeguard
+        });
 
         if (!existingTicket) {
           const generatedTicketId = emailMessage.id
@@ -143,5 +154,5 @@ export class EmailService {
       return 'Logistics Operations';
     }
     return process.env.DEFAULT_EMAIL_CATEGORY || 'General Support';
-  }}
-  
+  }
+}
