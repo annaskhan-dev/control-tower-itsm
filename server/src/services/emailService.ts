@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import { Ticket } from '../tickets/schemas/ticket.schema';
 
@@ -26,7 +26,7 @@ export class EmailService {
   private msalClient = new ConfidentialClientApplication(this.msalConfig);
 
   constructor(@InjectModel(Ticket.name) private ticketModel: Model<Ticket>) {
-    // Give Mongoose 8 seconds to establish stable Atlas connection before allowing cron tasks
+    // Give Mongoose 5 seconds to establish stable Atlas connection before allowing cron tasks
     setTimeout(() => {
       this.isAppReady = true;
       this.logger.log(
@@ -35,7 +35,7 @@ export class EmailService {
     }, 5000);
   }
 
-  @Cron(CronExpression.EVERY_30_SECONDS)
+  @Cron('*/5 * * * * *') // Updated to run every 5 seconds
   async handleCronEmailSync(): Promise<void> {
     if (!this.isAppReady) {
       return; // Skip execution during the startup window
