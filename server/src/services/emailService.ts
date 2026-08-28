@@ -1,5 +1,5 @@
 import { ConfidentialClientApplication } from '@azure/msal-node';
-import Ticket from '../../models/Ticket';
+import Ticket from '../models/Ticket';
 
 const msalConfig = {
   auth: {
