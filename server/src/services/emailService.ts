@@ -3,7 +3,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import { Ticket } from '../tickets/schemas/ticket.schema';
-import * as cron from 'node-cron';
 
 @Injectable()
 export class EmailService implements OnApplicationBootstrap {
@@ -24,19 +23,18 @@ export class EmailService implements OnApplicationBootstrap {
     @InjectModel(Ticket.name) private ticketModel: Model<Ticket>,
   ) {}
 
-  // This lifecycle hook runs automatically AFTER NestJS fully boots and Mongoose is connected
   onApplicationBootstrap() {
-    this.logger.log('[Worker] Email polling cron job initializing...');
+    this.logger.log('[Worker] Email polling worker initialized via setInterval...');
     
-    // Run an initial scan after 5 seconds to let the connection settle
+    // Initial sync after 5 seconds to let MongoDB connection fully settle
     setTimeout(() => {
       this.processUnreadEmails();
     }, 5000);
 
-    // Schedule cron job every 5 seconds safely within NestJS
-    cron.schedule('*/5 * * * * *', () => {
+    // Poll every 30 seconds safely using native Node timers
+    setInterval(() => {
       this.processUnreadEmails();
-    });
+    }, 30000);
   }
 
   async getAccessToken(): Promise<string> {
