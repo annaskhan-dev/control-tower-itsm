@@ -24,13 +24,12 @@ export class EmailService {
     @InjectModel(Ticket.name) private ticketModel: Model<Ticket>,
   ) {}
 
-  // Cron job runs every 30 seconds safely using @nestjs/schedule
   @Cron(CronExpression.EVERY_30_SECONDS)
   async handleCronEmailSync(): Promise<void> {
-    // 1. Safety Check: Ensure Mongoose connection is fully open (readyState 1 = connected)
-    // This entirely prevents the "buffering timed out" issue on startup.
+    // 1. Strict Mongoose state check (1 = connected). 
+    // This completely prevents queries from triggering while the driver is still handshaking.
     if (connection.readyState !== 1) {
-      this.logger.warn('[Worker] Skipping email sync: MongoDB connection is not ready yet.');
+      this.logger.warn('[Worker] Skipping email sync: MongoDB is not fully connected yet.');
       return;
     }
 
