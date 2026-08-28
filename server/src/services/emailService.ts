@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, connection } from 'mongoose';
+import { Model } from 'mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import { Ticket } from '../tickets/schemas/ticket.schema';
@@ -35,14 +35,6 @@ export class EmailService {
   async handleCronEmailSync(): Promise<void> {
     if (!this.isAppReady) {
       return; // Skip execution during the startup window
-    }
-
-    // State 1 means fully connected to MongoDB
-    if (connection.readyState !== 1) {
-      this.logger.warn(
-        `[Email Worker] Skipping sync. DB connection state is: ${connection.readyState}`,
-      );
-      return;
     }
 
     if (this.isSyncing) return;
