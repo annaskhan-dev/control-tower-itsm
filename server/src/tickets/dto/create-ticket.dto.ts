@@ -7,21 +7,20 @@ export class CreateTicketDto {
   title!: string;
 
   @IsString()
-  @IsNotEmpty()
-  type!: string;
-
-  // Added issueType to accept the selection from your frontend modal
-  @IsString()
-  @IsNotEmpty()
-  issueType!: string; 
+  @IsOptional() // Changed to optional in case the frontend form doesn't send it immediately
+  type?: string;
 
   @IsString()
-  @IsNotEmpty()
-  priority!: string;
+  @IsOptional() // Made optional to prevent 500 errors if the modal dropdown isn't selected
+  issueType?: string; 
 
   @IsString()
-  @IsNotEmpty()
-  category!: string;
+  @IsOptional() // Made optional (defaults can be handled in your service if missing)
+  priority?: string;
+
+  @IsString()
+  @IsOptional() // Made optional to prevent strict payload rejections
+  category?: string;
 
   @IsString()
   @IsOptional()

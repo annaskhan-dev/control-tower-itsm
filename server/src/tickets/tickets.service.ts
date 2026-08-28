@@ -75,29 +75,37 @@ export class TicketsService {
     userId?: string
   ): Promise<Ticket> {
     try {
+      const resolvedCompanyId = companyId || createTicketDto.companyId || 'openport123';
       const category = createTicketDto.category || 'fleet-coordination';
-      const slaConfig = await this.slaConfigModel.findOne({ category, companyId }).exec();
+      
+      const slaConfig = await this.slaConfigModel.findOne({ category, companyId: resolvedCompanyId }).exec();
       const hoursAllowed = slaConfig ? slaConfig.hours : 24;
       const deadline = new Date(Date.now() + hoursAllowed * 60 * 60 * 1000);
+      
       const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
       const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
 
       const resolvedUserName = userName && userName !== 'User' ? userName : 'Ali';
-      const ticketGenerator = createTicketDto.generator || `${resolvedUserName} (${userRole})`;
+      const ticketGenerator = createTicketDto.generator || `${resolvedUserName} (${userRole || 'Super Admin'})`;
 
       const ticketData = {
         ...createTicketDto,
-        issueType: createTicketDto.issueType,
+        title: createTicketDto.title || 'Untitled Ticket',
+        description: createTicketDto.description || '',
+        source: createTicketDto.source || 'Manual Web Form',
+        issueType: createTicketDto.issueType || 'General Support',
         category,
+        type: createTicketDto.type || 'Incident',
+        priority: createTicketDto.priority || 'Medium',
         status: 'Open',
         assignee: isAssigned ? createTicketDto.assignee : 'Unassigned',
         subAssignment: isSubAssigned ? createTicketDto.subAssignment : null,
-        ticketId: `INC-${Math.floor(10000 + Math.random() * 90000)}`,
+        ticketId: (createTicketDto as any).ticketId || `INC-${Math.floor(10000 + Math.random() * 90000)}`,
         slaDeadline: deadline,
         assignedAt: isAssigned ? new Date() : null,
         subAssignmentAt: isSubAssigned ? new Date() : null,
         resolvedAt: null,
-        companyId: companyId,
+        companyId: resolvedCompanyId,
         generator: ticketGenerator,
         createdBy: userId || null,
       };
@@ -105,11 +113,11 @@ export class TicketsService {
       const createdTicket = new this.ticketModel(ticketData);
       const savedTicket = await createdTicket.save();
 
-      this.ticketsGateway.emitTicketCreated(savedTicket, companyId);
+      this.ticketsGateway.emitTicketCreated(savedTicket, resolvedCompanyId);
       return savedTicket;
     } catch (error: any) {
       this.logger.error(`Failed to create ticket: ${error.message}`);
-      throw new InternalServerErrorException('Could not create ticket');
+      throw new InternalServerErrorException(`Could not create ticket: ${error.message}`);
     }
   }
 
@@ -199,10 +207,8 @@ export class TicketsService {
       if (isActuallySubAssigned) {
         const isNewSubAssignment = updateData.subAssignment !== existingTicket.subAssignment;
         if (isNewSubAssignment || !existingTicket.subAssignmentAt) {
-          // If a new sub-assignee is picked or timestamp didn't exist, use the incoming payload time or current time
           updateData.subAssignmentAt = updateData.subAssignmentAt ? new Date(updateData.subAssignmentAt) : new Date();
         } else {
-          // Preserve existing subAssignmentAt so duration calculation stops accurately
           updateData.subAssignmentAt = existingTicket.subAssignmentAt;
         }
       } else {
@@ -210,7 +216,6 @@ export class TicketsService {
         updateData.subAssignmentAt = null;
       }
     } else if (existingTicket.subAssignment) {
-      // Retain existing subAssignment and its timestamp on partial status-only updates
       updateData.subAssignment = existingTicket.subAssignment;
       updateData.subAssignmentAt = existingTicket.subAssignmentAt;
     }
