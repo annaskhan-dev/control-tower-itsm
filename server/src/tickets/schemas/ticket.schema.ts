@@ -59,6 +59,9 @@ export class Ticket extends Document {
 
   @Prop({ type: Object, default: {} })
   metadata?: Record<string, any>;
+
+  @Prop({ unique: true, sparse: true })
+  outlookMessageId!: string;
 }
 
 export const TicketSchema = SchemaFactory.createForClass(Ticket);

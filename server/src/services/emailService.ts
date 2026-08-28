@@ -90,6 +90,16 @@ export class EmailService {
       );
 
       for (const emailMessage of data.value) {
+        // 1. Strict Check: If a ticket with this Outlook Message ID already exists, skip it completely!
+        const existingTicket = await this.ticketModel.findOne({
+          outlookMessageId: emailMessage.id,
+        });
+
+        if (existingTicket) {
+          this.logger.log(`[Email Worker] Ticket already exists for message ID: ${emailMessage.id}. Skipping.`);
+          continue; 
+        }
+
         const senderEmail =
           emailMessage.from?.emailAddress?.address || 'Unknown';
         const senderName = emailMessage.from?.emailAddress?.name || 'Unknown';
@@ -103,38 +113,38 @@ export class EmailService {
           cleanDescription,
         );
 
-        // Double check against MongoDB using outlookMessageId to prevent duplicate entries
-        const existingTicket = await this.ticketModel.findOne({
-          outlookMessageId: emailMessage.id,
-        });
+        try {
+          // Use a stable, deterministic ID based on the message ID (no random numbers)
+          const shortId = emailMessage.id
+            ? emailMessage.id.substring(emailMessage.id.length - 10)
+            : Date.now();
+          const generatedTicketId = `INC-${shortId}`;
 
-        if (!existingTicket) {
-          try {
-            const generatedTicketId = emailMessage.id
-              ? `INC-${emailMessage.id.substring(emailMessage.id.length - 10)}-${Math.floor(Math.random() * 1000)}`
-              : `INC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-
-            await (this.ticketModel as any).create({
-              ticketId: generatedTicketId,
-              title: emailMessage.subject || 'No Subject',
-              subject: emailMessage.subject || 'No Subject',
-              description: cleanDescription,
-              source: 'Email',
-              issueType: resolvedIssueType,
-              priority: 'Medium',
-              generator: senderName,
-              sender: senderName,
-              senderEmail: senderEmail,
-              bodyPreview: cleanDescription,
-              receivedDateTime: emailMessage.receivedDateTime,
-              status: 'Open',
-              companyId: 'openport123',
-              outlookMessageId: emailMessage.id,
-            });
-            this.logger.log(
-              `[MongoDB] Ticket successfully created for: "${emailMessage.subject}" from ${senderEmail}`,
-            );
-          } catch (dbError: any) {
+          await (this.ticketModel as any).create({
+            ticketId: generatedTicketId,
+            title: emailMessage.subject || 'No Subject',
+            subject: emailMessage.subject || 'No Subject',
+            description: cleanDescription,
+            source: 'Email',
+            issueType: resolvedIssueType,
+            priority: 'Medium',
+            generator: senderName,
+            sender: senderName,
+            senderEmail: senderEmail,
+            bodyPreview: cleanDescription,
+            receivedDateTime: emailMessage.receivedDateTime,
+            status: 'Open',
+            companyId: 'openport123',
+            outlookMessageId: emailMessage.id,
+          });
+          this.logger.log(
+            `[MongoDB] Ticket successfully created for: "${emailMessage.subject}" from ${senderEmail}`,
+          );
+        } catch (dbError: any) {
+          // Catch race-condition or duplicate key errors safely
+          if (dbError.code === 11000) {
+            this.logger.log(`[Email Worker] Duplicate message ID caught by DB index: ${emailMessage.id}`);
+          } else {
             this.logger.error(`[MongoDB Create Error]: ${dbError.message}`);
           }
         }
