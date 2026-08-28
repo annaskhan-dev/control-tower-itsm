@@ -138,7 +138,7 @@ async function processUnreadEmails() {
         body: JSON.stringify({ isRead: true }),
       });
     }
-  } catch (error) {
+  } catch (error:any) {
     console.error('[Email Sync Error]:', error.message);
   } finally {
     isSyncing = false;
