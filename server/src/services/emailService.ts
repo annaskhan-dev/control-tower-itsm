@@ -125,7 +125,7 @@ export class EmailService {
             issueType: null,         // Left empty/null for admin/manager configuration
             category: null,          // Left empty/null for admin/manager configuration
             priority: 'Medium',      // Default baseline priority until set by manager
-            generator: senderEmail,  // Explicitly set generator to sender's email address
+            generator: 'email',      // Explicitly set generator to the literal word 'email'
             sender: senderName,
             senderEmail: senderEmail,
             bodyPreview: cleanDescription,
