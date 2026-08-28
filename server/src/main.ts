@@ -6,31 +6,13 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // Permanent CORS configuration supporting production domains, Netlify previews, and local development
+  // Open CORS configuration to allow all origins and prevent blocking
   app.enableCors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or Postman)
-      if (!origin) return callback(null, true);
-
-      const allowedPatterns = [
-        /^https:\/\/.*\.netlify\.app$/,      // Matches any Netlify deploy preview or production URL
-        /^https:\/\/control-tower-itsm\.netlify\.app$/,
-        /^http:\/\/localhost:\d+$/,          // Matches local development ports (3000, 5173, etc.)
-        /^http:\/\/127\.0\.0\.1:\d+$/,
-      ];
-
-      const isAllowed = allowedPatterns.some((pattern) => pattern.test(origin));
-
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization, x-company-id',
     credentials: true,
-    optionsSuccessStatus: 204, // Ensures preflight requests resolve correctly across all browsers
+    optionsSuccessStatus: 204,
   });
 
   const port = parseInt(process.env.PORT || '5000', 10);
