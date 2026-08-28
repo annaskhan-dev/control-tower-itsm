@@ -108,10 +108,6 @@ export class EmailService {
         const cleanDescription = rawDescription
           .replace(/Get Outlook for iOS/gi, '')
           .trim();
-        const resolvedIssueType = this.determineCategory(
-          emailMessage.subject,
-          cleanDescription,
-        );
 
         try {
           // Use a stable, deterministic ID based on the message ID (no random numbers)
@@ -126,9 +122,10 @@ export class EmailService {
             subject: emailMessage.subject || 'No Subject',
             description: cleanDescription,
             source: 'Email',
-            issueType: resolvedIssueType,
-            priority: 'Medium',
-            generator: senderName,
+            issueType: null,         // Left empty/null for admin/manager configuration
+            category: null,          // Left empty/null for admin/manager configuration
+            priority: 'Medium',      // Default baseline priority until set by manager
+            generator: senderEmail,  // Explicitly set generator to sender's email address
             sender: senderName,
             senderEmail: senderEmail,
             bodyPreview: cleanDescription,
@@ -164,31 +161,5 @@ export class EmailService {
       throw new Error('Could not acquire Microsoft Graph access token.');
     }
     return tokenResponse.accessToken;
-  }
-
-  private determineCategory(subject = '', body = ''): string {
-    const text = `${subject} ${body}`.toLowerCase();
-    if (
-      text.includes('urgent') ||
-      text.includes('critical') ||
-      text.includes('down')
-    ) {
-      return 'Critical Incident';
-    }
-    if (
-      text.includes('login') ||
-      text.includes('password') ||
-      text.includes('access')
-    ) {
-      return 'Access Control';
-    }
-    if (
-      text.includes('shipping') ||
-      text.includes('dock') ||
-      text.includes('logistics')
-    ) {
-      return 'Logistics Operations';
-    }
-    return process.env.DEFAULT_EMAIL_CATEGORY || 'General Support';
   }
 }
