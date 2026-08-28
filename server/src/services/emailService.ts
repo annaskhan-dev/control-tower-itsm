@@ -26,12 +26,9 @@ export class EmailService {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async handleCronEmailSync(): Promise<void> {
-    // Log the exact mongoose connection state number:
     // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
-    this.logger.log(`[MongoDB Status Check] Current connection.readyState is: ${connection.readyState}`);
-
     if (connection.readyState !== 1) {
-      this.logger.warn('[Worker] Skipping sync: Database socket is not fully established.');
+      this.logger.warn(`[Email Worker] Skipping sync. DB connection state is: ${connection.readyState}`);
       return;
     }
 
@@ -42,10 +39,7 @@ export class EmailService {
       const accessToken = await this.getAccessToken();
       const email = process.env.OUTLOOK_EMAIL;
 
-      if (!email) {
-        this.logger.error('[Email Sync Error]: OUTLOOK_EMAIL environment variable is missing.');
-        return;
-      }
+      if (!email) return;
 
       const graphUrl =
         `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}` +
@@ -64,13 +58,7 @@ export class EmailService {
       });
 
       const data = (await response.json()) as any;
-
-      if (!response.ok) {
-        this.logger.error(`[Microsoft Graph Error]: ${JSON.stringify(data)}`);
-        return;
-      }
-
-      if (!data.value || data.value.length === 0) {
+      if (!response.ok || !data.value || data.value.length === 0) {
         return;
       }
 
@@ -84,7 +72,7 @@ export class EmailService {
 
         const existingTicket = await this.ticketModel.findOne({
           outlookMessageId: emailMessage.id,
-        });
+        }).maxTimeMS(5000); // 5-second explicit timeout safeguard
 
         if (!existingTicket) {
           const generatedTicketId = emailMessage.id
@@ -127,8 +115,7 @@ export class EmailService {
         });
       }
     } catch (error: any) {
-      // This will now print the full native MongoDB error stack if it's a network timeout
-      this.logger.error(`[Email Sync Crash Stack]: ${error.stack || error.message}`);
+      this.logger.error(`[Email Sync Error]: ${error.message}`);
     } finally {
       this.isSyncing = false;
     }
