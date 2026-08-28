@@ -10,6 +10,10 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private isSyncing = false;
   private isAppReady = false;
+  
+  // Record the exact time this server instance started up. 
+  // It will ONLY process emails received *after* this moment, preventing past emails from flooding.
+  private readonly serverStartTime = new Date();
 
   private msalConfig = {
     auth: {
@@ -26,7 +30,7 @@ export class EmailService {
     setTimeout(() => {
       this.isAppReady = true;
       this.logger.log(
-        '[Email Worker] Initial boot delay passed. Worker is now active.',
+        `[Email Worker] Initial boot delay passed. Worker is now active (Filtering emails forward from ${this.serverStartTime.toISOString()}).`,
       );
     }, 8000);
   }
@@ -51,10 +55,13 @@ export class EmailService {
         return;
       }
 
+      // Format server start time to ISO string for Microsoft Graph OData filter
+      const startTimeIso = this.serverStartTime.toISOString();
+
       const graphUrl =
         `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}` +
         `/mailFolders/inbox/messages` +
-        `?$filter=isRead eq false` +
+        `?$filter=isRead eq false and receivedDateTime ge ${startTimeIso}` +
         `&$top=10` +
         `&$select=id,subject,from,receivedDateTime,bodyPreview,isRead` +
         `&$orderby=receivedDateTime desc`;
@@ -69,25 +76,20 @@ export class EmailService {
 
       const data = (await response.json()) as any;
       
-      // DEBUG: Log Graph API response status and details
-      this.logger.log(`[Email Worker] Graph API Response Status: ${response.status}`);
       if (!response.ok) {
         this.logger.error(`[Graph API Error Response]: ${JSON.stringify(data)}`);
         return;
       }
 
       if (!data.value || data.value.length === 0) {
-        this.logger.log('[Email Worker] No unread emails found in inbox.');
         return;
       }
 
       this.logger.log(
-        `[Email Worker] Found ${data.value.length} unread email(s). Processing...`,
+        `[Email Worker] Found ${data.value.length} new unread email(s) since startup. Processing...`,
       );
 
       for (const emailMessage of data.value) {
-        this.logger.log(`[Email Worker] Processing email: "${emailMessage.subject}" (ID: ${emailMessage.id})`);
-
         const senderEmail =
           emailMessage.from?.emailAddress?.address || 'Unknown';
         const senderName = emailMessage.from?.emailAddress?.name || 'Unknown';
@@ -101,6 +103,7 @@ export class EmailService {
           cleanDescription,
         );
 
+        // Double check against MongoDB using outlookMessageId to prevent duplicate entries
         const existingTicket = await this.ticketModel.findOne({
           outlookMessageId: emailMessage.id,
         });
@@ -134,28 +137,6 @@ export class EmailService {
           } catch (dbError: any) {
             this.logger.error(`[MongoDB Create Error]: ${dbError.message}`);
           }
-        } else {
-          this.logger.log(
-            `[Email Worker] Ticket already exists for message ID: ${emailMessage.id}`,
-          );
-        }
-
-        const markAsReadUrl =
-          `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}` +
-          `/messages/${encodeURIComponent(emailMessage.id)}`;
-
-        const patchRes = await fetch(markAsReadUrl, {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ isRead: true }),
-        });
-
-        if (!patchRes.ok) {
-          const patchErr = await patchRes.json();
-          this.logger.error(`[Graph API Patch Error]: ${JSON.stringify(patchErr)}`);
         }
       }
     } catch (error: any) {
