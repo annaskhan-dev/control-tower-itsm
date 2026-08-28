@@ -1,11 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ConfidentialClientApplication } from '@azure/msal-node';
-import { Ticket } from '../tickets/schemas/ticket.schema'; // Update this relative path if needed to point to your ticket schema
+import { Ticket } from '../tickets/schemas/ticket.schema';
+import * as cron from 'node-cron';
 
 @Injectable()
-export class EmailService {
+export class EmailService implements OnApplicationBootstrap {
   private readonly logger = new Logger(EmailService.name);
   private isSyncing = false;
 
@@ -23,6 +24,21 @@ export class EmailService {
     @InjectModel(Ticket.name) private ticketModel: Model<Ticket>,
   ) {}
 
+  // This lifecycle hook runs automatically AFTER NestJS fully boots and Mongoose is connected
+  onApplicationBootstrap() {
+    this.logger.log('[Worker] Email polling cron job initializing...');
+    
+    // Run an initial scan after 5 seconds to let the connection settle
+    setTimeout(() => {
+      this.processUnreadEmails();
+    }, 5000);
+
+    // Schedule cron job every 5 seconds safely within NestJS
+    cron.schedule('*/5 * * * * *', () => {
+      this.processUnreadEmails();
+    });
+  }
+
   async getAccessToken(): Promise<string> {
     const tokenResponse = await this.msalClient.acquireTokenByClientCredential({
       scopes: ['https://graph.microsoft.com/.default'],
@@ -33,10 +49,8 @@ export class EmailService {
     return tokenResponse.accessToken;
   }
 
-  // Helper function to dynamically determine category based on subject/content 
   private determineCategory(subject = '', body = ''): string {
     const text = `${subject} ${body}`.toLowerCase();
-    
     if (text.includes('urgent') || text.includes('critical') || text.includes('down')) {
       return 'Critical Incident';
     }
@@ -46,7 +60,6 @@ export class EmailService {
     if (text.includes('shipping') || text.includes('dock') || text.includes('logistics')) {
       return 'Logistics Operations';
     }
-    
     return process.env.DEFAULT_EMAIL_CATEGORY || 'General Support';
   }
 
@@ -59,7 +72,6 @@ export class EmailService {
       const email = process.env.OUTLOOK_EMAIL;
 
       if (!email) {
-        this.logger.error('[Email Sync Error] OUTLOOK_EMAIL missing from .env');
         return;
       }
 
@@ -81,12 +93,7 @@ export class EmailService {
 
       const data = (await response.json()) as any;
 
-      if (!response.ok) {
-        this.logger.error(`[Graph API Error Details]: ${JSON.stringify(data, null, 2)}`);
-        return;
-      }
-
-      if (!data.value || data.value.length === 0) {
+      if (!response.ok || !data.value || data.value.length === 0) {
         return;
       }
 
@@ -95,10 +102,7 @@ export class EmailService {
         const senderName = emailMessage.from?.emailAddress?.name || 'Unknown';
 
         const rawDescription = emailMessage.bodyPreview || '';
-        const cleanDescription = rawDescription
-          .replace(/Get Outlook for iOS/gi, '')
-          .trim();
-
+        const cleanDescription = rawDescription.replace(/Get Outlook for iOS/gi, '').trim();
         const resolvedIssueType = this.determineCategory(emailMessage.subject, cleanDescription);
 
         const existingTicket = await this.ticketModel.findOne({
@@ -111,27 +115,25 @@ export class EmailService {
             : `INC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
           await (this.ticketModel as any).create({
-  ticketId: generatedTicketId,
-  title: emailMessage.subject || 'No Subject',
-  subject: emailMessage.subject || 'No Subject',
-  description: cleanDescription,
-  source: 'Email',
-  issueType: resolvedIssueType,
-  priority: 'Medium',
-  generator: senderName,
-  sender: senderName,
-  sendEmail: senderEmail,
-  senderEmail: senderEmail,
-  bodyPreview: cleanDescription,
-  receivedDateTime: emailMessage.receivedDateTime,
-  status: 'Open',
-  companyId: 'openport123',
-  outlookMessageId: emailMessage.id,
-});
+            ticketId: generatedTicketId,
+            title: emailMessage.subject || 'No Subject',
+            subject: emailMessage.subject || 'No Subject',
+            description: cleanDescription,
+            source: 'Email',
+            issueType: resolvedIssueType,
+            priority: 'Medium',
+            generator: senderName,
+            sender: senderName,
+            sendEmail: senderEmail,
+            senderEmail: senderEmail,
+            bodyPreview: cleanDescription,
+            receivedDateTime: emailMessage.receivedDateTime,
+            status: 'Open',
+            companyId: 'openport123',
+            outlookMessageId: emailMessage.id,
+          });
           
-          this.logger.log(
-            `[MongoDB] Unified ticket successfully created for: "${emailMessage.subject}" under category: "${resolvedIssueType}"`,
-          );
+          this.logger.log(`[MongoDB] Ticket successfully created for: "${emailMessage.subject}"`);
         }
 
         const markAsReadUrl =
