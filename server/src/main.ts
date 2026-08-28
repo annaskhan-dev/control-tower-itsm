@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { processUnreadEmails } from '../services/emailService'; // Adjust path if your file location is different
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -14,6 +15,14 @@ async function bootstrap() {
     credentials: true,
     optionsSuccessStatus: 204,
   });
+
+  // Start the background email polling worker (runs every 5 seconds)
+  setInterval(() => {
+    processUnreadEmails().catch((err) =>
+      console.error('[Email Worker Error]:', err.message)
+    );
+  }, 5000);
+  console.log('[Worker] Email polling cron job initialized (runs every 5 seconds).');
 
   const port = parseInt(process.env.PORT || '5000', 10);
   await app.listen(port, '0.0.0.0');
