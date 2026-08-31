@@ -35,7 +35,7 @@ export class EmailService {
     }, 5000);
   }
 
-  @Cron('*/5 * * * * *') // Runs every 5 seconds
+  @Cron('*/5 * * * * ') // Runs every 5 seconds
   async handleCronEmailSync(): Promise<void> {
     if (!this.isAppReady) {
       return; // Skip execution during the startup window
