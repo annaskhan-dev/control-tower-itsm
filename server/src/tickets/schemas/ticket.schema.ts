@@ -48,11 +48,12 @@ export class Ticket extends Document {
   @Prop()
   resolvedAt!: Date;
 
-  @Prop({ default: 'fleet-coordination', index: true })
+  // Set default to null so email and manual tickets can start unassigned
+  @Prop({ type: String, default: null, index: true })
   category!: string;
 
-  @Prop()
-  slaDeadline!: Date;
+  @Prop({ type: Date, default: null })
+  slaDeadline!: Date | null;
 
   @Prop({ required: true, index: true })
   companyId!: string;
@@ -70,5 +71,26 @@ export const TicketSchema = SchemaFactory.createForClass(Ticket);
 TicketSchema.index({ companyId: 1, status: 1 });
 TicketSchema.index({ companyId: 1, createdAt: -1 });
 TicketSchema.index({ companyId: 1, generator: 1 });
+
+// Mongoose pre-save hook to calculate SLA deadline automatically when category is present/modified
+TicketSchema.pre('save', async function () {
+  if (this.category && (this.isNew || this.isModified('category'))) {
+    try {
+      const slaConfigModel = this.model('SlaConfig');
+      const rule = (await slaConfigModel.findOne({ category: this.category })) as any;
+
+      const hours = rule ? rule.hours : 24; // Fallback to 24h if config is missing
+      this.slaDeadline = new Date(Date.now() + hours * 60 * 60 * 1000);
+
+      if (rule && rule.priority) {
+        this.priority = rule.priority;
+      }
+    } catch (err) {
+      this.slaDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    }
+  } else if (!this.category) {
+    this.slaDeadline = null; // Clear deadline if category is empty
+  }
+});
 
 export type TicketDocument = Ticket & Document;

@@ -76,11 +76,21 @@ export class TicketsService {
   ): Promise<Ticket> {
     try {
       const resolvedCompanyId = companyId || createTicketDto.companyId || 'openport123';
-      const category = createTicketDto.category || 'fleet-coordination';
       
-      const slaConfig = await this.slaConfigModel.findOne({ category, companyId: resolvedCompanyId }).exec();
-      const hoursAllowed = slaConfig ? slaConfig.hours : 24;
-      const deadline = new Date(Date.now() + hoursAllowed * 60 * 60 * 1000);
+      // Allow category to start as null if not specified (e.g. for email ingestion or blank tickets)
+      const category = createTicketDto.category || null;
+      
+      let deadline: Date | null = null;
+      let ticketPriority = createTicketDto.priority || 'Medium';
+
+      if (category) {
+        const slaConfig = await this.slaConfigModel.findOne({ category, companyId: resolvedCompanyId }).exec();
+        const hoursAllowed = slaConfig ? slaConfig.hours : 24;
+        deadline = new Date(Date.now() + hoursAllowed * 60 * 60 * 1000);
+        if (slaConfig && slaConfig.priority) {
+          ticketPriority = slaConfig.priority;
+        }
+      }
       
       const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
       const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
@@ -96,7 +106,7 @@ export class TicketsService {
         issueType: createTicketDto.issueType || 'General Support',
         category,
         type: createTicketDto.type || 'Incident',
-        priority: createTicketDto.priority || 'Medium',
+        priority: ticketPriority,
         status: 'Open',
         assignee: isAssigned ? createTicketDto.assignee : 'Unassigned',
         subAssignment: isSubAssigned ? createTicketDto.subAssignment : null,
@@ -189,7 +199,23 @@ export class TicketsService {
     }
 
     const updateData: any = { ...updateTicketDto };
-    delete updateData.slaDeadline;
+    
+    // Explicitly handle category changes and dynamic SLA deadline recalculation for findOneAndUpdate
+    if (updateData.category !== undefined) {
+      if (updateData.category) {
+        const slaConfig = await this.slaConfigModel.findOne({ category: updateData.category, companyId }).exec();
+        const hoursAllowed = slaConfig ? slaConfig.hours : 24;
+        updateData.slaDeadline = new Date(Date.now() + hoursAllowed * 60 * 60 * 1000);
+        if (slaConfig && slaConfig.priority) {
+          updateData.priority = slaConfig.priority;
+        }
+      } else {
+        updateData.category = null;
+        updateData.slaDeadline = null;
+      }
+    } else {
+      delete updateData.slaDeadline; // Prevent overwriting with stale data if category isn't changed
+    }
 
     if (updateData.assignee !== undefined) {
       const isActuallyAssigned = updateData.assignee !== 'Unassigned' && updateData.assignee !== '';

@@ -114,16 +114,22 @@ export class EmailService {
           const randomNumericId = Math.floor(10000 + Math.random() * 90000);
           const generatedTicketId = `INC-${randomNumericId}`;
 
+// 1. Determine default SLA hours based on priority or a default rule
+          // (You can also query your SlaConfig model here if available)
+          const defaultHours = 24; // Fallback or lookup from your SLA configs
+          const calculatedSlaDeadline = new Date(Date.now() + defaultHours * 60 * 60 * 1000);
+
           await (this.ticketModel as any).create({
             ticketId: generatedTicketId,
             title: emailMessage.subject || 'No Subject',
             subject: emailMessage.subject || 'No Subject',
             description: cleanDescription,
             source: 'Email',
-            issueType: null,         // Left empty/null for admin/manager configuration
-            category: null,          // Left empty/null for admin/manager configuration
-            priority: 'Medium',      // Default baseline priority until set by manager
-            generator: 'email',      // Explicitly set generator to the literal word 'email'
+            issueType: null,         
+            category: null,          // Remains null until assigned, OR set a default category here
+            priority: 'Medium',      
+            slaDeadline: calculatedSlaDeadline, // <-- Add this so it generates an initial deadline!
+            generator: 'email',      
             sender: senderName,
             senderEmail: senderEmail,
             bodyPreview: cleanDescription,
