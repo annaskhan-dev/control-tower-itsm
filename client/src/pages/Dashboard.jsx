@@ -1189,18 +1189,18 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   ]);
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 font-sans text-slate-800 p-4 sm:p-6 overflow-x-hidden animate-in fade-in duration-300">
+    <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 font-sans text-slate-800 p-3 sm:p-6 overflow-x-hidden animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
             Operational Dashboard
           </h2>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Real-time ticketing lifecycle, creator tracking, operator resolution metrics, and SLA health
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           {onOpenCreateTicket && (
             <button
               onClick={onOpenCreateTicket}
@@ -1224,15 +1224,15 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           )}
 
           {/* Month Filter Selector for Excel Export */}
-          <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs">
-            <label htmlFor="excel-month-filter" className="text-xs font-medium text-slate-500">
+          <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs flex-1 sm:flex-none">
+            <label htmlFor="excel-month-filter" className="text-xs font-medium text-slate-500 whitespace-nowrap">
               Export Month:
             </label>
             <select
               id="excel-month-filter"
               value={excelExportMonth}
               onChange={(e) => setExcelExportMonth(e.target.value)}
-              className="text-xs font-bold bg-transparent text-slate-800 focus:outline-none cursor-pointer"
+              className="text-xs font-bold bg-transparent text-slate-800 focus:outline-none cursor-pointer w-full"
             >
               {[
                 "January", "February", "March", "April", "May", "June",
@@ -1247,7 +1247,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
           <button
             onClick={handleExportExcel}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-xs flex items-center gap-2 cursor-pointer justify-center flex-1 sm:flex-none"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-xs flex items-center gap-2 cursor-pointer justify-center w-full sm:w-auto"
             title={`Export data for ${excelExportMonth}`}
           >
             <Download size={16} /> Export {excelExportMonth} to Excel
@@ -1288,26 +1288,26 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           <div
             key={item.label}
             onClick={() => setSelectedTab(item.tab)}
-            className={`p-4 bg-white border rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-all cursor-pointer ${
+            className={`p-3 sm:p-4 bg-white border rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-all cursor-pointer ${
               selectedTab === item.tab
                 ? "border-blue-500 ring-2 ring-blue-100"
                 : "border-slate-200/80"
             }`}
           >
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 {item.label}
               </p>
               {isDataLoading ? (
                 <div className="h-6 w-8 bg-slate-200 rounded animate-pulse mt-1" />
               ) : (
-                <h3 className="text-xl font-bold text-slate-900 mt-0.5">
+                <h3 className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">
                   {item.val}
                 </h3>
               )}
             </div>
             <div
-              className={`p-2.5 rounded-xl transition-all ${selectedTab === item.tab ? "bg-blue-50 text-blue-600" : "bg-slate-50 text-slate-600"}`}
+              className={`p-2 sm:p-2.5 rounded-xl transition-all ${selectedTab === item.tab ? "bg-blue-50 text-blue-600" : "bg-slate-50 text-slate-600"}`}
             >
               <item.icon size={18} />
             </div>
@@ -1429,10 +1429,10 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       </div>
 
       {/* Active Time & Monthly Average Card */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6 transition-all duration-300">
-        <h3 className="text-lg font-semibold text-gray-800 mb-3">User Active Time & Monthly Averages</h3>
+      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 mt-6 transition-all duration-300">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3">User Active Time & Monthly Averages</h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-600">
+          <table className="w-full text-left text-sm text-gray-600 min-w-[650px]">
             <thead className="bg-gray-50 uppercase text-xs text-gray-500">
               <tr>
                 <th className="p-3">User / Operator</th>
@@ -1475,18 +1475,18 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       </div>
 
       {/* Month-on-Month Tickets Breakdown Card with Filter */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-6 transition-all duration-300">
+      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 mt-6 transition-all duration-300">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">Month-on-Month Ticket Breakdown</h3>
-          <div className="flex items-center gap-2">
-            <label htmlFor="mom-month-select" className="text-xs text-gray-500 font-medium">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800">Month-on-Month Ticket Breakdown</h3>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <label htmlFor="mom-month-select" className="text-xs text-gray-500 font-medium whitespace-nowrap">
               Filter Month:
             </label>
             <select
               id="mom-month-select"
               value={selectedMomMonth}
               onChange={(e) => setSelectedMomMonth(e.target.value)}
-              className="text-xs font-bold bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer transition-all"
+              className="text-xs font-bold bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer transition-all w-full sm:w-auto"
             >
               {[
                 "January", "February", "March", "April", "May", "June",
@@ -1531,7 +1531,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
             Ticket Intake Velocity Trend
           </h4>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
             <label
               htmlFor="velocity-days-select"
               className="text-xs text-slate-500 font-medium"
@@ -1616,14 +1616,14 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       </div>
 
       {/* Priority Summary & Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <ShieldAlert size={18} className="text-amber-500" />
+          <ShieldAlert size={18} className="text-amber-500 shrink-0" />
           <span className="text-xs font-bold uppercase text-slate-700 tracking-wider">
             Priority Breakdown & Filters:
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {[
             { key: "all", label: "All Priorities", count: stats.total },
             {
@@ -1654,7 +1654,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
             <button
               key={p.key}
               onClick={() => setSelectedPriorityFilter(p.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border flex items-center gap-1.5 cursor-pointer flex-1 sm:flex-none justify-center ${
                 selectedPriorityFilter === p.key
                   ? "bg-slate-900 text-white border-slate-900 shadow-sm"
                   : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
@@ -1673,8 +1673,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       </div>
 
       {/* Filters and Search Toolbar */}
-      <div className="px-6 py-4 bg-white border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
-        <div className="relative w-full max-w-sm">
+      <div className="px-4 sm:px-6 py-4 bg-white border border-slate-200/80 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
+        <div className="relative w-full md:max-w-sm">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
             <svg
               className="w-4 h-4"
@@ -1696,7 +1696,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           />
         </div>
 
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto justify-center flex-wrap">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full md:w-auto justify-center flex-wrap">
           {[
             { key: "all", label: "All Work" },
             { key: "unassigned", label: "Unassigned" },
@@ -1708,7 +1708,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
             <button
               key={tab.key}
               onClick={() => setSelectedTab(tab.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex-1 sm:flex-none text-center ${
                 selectedTab === tab.key
                   ? "bg-white text-slate-900 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -1746,7 +1746,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
             No tickets found matching the selected filter parameters.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto w-full">
             <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1750px]">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-[10px] tracking-wider font-bold">
                 <tr>

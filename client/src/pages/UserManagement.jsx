@@ -143,7 +143,8 @@ export const UserManagement = () => {
 
   return (
     <div className="h-full flex flex-col font-sans bg-white text-slate-800">
-      <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 shrink-0">
+      {/* Header section adjusted for responsive stacking */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4 sm:px-6 py-4 border-b border-slate-200 shrink-0 gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#13203B]">
             User & Role Management
@@ -157,111 +158,114 @@ export const UserManagement = () => {
         {isAdmin && (
           <button
             onClick={handleOpenCreate}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5"
+            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition shadow-sm flex items-center justify-center gap-1.5"
           >
             <UserPlus size={16} /> Add User
           </button>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/50">
         <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
           {isLoading ? (
             <div className="flex justify-center p-12">
               <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
             </div>
           ) : (
-            <table className="w-full text-left text-sm text-slate-600 border-collapse">
-              <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
-                <tr>
-                  <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">User</th>
-                  <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Email</th>
-                  <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Role</th>
-                  <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Status</th>
-                  {isAdmin && <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider text-right">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {users.length > 0 ? (
-                  users.map((u) => {
-                    const rowId = u._id || u.id;
-                    return (
-                      <tr
-                        key={rowId}
-                        className="hover:bg-slate-50 transition-colors text-sm"
-                      >
-                        <td className="p-4 font-semibold text-slate-900 flex items-center gap-3">
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
-                            style={{ backgroundColor: u.avatarColor }}
-                          >
-                            {u.name?.charAt(0).toUpperCase()}
-                          </div>
-                          {u.name}
-                        </td>
-                        <td className="p-4 text-slate-600">{u.email}</td>
-                        <td className="p-4 font-medium text-slate-700">{u.role}</td>
-                        <td className="p-4">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                              u.status === "Active" 
-                                ? "bg-emerald-100 text-emerald-800" 
-                                : "bg-slate-200 text-slate-600"
-                            }`}
-                          >
-                            {u.status || "Active"}
-                          </span>
-                        </td>
-                        {isAdmin && (
-                          <td className="p-4 text-right space-x-1">
-                            <button
-                              onClick={() => handleOpenEdit(u)}
-                              className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition"
-                              title="Edit User"
-                            >
-                              <Edit3 size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleToggleStatus(u)}
-                              className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition"
-                              title="Toggle Status"
-                            >
-                              {u.status === "Active" ? (
-                                <UserX size={16} className="text-rose-500" />
-                              ) : (
-                                <UserCheck size={16} className="text-emerald-500" />
-                              )}
-                            </button>
-                            <button
-                              onClick={() => handleDelete(rowId)}
-                              className="p-2 hover:bg-slate-100 rounded-lg text-rose-500 transition"
-                              title="Delete User"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })
-                ) : (
+            /* Wrapped table container with overflow-x-auto for mobile horizontal scrolling */
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left text-sm text-slate-600 border-collapse min-w-[650px]">
+                <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
                   <tr>
-                    <td colSpan="5" className="p-12 text-center text-slate-400 italic text-base">
-                      No users found for this company.
-                    </td>
+                    <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">User</th>
+                    <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Email</th>
+                    <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Role</th>
+                    <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider">Status</th>
+                    {isAdmin && <th className="p-4 font-semibold text-slate-700 uppercase text-xs tracking-wider text-right">Actions</th>}
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {users.length > 0 ? (
+                    users.map((u) => {
+                      const rowId = u._id || u.id;
+                      return (
+                        <tr
+                          key={rowId}
+                          className="hover:bg-slate-50 transition-colors text-sm"
+                        >
+                          <td className="p-4 font-semibold text-slate-900 flex items-center gap-3">
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm shrink-0"
+                              style={{ backgroundColor: u.avatarColor }}
+                            >
+                              {u.name?.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="truncate max-w-[150px] sm:max-w-none">{u.name}</span>
+                          </td>
+                          <td className="p-4 text-slate-600 truncate max-w-[180px] sm:max-w-none">{u.email}</td>
+                          <td className="p-4 font-medium text-slate-700">{u.role}</td>
+                          <td className="p-4">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-xs font-bold inline-block ${
+                                u.status === "Active" 
+                                  ? "bg-emerald-100 text-emerald-800" 
+                                  : "bg-slate-200 text-slate-600"
+                              }`}
+                            >
+                              {u.status || "Active"}
+                            </span>
+                          </td>
+                          {isAdmin && (
+                            <td className="p-4 text-right space-x-1 whitespace-nowrap">
+                              <button
+                                onClick={() => handleOpenEdit(u)}
+                                className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition"
+                                title="Edit User"
+                              >
+                                <Edit3 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleToggleStatus(u)}
+                                className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition"
+                                title="Toggle Status"
+                              >
+                                {u.status === "Active" ? (
+                                  <UserX size={16} className="text-rose-500" />
+                                ) : (
+                                  <UserCheck size={16} className="text-emerald-500" />
+                                )}
+                              </button>
+                              <button
+                                onClick={() => handleDelete(rowId)}
+                                className="p-2 hover:bg-slate-100 rounded-lg text-rose-500 transition"
+                                title="Delete User"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="p-12 text-center text-slate-400 italic text-base">
+                        No users found for this company.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-2xl">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-5 sm:p-6 shadow-2xl my-auto">
             <h3 className="font-bold text-base text-slate-800 mb-5 flex items-center gap-2">
-              <ShieldAlert size={20} className="text-blue-600" />
+              <ShieldAlert size={20} className="text-blue-600 shrink-0" />
               {editingUser ? "Edit User Details" : "Create New User"}
             </h3>
             <form onSubmit={handleSubmit} className="space-y-4 text-sm">
@@ -311,7 +315,7 @@ export const UserManagement = () => {
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1.5 text-xs uppercase tracking-wider">
                     Role
@@ -344,17 +348,17 @@ export const UserManagement = () => {
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  className="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-xl font-semibold text-slate-700 hover:bg-slate-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition shadow-sm"
+                  className="w-full sm:w-auto px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition shadow-sm"
                 >
                   Save User
                 </button>

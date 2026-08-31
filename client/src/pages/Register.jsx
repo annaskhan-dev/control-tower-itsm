@@ -33,7 +33,7 @@ export const Register = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 p-4 sm:p-6 md:p-8 overflow-y-auto">
+    <div className="min-h-[100dvh] w-full flex items-center justify-center bg-gradient-to-br from-indigo-950 via-purple-950 to-blue-950 px-4 py-6 sm:p-6 md:p-8 overflow-y-auto">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -51,17 +51,18 @@ export const Register = () => {
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
           <form onSubmit={handleRegister} className="flex flex-col gap-4">
             {[
-              { icon: User, label: 'Full Name', key: 'name', type: 'text' },
-              { icon: Mail, label: 'Email address', key: 'email', type: 'email' },
-              { icon: Lock, label: 'Password', key: 'password', type: 'password' },
-              { icon: Building, label: 'Company ID', key: 'companyId', type: 'text' },
+              { icon: User, label: 'Full Name', key: 'name', type: 'text', autoComplete: 'name' },
+              { icon: Mail, label: 'Email address', key: 'email', type: 'email', autoComplete: 'email' },
+              { icon: Lock, label: 'Password', key: 'password', type: 'password', autoComplete: 'new-password' },
+              { icon: Building, label: 'Company ID', key: 'companyId', type: 'text', autoComplete: 'off' },
             ].map((field) => (
               <div key={field.key} className="flex items-center bg-black/20 rounded-xl border border-white/10 focus-within:border-purple-500/50 transition-all px-2">
                 <field.icon className="ml-2 text-gray-400 shrink-0" size={20} />
                 <input 
-                  className="w-full bg-transparent p-3 text-white text-base outline-none"
+                  className="w-full bg-transparent p-3 text-white text-base outline-none [-webkit-text-size-adjust:100%]"
                   type={field.type}
                   placeholder={field.label}
+                  autoComplete={field.autoComplete}
                   value={formData[field.key]}
                   onChange={(e) => setFormData({...formData, [field.key]: e.target.value})}
                   required
@@ -72,7 +73,7 @@ export const Register = () => {
             <div className="flex items-center bg-black/20 rounded-xl border border-white/10 focus-within:border-purple-500/50 transition-all px-2">
               <ShieldCheck className="ml-2 text-gray-400 shrink-0" size={20} />
               <select 
-                className="w-full bg-transparent p-3 text-white outline-none text-base cursor-pointer [&>option]:bg-indigo-950"
+                className="w-full bg-transparent p-3 text-white outline-none text-base cursor-pointer [&>option]:bg-indigo-950 [-webkit-text-size-adjust:100%]"
                 onChange={(e) => setFormData({...formData, role: e.target.value})}
                 required
                 value={formData.role}
@@ -90,7 +91,7 @@ export const Register = () => {
             <button 
               type="submit" 
               disabled={loading}
-              className="mt-2 w-full bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold py-3 rounded-xl text-base transition-all shadow-lg shadow-purple-600/30 cursor-pointer"
+              className="mt-2 w-full bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold py-3.5 sm:py-3 rounded-xl text-base transition-all shadow-lg shadow-purple-600/30 cursor-pointer disabled:opacity-70 flex items-center justify-center"
             >
               {loading ? <Loader2 className="animate-spin mx-auto" size={22} /> : 'REGISTER'}
             </button>

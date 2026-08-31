@@ -340,18 +340,18 @@ export const TicketDetail = () => {
   const ticketGenerator = ticket.generator || ticket.source || "System / Direct";
 
   return (
-    <div className="h-full bg-slate-50 overflow-y-auto p-6">
-      <div className="max-w-5xl mx-auto">
+    <div className="h-full bg-slate-50 overflow-y-auto p-3 sm:p-6 [-webkit-text-size-adjust:100%]">
+      <div className="max-w-5xl mx-auto pb-10">
         
         {/* Header with Back Button */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-3 sm:gap-4 mb-6">
           <button 
             onClick={() => navigate(-1)} 
-            className="p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-100 transition cursor-pointer"
+            className="p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-100 transition cursor-pointer shrink-0"
           >
             <ArrowLeft size={18} className="text-slate-600" />
           </button>
-          <h2 className="text-lg font-bold text-slate-800">Ticket Details: {ticket.ticketId}</h2>
+          <h2 className="text-base sm:text-lg font-bold text-slate-800 break-words">Ticket Details: {ticket.ticketId}</h2>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -359,22 +359,22 @@ export const TicketDetail = () => {
           {/* Left Column: Description Panel & Sub Assignment */}
           <div className="lg:col-span-2 space-y-6">
             <div 
-              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${!canEditDesc ? 'cursor-not-allowed' : ''}`}
+              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-4 sm:p-5 ${!canEditDesc ? 'cursor-not-allowed' : ''}`}
             >
-              <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-sm">Description</h3>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                   <button
                     onClick={handleDelete}
                     disabled={isDeleting || !canDelete}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 disabled:opacity-50 transition cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 disabled:opacity-50 transition cursor-pointer"
                   >
                     <Trash2 size={14} /> Delete
                   </button>
                   <button
                     onClick={() => handleUpdate({ description })}
                     disabled={isUpdating || !canEditDesc}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer"
                   >
                     {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                     Save
@@ -386,23 +386,23 @@ export const TicketDetail = () => {
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={!canEditDesc}
                 rows={8}
-                className="w-full p-4 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-slate-50 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                className="w-full p-3 sm:p-4 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-slate-50 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 placeholder="No description provided..."
               />
             </div>
 
             {/* Sub Assignment Panel with restriction indicator */}
             <div 
-              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-5 ${isRestricted || !isPrimaryAssigned || isResolvedState ? 'cursor-not-allowed' : ''}`}
+              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-4 sm:p-5 ${isRestricted || !isPrimaryAssigned || isResolvedState ? 'cursor-not-allowed' : ''}`}
               title={
                 isResolvedState 
                   ? "Cannot modify sub-assignment for a resolved or closed ticket" 
                   : (!isPrimaryAssigned ? "Please assign a primary assignee before selecting a sub-assignee" : (isRestricted ? "Only Managers and Admins can modify sub-assignments" : ""))
               }
             >
-              <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                  <UserPlus size={16} className="text-blue-600" /> Sub Assignment
+                  <UserPlus size={16} className="text-blue-600 shrink-0" /> Sub Assignment
                 </h3>
                 <button
                   onClick={() => {
@@ -410,7 +410,7 @@ export const TicketDetail = () => {
                     handleUpdate({ subAssignment: finalSubValue });
                   }}
                   disabled={isUpdating || isRestricted || !isPrimaryAssigned || isResolvedState}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer self-end sm:self-auto"
                 >
                   {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   Assign
@@ -482,17 +482,17 @@ export const TicketDetail = () => {
 
           {/* Right Column: Properties & Live Durations */}
           <div className="space-y-4">
-            <div className="bg-white border border-slate-200 rounded-xl shadow-xs p-5 space-y-4">
+            <div className="bg-white border border-slate-200 rounded-xl shadow-xs p-4 sm:p-5 space-y-4">
               <h3 className="text-xs font-bold flex items-center gap-2 text-slate-700">
-                <ShieldAlert size={14} className="text-blue-600" /> Properties
+                <ShieldAlert size={14} className="text-blue-600 shrink-0" /> Properties
               </h3>
 
               {/* Creator / Entry Generator Info */}
               <div className="pb-2 border-b border-slate-100">
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <Cpu size={10} /> Created By / Generator
+                  <Cpu size={10} className="shrink-0" /> Created By / Generator
                 </label>
-                <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700">
+                <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700 break-words">
                   {ticketGenerator}
                 </div>
               </div>
@@ -501,7 +501,7 @@ export const TicketDetail = () => {
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                    <UserCheck size={10} /> Assignee (Primary)
+                    <UserCheck size={10} className="shrink-0" /> Assignee (Primary)
                   </label>
                   {!isRestricted && (
                     <button
@@ -578,12 +578,12 @@ export const TicketDetail = () => {
               </div>
 
               <div className="pt-2 border-t border-slate-100">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block flex items-center gap-1">
-                  <Calendar size={10} /> SLA Deadline
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Calendar size={10} className="shrink-0" /> SLA Deadline
                 </label>
-                <div className={`w-full p-2 border rounded-lg text-xs font-medium flex items-center gap-2 ${isOverdue ? "bg-red-50 text-red-700 border-red-200" : "bg-slate-50 text-slate-600 border-slate-200"}`}>
-                  {isOverdue && <AlertCircle size={12} />}
-                  {ticket.slaDeadline ? new Date(ticket.slaDeadline).toLocaleString() : "No Deadline Set"}
+                <div className={`w-full p-2 border rounded-lg text-xs font-medium flex items-center gap-2 break-all ${isOverdue ? "bg-red-50 text-red-700 border-red-200" : "bg-slate-50 text-slate-600 border-slate-200"}`}>
+                  {isOverdue && <AlertCircle size={12} className="shrink-0" />}
+                  <span>{ticket.slaDeadline ? new Date(ticket.slaDeadline).toLocaleString() : "No Deadline Set"}</span>
                 </div>
               </div>
 
@@ -591,47 +591,47 @@ export const TicketDetail = () => {
               <div className="pt-2 border-t border-slate-100 space-y-2">
                 <div>
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Primary Assignment Duration</span>
-                  <div className="text-xs font-semibold text-slate-700 mt-0.5 bg-slate-50 p-2 border border-slate-200 rounded-lg">
+                  <div className="text-xs font-semibold text-slate-700 mt-0.5 bg-slate-50 p-2 border border-slate-200 rounded-lg break-all">
                     {calculatedMetrics.assignmentTimeFormatted}
                   </div>
                 </div>
 
                 <div>
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">SLA Active Time</span>
-                  <div className="text-xs font-semibold text-blue-700 mt-0.5 bg-blue-50/50 p-2 border border-blue-100 rounded-lg">
+                  <div className="text-xs font-semibold text-blue-700 mt-0.5 bg-blue-50/50 p-2 border border-blue-100 rounded-lg break-all">
                     {calculatedMetrics.slaTimeFormatted}
                   </div>
                 </div>
 
                 <div>
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Sub-Assignment Active Time</span>
-                  <div className="text-xs font-semibold text-purple-700 mt-0.5 bg-purple-50/50 p-2 border border-purple-100 rounded-lg">
+                  <div className="text-xs font-semibold text-purple-700 mt-0.5 bg-purple-50/50 p-2 border border-purple-100 rounded-lg break-all">
                     {calculatedMetrics.subAssignmentTimeFormatted}
                   </div>
                 </div>
 
                 <div>
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Total Resolution Duration</span>
-                  <div className="text-xs font-semibold text-emerald-700 mt-0.5 bg-emerald-50/50 p-2 border border-emerald-100 rounded-lg">
+                  <div className="text-xs font-semibold text-emerald-700 mt-0.5 bg-emerald-50/50 p-2 border border-emerald-100 rounded-lg break-all">
                     {calculatedMetrics.finalResolutionTimeFormatted}
                   </div>
                 </div>
               </div>
 
               <div className="pt-2 border-t border-slate-100">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block flex items-center gap-1">
-                  <Calendar size={10} /> Sub Assignment Timestamp
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Calendar size={10} className="shrink-0" /> Sub Assignment Timestamp
                 </label>
-                <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600">
+                <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600 break-all">
                   {ticket.subAssignmentAt ? new Date(ticket.subAssignmentAt).toLocaleString() : "Not Sub-assigned Yet"}
                 </div>
               </div>
 
               <div className="pt-2 border-t border-slate-100">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block flex items-center gap-1">
-                  <Calendar size={10} /> Resolved Timestamp
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Calendar size={10} className="shrink-0" /> Resolved Timestamp
                 </label>
-                <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600">
+                <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600 break-all">
                   {ticket.resolvedAt ? new Date(ticket.resolvedAt).toLocaleString() : "Not Resolved Yet"}
                 </div>
               </div>
