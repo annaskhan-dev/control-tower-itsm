@@ -35,7 +35,7 @@ export class EmailService {
     }, 5000);
   }
 
-  @Cron('*/5 * * * * *') // Updated to run every 5 seconds
+  @Cron('*/5 * * * * *') // Runs every 5 seconds
   async handleCronEmailSync(): Promise<void> {
     if (!this.isAppReady) {
       return; // Skip execution during the startup window
@@ -110,11 +110,9 @@ export class EmailService {
           .trim();
 
         try {
-          // Use a stable, deterministic ID based on the message ID (no random numbers)
-          const shortId = emailMessage.id
-            ? emailMessage.id.substring(emailMessage.id.length - 10)
-            : Date.now();
-          const generatedTicketId = `INC-${shortId}`;
+          // Generate a clean numeric ID like INC-73431 instead of raw Base64 string with symbols
+          const randomNumericId = Math.floor(10000 + Math.random() * 90000);
+          const generatedTicketId = `INC-${randomNumericId}`;
 
           await (this.ticketModel as any).create({
             ticketId: generatedTicketId,
@@ -135,7 +133,7 @@ export class EmailService {
             outlookMessageId: emailMessage.id,
           });
           this.logger.log(
-            `[MongoDB] Ticket successfully created for: "${emailMessage.subject}" from ${senderEmail}`,
+            `[MongoDB] Ticket successfully created with ID ${generatedTicketId} for: "${emailMessage.subject}" from ${senderEmail}`,
           );
         } catch (dbError: any) {
           // Catch race-condition or duplicate key errors safely
