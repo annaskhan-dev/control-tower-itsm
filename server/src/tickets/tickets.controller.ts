@@ -195,6 +195,27 @@ export class TicketsController {
     const currentUserName = this.extractUserName(req.user);
     const userRole = req.user.role;
 
+    // 🛑 VALIDATION: Restrict assigning Transporters or Sales Persons only (Shipper Ops are allowed)
+    const restrictedAssignmentKeywords = ['transporter', 'sales'];
+    
+    const targetAssignee = updateTicketDto.assignee;
+    if (targetAssignee && targetAssignee !== 'Unassigned') {
+      const lowerAssignee = targetAssignee.toLowerCase();
+      const isRestricted = restrictedAssignmentKeywords.some(keyword => lowerAssignee.includes(keyword));
+      if (isRestricted) {
+        throw new BadRequestException('Action forbidden: Transporters and Sales Persons cannot be assigned tickets.');
+      }
+    }
+
+    const targetSubAssignment = updateTicketDto.subAssignment;
+    if (targetSubAssignment && targetSubAssignment !== '' && targetSubAssignment !== 'Unassigned') {
+      const lowerSub = targetSubAssignment.toLowerCase();
+      const isRestrictedSub = restrictedAssignmentKeywords.some(keyword => lowerSub.includes(keyword));
+      if (isRestrictedSub) {
+        throw new BadRequestException('Action forbidden: Transporters and Sales Persons cannot be given sub-assignments.');
+      }
+    }
+
     const hasSubAssignment = Boolean(existingTicket.subAssignment);
     const isTryingToChangeStatus = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
     const isManagerOrAdmin = ['Manager', 'Super Admin'].includes(userRole);

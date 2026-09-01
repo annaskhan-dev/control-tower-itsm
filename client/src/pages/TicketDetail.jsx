@@ -34,12 +34,14 @@ export const TicketDetail = () => {
   const [slaConfigs, setSlaConfigs] = useState([]);
   const [now, setNow] = useState(new Date());
 
-  // Filter out any users containing "shipper" in their role, name, or username
+  // Filter out any users containing "transporter" or "sales" in their role, name, or username (Shipper Ops are now allowed)
   const filteredCompanyUsers = useMemo(() => {
     return companyUsers.filter((u) => {
       const name = (u.name || u.username || "").toLowerCase();
       const role = (u.role || "").toLowerCase();
-      return !name.includes("shipper") && !role.includes("shipper");
+      const isTransporter = name.includes("transporter") || role.includes("transporter");
+      const isSales = name.includes("sales") || role.includes("sales");
+      return !isTransporter && !isSales;
     });
   }, [companyUsers]);
 
@@ -255,6 +257,38 @@ export const TicketDetail = () => {
     }
 
     let payload = { ...updatedFields };
+
+    // 🛑 VALIDATION: Check that assignee and sub-assignment don't match
+    const targetAssignee = 'assignee' in payload ? payload.assignee : (ticket.assignee || "");
+    const rawSubInput = 'subAssignment' in payload ? payload.subAssignment : (ticket.subAssignment || "");
+    const targetSub = rawSubInput === "custom" ? customSubAssignment : rawSubInput;
+
+    const isAssignedValid = targetAssignee && targetAssignee !== 'Unassigned' && targetAssignee !== '';
+    const isSubAssignedValid = targetSub && targetSub !== 'Unassigned' && targetSub !== '' && targetSub !== null;
+
+    if (isAssignedValid && isSubAssignedValid) {
+      if (targetAssignee.trim().toLowerCase() === targetSub.trim().toLowerCase()) {
+        alert("Validation Error: The assignee and sub-assignee cannot be the same person.");
+        return;
+      }
+    }
+
+    // 🛑 VALIDATION: Check that Transporters or Sales Persons are not assigned
+    const restrictedKeywords = ['transporter', 'sales'];
+    if (isAssignedValid) {
+      const lowerAssignee = targetAssignee.toLowerCase();
+      if (restrictedKeywords.some(kw => lowerAssignee.includes(kw))) {
+        alert("Action forbidden: Transporters and Sales Persons cannot be assigned tickets.");
+        return;
+      }
+    }
+    if (isSubAssignedValid) {
+      const lowerSub = targetSub.toLowerCase();
+      if (restrictedKeywords.some(kw => lowerSub.includes(kw))) {
+        alert("Action forbidden: Transporters and Sales Persons cannot be given sub-assignments.");
+        return;
+      }
+    }
 
     if (payload.category) {
       const rule = slaConfigs.find((c) => c.category === payload.category);

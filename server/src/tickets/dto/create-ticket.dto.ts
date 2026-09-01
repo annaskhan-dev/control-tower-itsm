@@ -1,5 +1,20 @@
-import { IsString, IsNotEmpty, IsOptional, IsDate, IsObject, ValidateIf } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsDate, IsObject, ValidateIf, ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments, Validate } from 'class-validator';
 import { Type } from 'class-transformer';
+
+// Custom validator to restrict Transporters and Sales Persons from being assigned
+@ValidatorConstraint({ name: 'isNotRestrictedAssignee', async: false })
+class IsNotRestrictedAssigneeConstraint implements ValidatorConstraintInterface {
+  validate(value: string, args: ValidationArguments) {
+    if (!value || typeof value !== 'string') return true;
+    const lowerValue = value.toLowerCase();
+    // Block if it contains transporter or sales keywords
+    return !lowerValue.includes('transporter') && !lowerValue.includes('sales');
+  }
+
+  defaultMessage(args: ValidationArguments) {
+    return `Action forbidden: Transporters and Sales Persons cannot be assigned tickets or given sub-assignments.`;
+  }
+}
 
 export class CreateTicketDto {
   @IsString()
@@ -7,19 +22,19 @@ export class CreateTicketDto {
   title!: string;
 
   @IsString()
-  @IsOptional() // Changed to optional in case the frontend form doesn't send it immediately
+  @IsOptional() 
   type?: string;
 
   @IsString()
-  @IsOptional() // Made optional to prevent 500 errors if the modal dropdown isn't selected
+  @IsOptional() 
   issueType?: string; 
 
   @IsString()
-  @IsOptional() // Made optional (defaults can be handled in your service if missing)
+  @IsOptional() 
   priority?: string;
 
   @IsString()
-  @IsOptional() // Made optional to prevent strict payload rejections
+  @IsOptional() 
   category?: string;
 
   @IsString()
@@ -40,11 +55,13 @@ export class CreateTicketDto {
 
   @IsString()
   @IsOptional()
+  @Validate(IsNotRestrictedAssigneeConstraint)
   assignee?: string;
 
   @ValidateIf((o) => o.assignee && o.assignee.trim() !== '' && o.assignee.toLowerCase() !== 'unassigned')
   @IsString()
   @IsNotEmpty()
+  @Validate(IsNotRestrictedAssigneeConstraint)
   subAssignment?: string;
 
   @IsOptional()

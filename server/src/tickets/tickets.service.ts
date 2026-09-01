@@ -77,9 +77,36 @@ export class TicketsService {
     try {
       const resolvedCompanyId = companyId || createTicketDto.companyId || 'openport123';
       
-      // Allow category to start as null if not specified (e.g. for email ingestion or blank tickets)
-      const category = createTicketDto.category || null;
+      // 🛑 VALIDATION: Restrict assigning Transporters or Sales Persons only (Shipper Ops are allowed)
+      const restrictedAssignmentKeywords = ['transporter', 'sales'];
+
+      if (createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned') {
+        const lowerAssignee = createTicketDto.assignee.toLowerCase();
+        const isRestricted = restrictedAssignmentKeywords.some(keyword => lowerAssignee.includes(keyword));
+        if (isRestricted) {
+          throw new BadRequestException('Action forbidden: Transporters and Sales Persons cannot be assigned tickets.');
+        }
+      }
+
+      if (createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '') {
+        const lowerSub = createTicketDto.subAssignment.toLowerCase();
+        const isRestrictedSub = restrictedAssignmentKeywords.some(keyword => lowerSub.includes(keyword));
+        if (isRestrictedSub) {
+          throw new BadRequestException('Action forbidden: Transporters and Sales Persons cannot be given sub-assignments.');
+        }
+      }
       
+      const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
+      const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
+
+      // Prevent same person as assignee and sub-assignee
+      if (isAssigned && isSubAssigned) {
+        if (createTicketDto.assignee?.trim().toLowerCase() === createTicketDto.subAssignment?.trim().toLowerCase()) {
+          throw new BadRequestException('The assignee and sub-assignee cannot be the same person.');
+        }
+      }
+      
+      const category = createTicketDto.category || null;
       let deadline: Date | null = null;
       let ticketPriority = createTicketDto.priority || 'Medium';
 
@@ -92,9 +119,6 @@ export class TicketsService {
         }
       }
       
-      const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
-      const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
-
       const resolvedUserName = userName && userName !== 'User' ? userName : 'Ali';
       const ticketGenerator = createTicketDto.generator || `${resolvedUserName} (${userRole || 'Super Admin'})`;
 
@@ -126,6 +150,7 @@ export class TicketsService {
       this.ticketsGateway.emitTicketCreated(savedTicket, resolvedCompanyId);
       return savedTicket;
     } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
       this.logger.error(`Failed to create ticket: ${error.message}`);
       throw new InternalServerErrorException(`Could not create ticket: ${error.message}`);
     }
@@ -172,9 +197,41 @@ export class TicketsService {
       }
     }
 
+    // 🛑 VALIDATION: Restrict assigning Transporters or Sales Persons during updates (Shipper Ops are allowed)
+    const restrictedAssignmentKeywords = ['transporter', 'sales'];
+
+    if (updateTicketDto.assignee && updateTicketDto.assignee !== 'Unassigned') {
+      const lowerAssignee = updateTicketDto.assignee.toLowerCase();
+      const isRestricted = restrictedAssignmentKeywords.some(keyword => lowerAssignee.includes(keyword));
+      if (isRestricted) {
+        throw new BadRequestException('Action forbidden: Transporters and Sales Persons cannot be assigned tickets.');
+      }
+    }
+
+    if (updateTicketDto.subAssignment && updateTicketDto.subAssignment !== '' && updateTicketDto.subAssignment !== 'Unassigned') {
+      const lowerSub = updateTicketDto.subAssignment.toLowerCase();
+      const isRestrictedSub = restrictedAssignmentKeywords.some(keyword => lowerSub.includes(keyword));
+      if (isRestrictedSub) {
+        throw new BadRequestException('Action forbidden: Transporters and Sales Persons cannot be given sub-assignments.');
+      }
+    }
+
     const baseQuery = id.startsWith('INC-') ? { ticketId: id } : { _id: id };
     const existingTicket = await this.ticketModel.findOne({ ...baseQuery, companyId });
     if (!existingTicket) throw new NotFoundException(`Ticket with ID ${id} not found`);
+
+    // Prevent same person as assignee and sub-assignee during updates
+    const targetAssignee = updateTicketDto.assignee !== undefined ? updateTicketDto.assignee : existingTicket.assignee;
+    const targetSubAssignment = updateTicketDto.subAssignment !== undefined ? updateTicketDto.subAssignment : existingTicket.subAssignment;
+
+    const isTargetAssigned = targetAssignee && targetAssignee !== 'Unassigned' && targetAssignee !== '';
+    const isTargetSubAssigned = targetSubAssignment && targetSubAssignment !== 'Unassigned' && targetSubAssignment !== '' && targetSubAssignment !== null;
+
+    if (isTargetAssigned && isTargetSubAssigned) {
+      if (targetAssignee?.trim().toLowerCase() === targetSubAssignment?.trim().toLowerCase()) {
+        throw new BadRequestException('The assignee and sub-assignee cannot be the same person.');
+      }
+    }
 
     const currentStatus = (existingTicket.status || '').toLowerCase();
     const isAlreadyResolved = ['resolved', 'completed', 'done'].includes(currentStatus);
@@ -200,7 +257,6 @@ export class TicketsService {
 
     const updateData: any = { ...updateTicketDto };
     
-    // Explicitly handle category changes and dynamic SLA deadline recalculation for findOneAndUpdate
     if (updateData.category !== undefined) {
       if (updateData.category) {
         const slaConfig = await this.slaConfigModel.findOne({ category: updateData.category, companyId }).exec();
@@ -214,7 +270,7 @@ export class TicketsService {
         updateData.slaDeadline = null;
       }
     } else {
-      delete updateData.slaDeadline; // Prevent overwriting with stale data if category isn't changed
+      delete updateData.slaDeadline;
     }
 
     if (updateData.assignee !== undefined) {
@@ -226,7 +282,6 @@ export class TicketsService {
       }
     }
 
-    // Fixed Sub-Assignment and Timestamp Management
     if (updateData.subAssignment !== undefined) {
       const isActuallySubAssigned = updateData.subAssignment !== 'Unassigned' && updateData.subAssignment !== '' && updateData.subAssignment !== null;
 
