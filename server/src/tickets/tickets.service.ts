@@ -77,14 +77,14 @@ export class TicketsService {
     try {
       const resolvedCompanyId = companyId || createTicketDto.companyId || 'openport123';
       
-      // 🛑 VALIDATION: Restrict assigning Transporters or Sales Persons only (Shipper Ops are allowed)
-      const restrictedAssignmentKeywords = ['transporter', 'sales'];
+      // 🛑 VALIDATION: Restrict assigning Transporters, Sales Persons, or Shipper Ops
+      const restrictedAssignmentKeywords = ['transporter', 'sales', 'shipper', 'ops'];
 
       if (createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned') {
         const lowerAssignee = createTicketDto.assignee.toLowerCase();
         const isRestricted = restrictedAssignmentKeywords.some(keyword => lowerAssignee.includes(keyword));
         if (isRestricted) {
-          throw new BadRequestException('Action forbidden: Transporters and Sales Persons cannot be assigned tickets.');
+          throw new BadRequestException('Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be assigned tickets.');
         }
       }
 
@@ -92,7 +92,7 @@ export class TicketsService {
         const lowerSub = createTicketDto.subAssignment.toLowerCase();
         const isRestrictedSub = restrictedAssignmentKeywords.some(keyword => lowerSub.includes(keyword));
         if (isRestrictedSub) {
-          throw new BadRequestException('Action forbidden: Transporters and Sales Persons cannot be given sub-assignments.');
+          throw new BadRequestException('Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be given sub-assignments.');
         }
       }
       
@@ -197,14 +197,14 @@ export class TicketsService {
       }
     }
 
-    // 🛑 VALIDATION: Restrict assigning Transporters or Sales Persons during updates (Shipper Ops are allowed)
-    const restrictedAssignmentKeywords = ['transporter', 'sales'];
+    // 🛑 VALIDATION: Restrict assigning Transporters, Sales Persons, or Shipper Ops during updates
+    const restrictedAssignmentKeywords = ['transporter', 'sales', 'shipper', 'ops'];
 
     if (updateTicketDto.assignee && updateTicketDto.assignee !== 'Unassigned') {
       const lowerAssignee = updateTicketDto.assignee.toLowerCase();
       const isRestricted = restrictedAssignmentKeywords.some(keyword => lowerAssignee.includes(keyword));
       if (isRestricted) {
-        throw new BadRequestException('Action forbidden: Transporters and Sales Persons cannot be assigned tickets.');
+        throw new BadRequestException('Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be assigned tickets.');
       }
     }
 
@@ -212,7 +212,7 @@ export class TicketsService {
       const lowerSub = updateTicketDto.subAssignment.toLowerCase();
       const isRestrictedSub = restrictedAssignmentKeywords.some(keyword => lowerSub.includes(keyword));
       if (isRestrictedSub) {
-        throw new BadRequestException('Action forbidden: Transporters and Sales Persons cannot be given sub-assignments.');
+        throw new BadRequestException('Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be given sub-assignments.');
       }
     }
 

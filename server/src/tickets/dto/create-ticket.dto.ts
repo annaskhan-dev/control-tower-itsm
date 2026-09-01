@@ -1,18 +1,23 @@
 import { IsString, IsNotEmpty, IsOptional, IsDate, IsObject, ValidateIf, ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments, Validate } from 'class-validator';
 import { Type } from 'class-transformer';
 
-// Custom validator to restrict Transporters and Sales Persons from being assigned
+// Custom validator to restrict Transporters, Sales Persons, and Shipper Ops from being assigned
 @ValidatorConstraint({ name: 'isNotRestrictedAssignee', async: false })
 class IsNotRestrictedAssigneeConstraint implements ValidatorConstraintInterface {
   validate(value: string, args: ValidationArguments) {
     if (!value || typeof value !== 'string') return true;
     const lowerValue = value.toLowerCase();
-    // Block if it contains transporter or sales keywords
-    return !lowerValue.includes('transporter') && !lowerValue.includes('sales');
+    
+    // Block if it contains transporter, sales, or shipper/ops keywords
+    const isTransporter = lowerValue.includes('transporter');
+    const isSales = lowerValue.includes('sales');
+    const isShipperOps = lowerValue.includes('shipper') || lowerValue.includes('ops');
+
+    return !isTransporter && !isSales && !isShipperOps;
   }
 
   defaultMessage(args: ValidationArguments) {
-    return `Action forbidden: Transporters and Sales Persons cannot be assigned tickets or given sub-assignments.`;
+    return `Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be assigned tickets or given sub-assignments.`;
   }
 }
 
@@ -30,11 +35,11 @@ export class CreateTicketDto {
   issueType?: string; 
 
   @IsString()
-  @IsOptional() 
+  @IsOptional()
   priority?: string;
 
   @IsString()
-  @IsOptional() 
+  @IsOptional()
   category?: string;
 
   @IsString()

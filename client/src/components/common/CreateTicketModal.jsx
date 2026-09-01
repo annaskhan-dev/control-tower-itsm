@@ -49,12 +49,12 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
         setSlaConfigs(slaData || []);
         const userData = usersResponse.data?.users || usersResponse.data || usersResponse;
         
-        // Filter out Transporters and Sales Persons so they aren't selectable in the dropdown
+        // Filter out Transporters, Sales Persons, and Shipper Ops so they aren't selectable in the dropdown
         const filteredUsers = Array.isArray(userData) ? userData.filter(u => {
           const role = (u.role || '').toLowerCase();
           const name = (u.name || u.username || '').toLowerCase();
-          return !role.includes('transporter') && !role.includes('sales') &&
-                 !name.includes('transporter') && !name.includes('sales');
+          const restrictedKeywords = ['transporter', 'sales', 'shipper', 'ops'];
+          return !restrictedKeywords.some(keyword => role.includes(keyword) || name.includes(keyword));
         }) : [];
 
         setUsers(filteredUsers);
@@ -83,6 +83,17 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
     if (!formData.title.trim()) return alert("Please select a title");
     if (!formData.issueType) return alert("Please select an issue type");
     if (!formData.category) return alert("Please select a category");
+    
+    // 🛑 VALIDATION: Check that Transporters, Sales Persons, or Shipper Ops are not assigned
+    const restrictedKeywords = ['transporter', 'sales', 'shipper', 'ops'];
+    if (formData.assignee && formData.assignee !== "Unassigned") {
+      const lowerAssignee = formData.assignee.toLowerCase();
+      if (restrictedKeywords.some(kw => lowerAssignee.includes(kw))) {
+        alert("Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be assigned tickets.");
+        return;
+      }
+    }
+
     if (isSubmitting) return;
 
     setIsSubmitting(true);
@@ -244,3 +255,5 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
     </div>
   );
 };
+
+export default CreateTicketModal;

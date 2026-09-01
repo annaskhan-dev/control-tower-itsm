@@ -34,14 +34,13 @@ export const TicketDetail = () => {
   const [slaConfigs, setSlaConfigs] = useState([]);
   const [now, setNow] = useState(new Date());
 
-  // Filter out any users containing "transporter" or "sales" in their role, name, or username (Shipper Ops are now allowed)
+  // Filter out any users containing "transporter", "sales", "shipper", or "ops" in their role, name, or username
   const filteredCompanyUsers = useMemo(() => {
     return companyUsers.filter((u) => {
       const name = (u.name || u.username || "").toLowerCase();
       const role = (u.role || "").toLowerCase();
-      const isTransporter = name.includes("transporter") || role.includes("transporter");
-      const isSales = name.includes("sales") || role.includes("sales");
-      return !isTransporter && !isSales;
+      const restrictedKeywords = ["transporter", "sales", "shipper", "ops"];
+      return !restrictedKeywords.some(keyword => name.includes(keyword) || role.includes(keyword));
     });
   }, [companyUsers]);
 
@@ -273,19 +272,19 @@ export const TicketDetail = () => {
       }
     }
 
-    // 🛑 VALIDATION: Check that Transporters or Sales Persons are not assigned
-    const restrictedKeywords = ['transporter', 'sales'];
+    // 🛑 VALIDATION: Check that Transporters, Sales Persons, or Shipper Ops are not assigned
+    const restrictedKeywords = ['transporter', 'sales', 'shipper', 'ops'];
     if (isAssignedValid) {
       const lowerAssignee = targetAssignee.toLowerCase();
       if (restrictedKeywords.some(kw => lowerAssignee.includes(kw))) {
-        alert("Action forbidden: Transporters and Sales Persons cannot be assigned tickets.");
+        alert("Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be assigned tickets.");
         return;
       }
     }
     if (isSubAssignedValid) {
       const lowerSub = targetSub.toLowerCase();
       if (restrictedKeywords.some(kw => lowerSub.includes(kw))) {
-        alert("Action forbidden: Transporters and Sales Persons cannot be given sub-assignments.");
+        alert("Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be given sub-assignments.");
         return;
       }
     }
