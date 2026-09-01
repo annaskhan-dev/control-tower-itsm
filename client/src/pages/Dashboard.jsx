@@ -492,11 +492,10 @@ const CustomTooltip = memo(({ active, payload, label }) => {
 CustomTooltip.displayName = "CustomTooltip";
 
 /**
- * List-based Card for Creators & Sources
+ * List-based Card for Creators & Sources with Month Filter support
  */
 const GeneratorListCard = memo(
-  ({ title, data, totalLabel = "total", theme = "emerald", isLoading }) => {
-    // FIX: Properly compute total regardless of whether item.count is a number or formatted string object
+  ({ title, data, totalLabel = "total", theme = "emerald", isLoading, selectedMonth, onMonthChange }) => {
     const totalValue = useMemo(() => {
       return data.reduce((acc, curr) => {
         if (curr.rawPrimary !== undefined) {
@@ -553,18 +552,35 @@ const GeneratorListCard = memo(
     return (
       <div className="p-5 border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between h-72">
         <div>
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
             <div className="flex items-center gap-2">
               <Layers size={16} className={currentTheme.iconColor} />
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                 {title}
               </h4>
             </div>
-            <span
-              className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${currentTheme.badgeBg}`}
-            >
-              Total: {totalValue}
-            </span>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+              {onMonthChange && (
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => onMonthChange(e.target.value)}
+                  className="text-[11px] font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-slate-700 focus:outline-none cursor-pointer"
+                >
+                  {[
+                    "All Months",
+                    "January", "February", "March", "April", "May", "June",
+                    "July", "August", "September", "October", "November", "December"
+                  ].map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              )}
+              <span
+                className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${currentTheme.badgeBg}`}
+              >
+                Total: {totalValue}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -587,7 +603,7 @@ const GeneratorListCard = memo(
             ))
           ) : (
             <div className="h-full flex items-center justify-center text-xs text-slate-400 italic">
-              No metrics available
+              No metrics available for {selectedMonth === "All Months" ? "this period" : selectedMonth}
             </div>
           )}
         </div>
@@ -633,6 +649,11 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   const currentYearStr = new Date().getFullYear().toString();
   const currentMonthName = new Date().toLocaleString("en-US", { month: "long" });
   const [selectedMomMonth, setSelectedMomMonth] = useState(currentMonthName);
+
+  // Dedicated month filter states for the three specific boxes
+  const [generatorMonth, setGeneratorMonth] = useState("All Months");
+  const [operatorWorkloadMonth, setOperatorWorkloadMonth] = useState("All Months");
+  const [operatorResolvedMonth, setOperatorResolvedMonth] = useState("All Months");
 
   // Dedicated state for Excel report month filter
   const [excelExportMonth, setExcelExportMonth] = useState(currentMonthName);
@@ -723,7 +744,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         const response = await api.get("/users");
         const allUsers = response.data || [];
         
-        // Filter out Admins AND Shippers completely from the assignment dropdown
         const filteredOps = allUsers.filter((u) => {
           const r = (u.role || u.userType || "")
             .replace(/\s+/g, "_")
@@ -783,6 +803,26 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       ),
     [tickets, now],
   );
+
+  // Month filter helper for boxes
+  const filterTicketsByMonth = useCallback((ticketList, monthName) => {
+    if (!monthName || monthName === "All Months") return ticketList;
+    const monthsMap = {
+      January: 0, February: 1, March: 2, April: 3, May: 4, June: 5,
+      July: 6, August: 7, September: 8, October: 9, November: 10, December: 11
+    };
+    const targetMonthIndex = monthsMap[monthName];
+    const currentYear = new Date().getFullYear();
+    return ticketList.filter((t) => {
+      if (!t.createdAt) return false;
+      const d = new Date(t.createdAt);
+      return !isNaN(d.getTime()) && d.getMonth() === targetMonthIndex && d.getFullYear() === currentYear;
+    });
+  }, []);
+
+  const generatorTicketsFiltered = useMemo(() => filterTicketsByMonth(normalizedTickets, generatorMonth), [normalizedTickets, generatorMonth, filterTicketsByMonth]);
+  const operatorWorkloadTicketsFiltered = useMemo(() => filterTicketsByMonth(normalizedTickets, operatorWorkloadMonth), [normalizedTickets, operatorWorkloadMonth, filterTicketsByMonth]);
+  const operatorResolvedTicketsFiltered = useMemo(() => filterTicketsByMonth(normalizedTickets, operatorResolvedMonth), [normalizedTickets, operatorResolvedMonth, filterTicketsByMonth]);
 
   const fullYearMonths = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -909,9 +949,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
   };
 
   const stats = useMemo(() => {
-    let generatorMap = {};
-    let operatorResolvedMap = {};
-    let operatorAssignmentWorkloadMap = {};
     let priorityMap = { Critical: 0, High: 0, Medium: 0, Low: 0 };
     let priorityResolvedMap = { Critical: 0, High: 0, Medium: 0, Low: 0 };
     let slaHealthMap = { "On Track": 0, "At Risk": 0, Breached: 0 };
@@ -921,68 +958,15 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
     let closedCount = 0;
     let openCount = 0;
 
-    const operatorRoleMap = {};
-    operators.forEach((op) => {
-      const opName = op.name || op.fullName || op.username;
-      const opRole = op.role || op.userType || "Operator";
-      if (opName) {
-        operatorRoleMap[opName.toLowerCase()] = opRole;
-      }
-    });
-
     normalizedTickets.forEach((t) => {
-      const src = t.entrySource || "Direct System";
-      generatorMap[src] = (generatorMap[src] || 0) + 1;
-
       const isClosed =
         t.isResolved ||
         ["closed", "resolved", "completed", "done"].includes(
           t.status.toLowerCase(),
         );
 
-      const formatOperatorName = (rawName) => {
-        if (!rawName || rawName === "Unassigned" || rawName === "Null" || rawName === "None") return null;
-        const lowerName = rawName.toLowerCase();
-        const matchedRole = operatorRoleMap[lowerName];
-        if (matchedRole && !rawName.toLowerCase().includes(matchedRole.toLowerCase())) {
-          return `${rawName} (${matchedRole})`;
-        } else if (!rawName.includes("(")) {
-          return `${rawName} (Operator)`;
-        }
-        return rawName;
-      };
-
-      if (t.isAssigned && t.assigneeName) {
-        const primaryOpFormatted = formatOperatorName(t.assigneeName);
-        if (primaryOpFormatted) {
-          if (!operatorAssignmentWorkloadMap[primaryOpFormatted]) {
-            operatorAssignmentWorkloadMap[primaryOpFormatted] = { primary: 0, subAssigned: 0 };
-          }
-          operatorAssignmentWorkloadMap[primaryOpFormatted].primary += 1;
-        }
-      }
-
-      if (t.isSubAssigned && t.subAssignmentName) {
-        const subOpFormatted = formatOperatorName(t.subAssignmentName);
-        if (subOpFormatted) {
-          if (!operatorAssignmentWorkloadMap[subOpFormatted]) {
-            operatorAssignmentWorkloadMap[subOpFormatted] = { primary: 0, subAssigned: 0 };
-          }
-          operatorAssignmentWorkloadMap[subOpFormatted].subAssigned += 1;
-        }
-      }
-
       if (isClosed) {
         closedCount++;
-        let operatorKeyRaw = "Unassigned / Other";
-        if (t.isSubAssigned && t.subAssignmentName && t.subAssignmentName !== "Null" && t.subAssignmentName !== "None") {
-          operatorKeyRaw = t.subAssignmentName;
-        } else if (t.isAssigned && t.assigneeName) {
-          operatorKeyRaw = t.assigneeName;
-        }
-        
-        let operatorKeyFormatted = formatOperatorName(operatorKeyRaw) || operatorKeyRaw;
-        operatorResolvedMap[operatorKeyFormatted] = (operatorResolvedMap[operatorKeyFormatted] || 0) + 1;
       } else {
         openCount++;
       }
@@ -1010,14 +994,35 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       closed: closedCount,
       open: openCount,
       slaRisk: (slaHealthMap["Breached"] || 0) + (slaHealthMap["At Risk"] || 0),
-      byGenerator: generatorMap,
-      byOperatorResolved: operatorResolvedMap,
-      byOperatorWorkload: operatorAssignmentWorkloadMap,
       byPriority: priorityMap,
       byPriorityResolved: priorityResolvedMap,
       slaHealth: slaHealthMap,
     };
-  }, [normalizedTickets, backendStats, operators]);
+  }, [normalizedTickets]);
+
+  const operatorRoleMap = useMemo(() => {
+    const map = {};
+    operators.forEach((op) => {
+      const opName = op.name || op.fullName || op.username;
+      const opRole = op.role || op.userType || "Operator";
+      if (opName) {
+        map[opName.toLowerCase()] = opRole;
+      }
+    });
+    return map;
+  }, [operators]);
+
+  const formatOperatorName = useCallback((rawName) => {
+    if (!rawName || rawName === "Unassigned" || rawName === "Null" || rawName === "None") return null;
+    const lowerName = rawName.toLowerCase();
+    const matchedRole = operatorRoleMap[lowerName];
+    if (matchedRole && !rawName.toLowerCase().includes(matchedRole.toLowerCase())) {
+      return `${rawName} (${matchedRole})`;
+    } else if (!rawName.includes("(")) {
+      return `${rawName} (Operator)`;
+    }
+    return rawName;
+  }, [operatorRoleMap]);
 
   const chartData = useMemo(() => {
     const daysCount = Math.max(1, Math.min(30, Number(velocityDays) || 7));
@@ -1041,25 +1046,60 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       }).length,
     }));
 
-    const generatorEntries = Object.entries(stats.byGenerator || {})
-      .map(([name, count]) => ({
-        name,
-        count: Number(count) || 0,
-      }))
+    // Generator data from filtered tickets
+    const generatorMap = {};
+    generatorTicketsFiltered.forEach((t) => {
+      const src = t.entrySource || "Direct System";
+      generatorMap[src] = (generatorMap[src] || 0) + 1;
+    });
+    const generatorEntries = Object.entries(generatorMap)
+      .map(([name, count]) => ({ name, count: Number(count) || 0 }))
       .filter((d) => d.count > 0);
 
-    const operatorResolvedEntries = Object.entries(
-      stats.byOperatorResolved || {},
-    )
-      .map(([name, count]) => ({
-        name,
-        count: Number(count) || 0,
-      }))
+    // Operator Resolved data from filtered tickets
+    const operatorResolvedMap = {};
+    operatorResolvedTicketsFiltered.forEach((t) => {
+      const isClosed =
+        t.isResolved ||
+        ["closed", "resolved", "completed", "done"].includes(t.status.toLowerCase());
+      if (isClosed) {
+        let operatorKeyRaw = "Unassigned / Other";
+        if (t.isSubAssigned && t.subAssignmentName && t.subAssignmentName !== "Null" && t.subAssignmentName !== "None") {
+          operatorKeyRaw = t.subAssignmentName;
+        } else if (t.isAssigned && t.assigneeName) {
+          operatorKeyRaw = t.assigneeName;
+        }
+        let operatorKeyFormatted = formatOperatorName(operatorKeyRaw) || operatorKeyRaw;
+        operatorResolvedMap[operatorKeyFormatted] = (operatorResolvedMap[operatorKeyFormatted] || 0) + 1;
+      }
+    });
+    const operatorResolvedEntries = Object.entries(operatorResolvedMap)
+      .map(([name, count]) => ({ name, count: Number(count) || 0 }))
       .filter((d) => d.count > 0);
 
-    const operatorWorkloadEntries = Object.entries(
-      stats.byOperatorWorkload || {},
-    )
+    // Operator Workload data from filtered tickets
+    const operatorAssignmentWorkloadMap = {};
+    operatorWorkloadTicketsFiltered.forEach((t) => {
+      if (t.isAssigned && t.assigneeName) {
+        const primaryOpFormatted = formatOperatorName(t.assigneeName);
+        if (primaryOpFormatted) {
+          if (!operatorAssignmentWorkloadMap[primaryOpFormatted]) {
+            operatorAssignmentWorkloadMap[primaryOpFormatted] = { primary: 0, subAssigned: 0 };
+          }
+          operatorAssignmentWorkloadMap[primaryOpFormatted].primary += 1;
+        }
+      }
+      if (t.isSubAssigned && t.subAssignmentName) {
+        const subOpFormatted = formatOperatorName(t.subAssignmentName);
+        if (subOpFormatted) {
+          if (!operatorAssignmentWorkloadMap[subOpFormatted]) {
+            operatorAssignmentWorkloadMap[subOpFormatted] = { primary: 0, subAssigned: 0 };
+          }
+          operatorAssignmentWorkloadMap[subOpFormatted].subAssigned += 1;
+        }
+      }
+    });
+    const operatorWorkloadEntries = Object.entries(operatorAssignmentWorkloadMap)
       .map(([name, counts]) => ({
         name,
         count: `Assigned: ${counts.primary} | Sub-assigned: ${counts.subAssigned}`,
@@ -1112,7 +1152,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       trend,
       slaPie: slaPieEntries,
     };
-  }, [normalizedTickets, stats, velocityDays]);
+  }, [normalizedTickets, generatorTicketsFiltered, operatorResolvedTicketsFiltered, operatorWorkloadTicketsFiltered, stats, velocityDays, formatOperatorName]);
 
   const filteredTickets = useMemo(() => {
     return normalizedTickets.filter((t) => {
@@ -1315,7 +1355,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         ))}
       </div>
 
-      {/* Widgets Grid */}
+      {/* Widgets Grid with Swapped Positions & Month Filters Added */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <GeneratorListCard
           title="TICKETS CREATED BY ROLE / SOURCE"
@@ -1323,13 +1363,8 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           totalLabel="tickets"
           theme="blue"
           isLoading={isDataLoading}
-        />
-        <GeneratorListCard
-          title="RESOLVED TICKETS BY OPERATOR"
-          data={chartData.operatorResolved}
-          totalLabel="resolved"
-          theme="emerald"
-          isLoading={isDataLoading}
+          selectedMonth={generatorMonth}
+          onMonthChange={setGeneratorMonth}
         />
         <GeneratorListCard
           title="OPERATOR ASSIGNED & SUB-ASSIGNED"
@@ -1337,6 +1372,17 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           totalLabel=""
           theme="purple"
           isLoading={isDataLoading}
+          selectedMonth={operatorWorkloadMonth}
+          onMonthChange={setOperatorWorkloadMonth}
+        />
+        <GeneratorListCard
+          title="RESOLVED TICKETS BY OPERATOR"
+          data={chartData.operatorResolved}
+          totalLabel="resolved"
+          theme="emerald"
+          isLoading={isDataLoading}
+          selectedMonth={operatorResolvedMonth}
+          onMonthChange={setOperatorResolvedMonth}
         />
 
         {/* SLA Health Distribution Card */}
