@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { TicketProvider } from './context/TicketContext';
+import { TicketProvider, useTickets } from './context/TicketContext';
 import { Sidebar } from './components/layout/Sidebar';
 import ProtectedRoute from './components/common/ProtectedRoute'; 
 import { Login } from './pages/Login';
@@ -29,6 +29,7 @@ function RootRedirect() {
 
 function MainLayout() {
   const { user, logout } = useAuth();
+  const { fetchTickets } = useTickets(); // <-- Grabbed refresh function from TicketContext
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -107,7 +108,10 @@ function MainLayout() {
       </main>
 
       {user && isTicketModalOpen && (
-        <CreateTicketModal onClose={() => setIsTicketModalOpen(false)} />
+        <CreateTicketModal 
+          onClose={() => setIsTicketModalOpen(false)} 
+          onSubmit={fetchTickets} // <-- Connected so dashboard/list auto-updates on ticket creation!
+        />
       )}
     </div>
   );
