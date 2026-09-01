@@ -1474,7 +1474,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Active Time & Monthly Average Card */}
+      {/* Active Time & Monthly Average Card (Crash-Proofed) */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 mt-6 transition-all duration-300">
         <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3">User Active Time & Monthly Averages</h3>
         <div className="overflow-x-auto">
@@ -1497,19 +1497,29 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
                     <td className="p-3"><div className="h-4 bg-slate-200 rounded w-28" /></td>
                   </tr>
                 ))
-              ) : activeTimes.length > 0 ? (
-                activeTimes.map((item, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-50 transition-colors">
-                    <td className="p-3 font-medium text-gray-900">{item.name}</td>
-                    <td className="p-3">{item.role}</td>
-                    <td className="p-3">
-                      {item.totalOverallMs ? (item.totalOverallMs / (1000 * 60 * 60)).toFixed(2) : (item.totalActiveHours ? item.totalActiveHours.toFixed(2) : 0)} hrs
-                    </td>
-                    <td className="p-3">
-                      {item.avgMonthlyActiveMs ? (item.avgMonthlyActiveMs / (1000 * 60 * 60)).toFixed(2) : (item.monthlyAverageActiveHours ? item.monthlyAverageActiveHours.toFixed(2) : 0)} hrs / mo
-                    </td>
-                  </tr>
-                ))
+              ) : Array.isArray(activeTimes) && activeTimes.length > 0 ? (
+                activeTimes.map((item, index) => {
+                  const overallMs = item?.totalOverallMs ?? 0;
+                  const fallbackOverallHours = item?.totalActiveHours ?? 0;
+                  const totalHours = overallMs > 0 ? overallMs / (1000 * 60 * 60) : fallbackOverallHours;
+
+                  const avgMs = item?.avgMonthlyActiveMs ?? 0;
+                  const fallbackAvgHours = item?.monthlyAverageActiveHours ?? 0;
+                  const avgHours = avgMs > 0 ? avgMs / (1000 * 60 * 60) : fallbackAvgHours;
+
+                  return (
+                    <tr key={item?._id || index} className="border-b hover:bg-gray-50 transition-colors">
+                      <td className="p-3 font-medium text-gray-900">{item?.name || "Unknown User"}</td>
+                      <td className="p-3">{item?.role || "Operator"}</td>
+                      <td className="p-3">
+                        {Number(totalHours || 0).toFixed(2)} hrs
+                      </td>
+                      <td className="p-3">
+                        {Number(avgHours || 0).toFixed(2)} hrs / mo
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan="4" className="p-4 text-center text-gray-400">No login/logout session activity records found.</td>
