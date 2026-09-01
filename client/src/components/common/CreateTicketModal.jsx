@@ -48,7 +48,16 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
         
         setSlaConfigs(slaData || []);
         const userData = usersResponse.data?.users || usersResponse.data || usersResponse;
-        setUsers(Array.isArray(userData) ? userData : []);
+        
+        // Filter out Transporters and Sales Persons so they aren't selectable in the dropdown
+        const filteredUsers = Array.isArray(userData) ? userData.filter(u => {
+          const role = (u.role || '').toLowerCase();
+          const name = (u.name || u.username || '').toLowerCase();
+          return !role.includes('transporter') && !role.includes('sales') &&
+                 !name.includes('transporter') && !name.includes('sales');
+        }) : [];
+
+        setUsers(filteredUsers);
       } catch (error) {
         console.error("Failed to fetch initial modal data:", error);
       }
