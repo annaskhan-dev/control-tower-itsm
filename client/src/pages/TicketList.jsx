@@ -53,10 +53,15 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         const response = await api.get('/users');
         const allUsers = response.data || [];
         const filteredOps = allUsers.filter(u => {
-          const r = (u.role || u.userType || "").replace(/\s+/g, "_").toLowerCase();
+          const r = (u.role || u.userType || u.type || "").replace(/\s+/g, "_").toLowerCase();
           const isShipper = r.includes('shipper');
-          const isEligible = (r.includes('operator') || r.includes('manager') || r.includes('admin')) && !isShipper;
-          return isEligible;
+          const isTransporter = r.includes('transporter');
+          const isSales = r.includes('sales');
+          const isCustomer = r.includes('customer');
+          
+          const isValidRole = r.includes('admin') || r.includes('manager') || r.includes('operator');
+          
+          return isValidRole && !isShipper && !isTransporter && !isSales && !isCustomer;
         });
         setOperators(filteredOps);
       } catch (err) {
@@ -464,16 +469,16 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                         ) : (
                           <div className="relative">
                             <select
-                              value={t.assignee || t.assignedTo || "Unassigned"}
+                              value={t.assignee && t.assignee.toLowerCase() !== "unassigned" ? t.assignee : ""}
                               disabled={isRestricted || isResolvedState}
                               onChange={(e) => {
                                 e.stopPropagation();
-                                handleManagerAssign(mongoId, e.target.value);
+                                handleManagerAssign(mongoId, e.target.value || "Unassigned");
                               }}
                               onClick={(e) => e.stopPropagation()}
                               className="w-full py-1.5 pl-2.5 pr-8 border border-slate-300 rounded-lg text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/25 focus:border-blue-600 outline-none disabled:bg-slate-100 cursor-pointer shadow-2xs appearance-none font-medium transition-all"
                             >
-                              <option value="Unassigned">Assign</option>
+                              <option value="" disabled>Select</option>
                               {operators.map((u) => {
                                 const userName = u.name || u.fullName || u.username;
                                 const userRole = u.role || u.userType || 'Operator';
@@ -591,16 +596,16 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                             ) : (
                               <div className="relative">
                                 <select
-                                  value={t.assignee || t.assignedTo || "Unassigned"}
+                                  value={t.assignee && t.assignee.toLowerCase() !== "unassigned" ? t.assignee : ""}
                                   disabled={isRestricted || isResolvedState}
                                   onChange={(e) => {
                                     e.stopPropagation();
-                                    handleManagerAssign(mongoId, e.target.value);
+                                    handleManagerAssign(mongoId, e.target.value || "Unassigned");
                                   }}
                                   onClick={(e) => e.stopPropagation()}
                                   className="w-full py-1.5 pl-2.5 pr-8 border border-slate-300 rounded-lg text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/25 focus:border-blue-600 outline-none disabled:bg-slate-100 cursor-pointer shadow-2xs appearance-none font-medium transition-all"
                                 >
-                                  <option value="Unassigned">Assign</option>
+                                  <option value="" disabled>Select</option>
                                   {operators.map((u) => {
                                     const userName = u.name || u.fullName || u.username;
                                     const userRole = u.role || u.userType || 'Operator';
