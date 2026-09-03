@@ -98,7 +98,7 @@ const TableRowItem = memo(({ t, isUserManagerOrAdmin, operators, handleAssignToM
           </button>
         ) : (
           <select
-            value={t.assignee || t.assignedTo || "Unassigned"}
+            value={t.assignee || t.assignedTo || ""}
             disabled={isRestricted || isResolvedState}
             onChange={(e) => {
               e.stopPropagation();
@@ -107,7 +107,7 @@ const TableRowItem = memo(({ t, isUserManagerOrAdmin, operators, handleAssignToM
             onClick={(e) => e.stopPropagation()}
             className="w-full py-1 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer"
           >
-            <option value="Unassigned">--select--</option>
+            <option value="" disabled>Select</option>
             {operators.map((u) => (
               <option key={u._id || u.id} value={u.name || u.fullName || u.username}>
                 {u.name || u.fullName || u.username} ({u.role || u.userType || "Operator"})
@@ -744,7 +744,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         const response = await api.get("/users");
         const allUsers = response.data || [];
         
-        // Include Admins and Operators in the assignment list as requested
+        // Include Admins and Operators in the assignment list as requested, and filter out placeholder 'select'[cite: 8]
         const filteredOps = allUsers.filter((u) => {
           const r = (u.role || u.userType || "")
             .replace(/\s+/g, "_")
@@ -755,8 +755,9 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           const isShipperRole = r.includes("shipper") || name.includes("shipper");
           const isSalesPerson = r.includes("sales") || name.includes("sales");
           const isTransporter = r.includes("transporter") || name.includes("transporter");
+          const isSelectPlaceholder = name === "select" || name === "--select--";
 
-          return (!isShipperRole && !isSalesPerson && !isTransporter);
+          return (!isShipperRole && !isSalesPerson && !isTransporter && !isSelectPlaceholder);
         });
 
         setOperators(filteredOps);
