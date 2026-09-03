@@ -107,7 +107,7 @@ const TableRowItem = memo(({ t, isUserManagerOrAdmin, operators, handleAssignToM
             onClick={(e) => e.stopPropagation()}
             className="w-full py-1 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer"
           >
-            <option value="Unassigned">Assign...</option>
+            <option value="Unassigned">--select--</option>
             {operators.map((u) => (
               <option key={u._id || u.id} value={u.name || u.fullName || u.username}>
                 {u.name || u.fullName || u.username} ({u.role || u.userType || "Operator"})
@@ -787,7 +787,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
   const handleManagerAssign = useCallback(
     async (mongoId, selectedOperatorName) => {
-      if (!selectedOperatorName) return;
+      if (!selectedOperatorName || selectedOperatorName === "Unassigned") return;
       try {
         await updateTicket(mongoId, { assignee: selectedOperatorName });
         if (fetchTickets) fetchTickets(queue, true);

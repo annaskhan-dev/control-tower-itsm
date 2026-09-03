@@ -478,7 +478,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                               onClick={(e) => e.stopPropagation()}
                               className="w-full py-1.5 pl-2.5 pr-8 border border-slate-300 rounded-lg text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/25 focus:border-blue-600 outline-none disabled:bg-slate-100 cursor-pointer shadow-2xs appearance-none font-medium transition-all"
                             >
-                              <option value="" disabled>Select</option>
+                              <option value="" disabled>--select--</option>
                               {operators.map((u) => {
                                 const userName = u.name || u.fullName || u.username;
                                 const userRole = u.role || u.userType || 'Operator';
@@ -605,7 +605,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                                   onClick={(e) => e.stopPropagation()}
                                   className="w-full py-1.5 pl-2.5 pr-8 border border-slate-300 rounded-lg text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/25 focus:border-blue-600 outline-none disabled:bg-slate-100 cursor-pointer shadow-2xs appearance-none font-medium transition-all"
                                 >
-                                  <option value="" disabled>Select</option>
+                                  <option value="" disabled>--select--</option>
                                   {operators.map((u) => {
                                     const userName = u.name || u.fullName || u.username;
                                     const userRole = u.role || u.userType || 'Operator';
