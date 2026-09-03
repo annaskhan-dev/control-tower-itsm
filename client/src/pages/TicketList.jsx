@@ -56,7 +56,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           const r = (u.role || u.userType || "").replace(/\s+/g, "_").toLowerCase();
           const isShipper = r.includes('shipper');
           const isAdminRole = r.includes('admin');
-          const isEligible = (r.includes('operator') || r.includes('transporter') || r.includes('sales') || r.includes('manager')) && !isAdminRole && !isShipper;
+          const isEligible = (r.includes('operator') || r.includes('manager')) && !isAdminRole && !isShipper;
           return isEligible;
         });
         setOperators(filteredOps);
