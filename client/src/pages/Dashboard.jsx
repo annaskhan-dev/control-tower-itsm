@@ -752,8 +752,10 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
 
           const isAdminRole = r.includes("admin");
           const isShipperRole = r.includes("shipper") || name.includes("shipper");
+          const isSalesPerson = r.includes("sales") || name.includes("sales");
+          const isTransporter = r.includes("transporter") || name.includes("transporter");
 
-          return !isAdminRole && !isShipperRole;
+          return !isAdminRole && !isShipperRole && !isSalesPerson && !isTransporter;
         });
 
         setOperators(filteredOps);
