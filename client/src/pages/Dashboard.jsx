@@ -758,7 +758,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           const isSales = r.includes("sales") || name.includes("sales");
           const isTransporter = r.includes("transporter") || name.includes("transporter");
           const isOps = r.includes("ops") || name.includes("ops") || r.includes("operation");
-          const isSelectPlaceholder = name === "select" || name === "--select--";
 
           return !isShipper && !isSales && !isTransporter && !isOps && !isSelectPlaceholder;
         });
