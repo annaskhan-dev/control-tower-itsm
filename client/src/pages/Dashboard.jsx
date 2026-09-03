@@ -744,20 +744,20 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         const response = await api.get("/users");
         const allUsers = response.data || [];
         
-        // Include Admins and Operators in the assignment list as requested, and filter out placeholder 'select'[cite: 8]
+        // Filter out Transporter, Shipper, Ops, and Sales personnel as requested
         const filteredOps = allUsers.filter((u) => {
           const r = (u.role || u.userType || "")
             .replace(/\s+/g, "_")
             .toLowerCase();
           const name = (u.name || u.fullName || u.username || "").toLowerCase();
 
-          const isAdminRole = r.includes("admin");
-          const isShipperRole = r.includes("shipper") || name.includes("shipper");
-          const isSalesPerson = r.includes("sales") || name.includes("sales");
+          const isShipper = r.includes("shipper") || name.includes("shipper");
+          const isSales = r.includes("sales") || name.includes("sales");
           const isTransporter = r.includes("transporter") || name.includes("transporter");
+          const isOps = r.includes("ops") || name.includes("ops") || r.includes("operation");
           const isSelectPlaceholder = name === "select" || name === "--select--";
 
-          return (!isShipperRole && !isSalesPerson && !isTransporter && !isSelectPlaceholder);
+          return !isShipper && !isSales && !isTransporter && !isOps && !isSelectPlaceholder;
         });
 
         setOperators(filteredOps);
