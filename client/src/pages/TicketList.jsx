@@ -463,27 +463,32 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                             <span className="text-slate-400 italic">Unassigned</span>
                           )
                         ) : (
-                          <select
-                            value={t.assignee || t.assignedTo || "Unassigned"}
-                            disabled={isRestricted || isResolvedState}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              handleManagerAssign(mongoId, e.target.value);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full py-1 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none disabled:bg-slate-100 cursor-pointer shadow-2xs"
-                          >
-                            <option value="Unassigned">Assign to Operator...</option>
-                            {operators.map((u) => {
-                              const userName = u.name || u.fullName || u.username;
-                              const userRole = u.role || u.userType || 'Operator';
-                              return (
-                                <option key={u._id || u.id} value={userName}>
-                                  {userName} ({userRole})
-                                </option>
-                              );
-                            })}
-                          </select>
+                          <div className="relative">
+                            <select
+                              value={t.assignee || t.assignedTo || "Unassigned"}
+                              disabled={isRestricted || isResolvedState}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleManagerAssign(mongoId, e.target.value);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full py-1.5 pl-2.5 pr-8 border border-slate-300 rounded-lg text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/25 focus:border-blue-600 outline-none disabled:bg-slate-100 cursor-pointer shadow-2xs appearance-none font-medium transition-all"
+                            >
+                              <option value="Unassigned">Assign to Operator...</option>
+                              {operators.map((u) => {
+                                const userName = u.name || u.fullName || u.username;
+                                const userRole = u.role || u.userType || 'Operator';
+                                return (
+                                  <option key={u._id || u.id} value={userName}>
+                                    {userName} ({userRole})
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            <span className="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-slate-400">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                            </span>
+                          </div>
                         )}
                       </div>
 
@@ -585,27 +590,32 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                                 <span className="text-slate-400 italic">Unassigned</span>
                               )
                             ) : (
-                              <select
-                                value={t.assignee || t.assignedTo || "Unassigned"}
-                                disabled={isRestricted || isResolvedState}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  handleManagerAssign(mongoId, e.target.value);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full py-1 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none disabled:bg-slate-100 cursor-pointer shadow-2xs"
-                              >
-                                <option value="Unassigned">Assign to Operator...</option>
-                                {operators.map((u) => {
-                                  const userName = u.name || u.fullName || u.username;
-                                  const userRole = u.role || u.userType || 'Operator';
-                                  return (
-                                    <option key={u._id || u.id} value={userName}>
-                                      {userName} ({userRole})
-                                    </option>
-                                  );
-                                })}
-                              </select>
+                              <div className="relative">
+                                <select
+                                  value={t.assignee || t.assignedTo || "Unassigned"}
+                                  disabled={isRestricted || isResolvedState}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleManagerAssign(mongoId, e.target.value);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-full py-1.5 pl-2.5 pr-8 border border-slate-300 rounded-lg text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/25 focus:border-blue-600 outline-none disabled:bg-slate-100 cursor-pointer shadow-2xs appearance-none font-medium transition-all"
+                                >
+                                  <option value="Unassigned">Assign to Operator...</option>
+                                  {operators.map((u) => {
+                                    const userName = u.name || u.fullName || u.username;
+                                    const userRole = u.role || u.userType || 'Operator';
+                                    return (
+                                      <option key={u._id || u.id} value={userName}>
+                                        {userName} ({userRole})
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-slate-400">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                </span>
+                              </div>
                             )}
                           </td>
 

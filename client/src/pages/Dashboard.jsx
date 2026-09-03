@@ -107,7 +107,7 @@ const TableRowItem = memo(({ t, isUserManagerOrAdmin, operators, handleAssignToM
             onClick={(e) => e.stopPropagation()}
             className="w-full py-1 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer"
           >
-            <option value="Unassigned">Assign to Operator...</option>
+            <option value="Unassigned">Assign...</option>
             {operators.map((u) => (
               <option key={u._id || u.id} value={u.name || u.fullName || u.username}>
                 {u.name || u.fullName || u.username} ({u.role || u.userType || "Operator"})
@@ -744,6 +744,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         const response = await api.get("/users");
         const allUsers = response.data || [];
         
+        // Include Admins and Operators in the assignment list as requested
         const filteredOps = allUsers.filter((u) => {
           const r = (u.role || u.userType || "")
             .replace(/\s+/g, "_")
@@ -755,7 +756,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           const isSalesPerson = r.includes("sales") || name.includes("sales");
           const isTransporter = r.includes("transporter") || name.includes("transporter");
 
-          return !isAdminRole && !isShipperRole && !isSalesPerson && !isTransporter;
+          return (!isShipperRole && !isSalesPerson && !isTransporter);
         });
 
         setOperators(filteredOps);
