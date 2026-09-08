@@ -280,14 +280,6 @@ const normalizeTicket = (t, now) => {
   else if (rawPriorityStr.includes("med") || rawPriorityStr.includes("p3"))
     priority = "Medium";
 
-  const rawCategoryStr = (
-    t.category ||
-    t.type ||
-    t.ticketType ||
-    t.kind ||
-    "General"
-  ).toString();
-
   let rawSourceStr = "";
   const candidateSources = [
     t.generator,
@@ -433,6 +425,18 @@ const normalizeTicket = (t, now) => {
     const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${mins}m`;
   };
+
+  let rawCategoryStr = (
+    t.category ||
+    t.type ||
+    t.ticketType ||
+    t.kind ||
+    "General"
+  ).toString();
+
+  if (rawSourceStr.toLowerCase().includes("sales") && rawCategoryStr.toLowerCase() === "service request") {
+    rawCategoryStr = "General";
+  }
 
   return {
     ...t,
