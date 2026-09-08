@@ -1,3 +1,4 @@
+name=Dashboard.jsx
 import React, {
   useState,
   useEffect,
@@ -1218,12 +1219,18 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         matchesQueue = !t.isAssigned;
       }
 
-      const searchStr = searchTerm.toLowerCase();
-      return (
-        matchesQueue &&
-        (t.title?.toLowerCase().includes(searchStr) ||
-          t.ticketId?.toLowerCase().includes(searchStr))
-      );
+      const searchStr = searchTerm.toLowerCase().trim();
+      
+      // Expanded search matching across multiple fields (Ticket ID, Title, Category, Primary Assignee, Sub-Assignee)
+      const matchesSearch =
+        !searchStr ||
+        t.title?.toLowerCase().includes(searchStr) ||
+        t.ticketId?.toLowerCase().includes(searchStr) ||
+        t.category?.toLowerCase().includes(searchStr) ||
+        t.assigneeName?.toLowerCase().includes(searchStr) ||
+        t.subAssignmentName?.toLowerCase().includes(searchStr);
+
+      return matchesQueue && matchesSearch;
     });
   }, [
     normalizedTickets,
@@ -1752,7 +1759,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           </span>
           <input
             type="text"
-            placeholder="Search by Ticket ID or Title..."
+            placeholder="Search by ID, Title, Category, or Operator..."
             className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50/75 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all shadow-2xl placeholder:text-slate-400 text-slate-800"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
