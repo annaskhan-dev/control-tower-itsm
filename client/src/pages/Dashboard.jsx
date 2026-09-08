@@ -1219,11 +1219,14 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       }
 
       const searchStr = searchTerm.toLowerCase();
-      return (
-        matchesQueue &&
-        (t.title?.toLowerCase().includes(searchStr) ||
-          t.ticketId?.toLowerCase().includes(searchStr))
-      );
+      // Enhanced to also match against Primary Assignee and Sub-Assignee names
+      const matchesSearch =
+        (t.title && t.title.toLowerCase().includes(searchStr)) ||
+        (t.ticketId && t.ticketId.toLowerCase().includes(searchStr)) ||
+        (t.assigneeName && t.assigneeName.toLowerCase().includes(searchStr)) ||
+        (t.subAssignmentName && t.subAssignmentName.toLowerCase().includes(searchStr));
+
+      return matchesQueue && matchesSearch;
     });
   }, [
     normalizedTickets,
@@ -1752,7 +1755,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
           </span>
           <input
             type="text"
-            placeholder="Search by Ticket ID or Title..."
+            placeholder="Search by ID, Title, or Assignee..."
             className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50/75 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all shadow-2xl placeholder:text-slate-400 text-slate-800"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
