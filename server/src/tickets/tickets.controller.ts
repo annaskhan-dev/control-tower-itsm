@@ -176,6 +176,26 @@ export class TicketsController {
       throw new NotFoundException(`Ticket with ID ${id} not found`);
     }
 
+    const currentUserName = this.extractUserName(req.user);
+    const userRole = req.user.role || '';
+    const userRoleLower = userRole.toLowerCase();
+
+    // 🛑 VALIDATION: Restrict Sales Ops / Sales users from changing Category or Issue Type
+    const isSalesOp = userRoleLower.includes('sales');
+    const isManagerOrAdmin = ['manager', 'super admin', 'admin'].some(r => userRoleLower.includes(r));
+
+    if (isSalesOp && !isManagerOrAdmin) {
+      const isChangingCategory = updateTicketDto.category !== undefined && updateTicketDto.category !== existingTicket.category;
+      // Also check standard DTO properties for issue type (handling both camelCase and snake_case alternatives)
+      const dtoIssueType = updateTicketDto.issueType || (updateTicketDto as any).issue_type;
+      const existingIssueType = existingTicket.issueType || (existingTicket as any).issue_type;
+      const isChangingIssueType = dtoIssueType !== undefined && dtoIssueType !== existingIssueType;
+
+      if (isChangingCategory || isChangingIssueType) {
+        throw new BadRequestException('Action forbidden: Sales Ops users are not permitted to modify ticket Category or Issue Type.');
+      }
+    }
+
     const currentStatus = (existingTicket.status || '').toLowerCase();
     const isAlreadyResolved = ['resolved', 'completed', 'done'].includes(currentStatus);
 
@@ -191,9 +211,6 @@ export class TicketsController {
         throw new BadRequestException('Once a ticket has been resolved, it cannot be reopened or modified.');
       }
     }
-
-    const currentUserName = this.extractUserName(req.user);
-    const userRole = req.user.role;
 
     // 🛑 VALIDATION: Restrict assigning Transporters, Sales Persons, or Shipper Ops
     const restrictedAssignmentKeywords = ['transporter', 'sales', 'shipper', 'ops'];
@@ -218,7 +235,6 @@ export class TicketsController {
 
     const hasSubAssignment = Boolean(existingTicket.subAssignment);
     const isTryingToChangeStatus = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
-    const isManagerOrAdmin = ['Manager', 'Super Admin'].includes(userRole);
 
     const isSubAssignee = existingTicket.subAssignment && 
       existingTicket.subAssignment.trim().toLowerCase() === currentUserName.trim().toLowerCase();

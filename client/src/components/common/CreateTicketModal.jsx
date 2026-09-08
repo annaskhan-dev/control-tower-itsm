@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, ShieldAlert } from "lucide-react";
 import { createTicket, fetchSlaConfigs } from "../../api/ticketApi";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
@@ -22,10 +22,15 @@ const ISSUE_TYPES = [
 ];
 
 export const CreateTicketModal = ({ onClose, onSubmit }) => {
-  const { token, user } = useAuth();
+  const { token, user, role, isAdmin, isManager } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [slaConfigs, setSlaConfigs] = useState([]);
   const [users, setUsers] = useState([]);
+
+  // Determine if the user is a Sales Op
+  const userRoleStr = (role || user?.role || user?.userType || "").toLowerCase();
+  const isSalesOp = userRoleStr.includes("sales");
+  const canModifyClassification = isAdmin || isManager || !isSalesOp;
 
   const [formData, setFormData] = useState({
     title: "",
@@ -51,10 +56,10 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
         
         // Filter out Transporters, Sales Persons, and Shipper Ops so they aren't selectable in the dropdown
         const filteredUsers = Array.isArray(userData) ? userData.filter(u => {
-          const role = (u.role || '').toLowerCase();
+          const r = (u.role || '').toLowerCase();
           const name = (u.name || u.username || '').toLowerCase();
           const restrictedKeywords = ['transporter', 'sales', 'shipper', 'ops'];
-          return !restrictedKeywords.some(keyword => role.includes(keyword) || name.includes(keyword));
+          return !restrictedKeywords.some(keyword => r.includes(keyword) || name.includes(keyword));
         }) : [];
 
         setUsers(filteredUsers);
@@ -66,6 +71,7 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
   }, [token]);
 
   const handleCategoryChange = (categoryName) => {
+    if (!canModifyClassification) return;
     const config = slaConfigs.find((c) => c.category === categoryName);
     
     setFormData((prev) => ({
@@ -79,12 +85,16 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validation: Ensure required fields are filled
+    // Validation: Ensure required fields are filled based on role permissions
     if (!formData.title.trim()) return alert("Please select a title");
-    if (!formData.issueType) return alert("Please select an issue type");
-    if (!formData.category) return alert("Please select a category");
     
-    // 🛑 VALIDATION: Check that Transporters, Sales Persons, or Shipper Ops are not assigned
+    // If not a sales op, issue type and category are required upfront
+    if (canModifyClassification) {
+      if (!formData.issueType) return alert("Please select an issue type");
+      if (!formData.category) return alert("Please select a category");
+    }
+    
+    // VALIDATION: Check that Transporters, Sales Persons, or Shipper Ops are not assigned
     const restrictedKeywords = ['transporter', 'sales', 'shipper', 'ops'];
     if (formData.assignee && formData.assignee !== "Unassigned") {
       const lowerAssignee = formData.assignee.toLowerCase();
@@ -98,10 +108,14 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
 
     setIsSubmitting(true);
 
-    // Build clean payload without hardcoded generator/source.
-    // The NestJS backend will automatically inject the authenticated user identity and role.
+    // Build payload. If Sales Op, omit or send blank classification fields so Admin/Manager can set them later.
     const payload = {
       ...formData,
+      ...(isSalesOp && {
+        category: "",
+        issueType: "",
+        priority: "Medium", // Default fallback priority
+      })
     };
 
     // Remove UI-only fields that the backend doesn't expect
@@ -123,7 +137,14 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-4 space-y-3">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <h3 className="text-sm font-bold text-slate-800">Create New Ticket</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-800">Create New Ticket</h3>
+            {isSalesOp && (
+              <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-md font-semibold">
+                Sales Op Mode (Restricted Classification)
+              </span>
+            )}
+          </div>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer">
             <X size={14} />
           </button>
@@ -160,12 +181,15 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
             <div>
               <label className="block text-slate-600 font-semibold mb-0.5">Issue Type</label>
               <select
-                value={formData.issueType}
+                value={canModifyClassification ? formData.issueType : ""}
+                disabled={!canModifyClassification}
                 onChange={(e) => setFormData({ ...formData, issueType: e.target.value })}
-                required
-                className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
+                required={canModifyClassification}
+                className={`w-full px-3 py-1.5 border border-slate-200 rounded-xl outline-none ${
+                  !canModifyClassification ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-slate-50 focus:border-blue-500"
+                }`}
               >
-                <option value="">Select issue type...</option>
+                <option value="">{canModifyClassification ? "Select issue type..." : "Managed by Admin/Manager"}</option>
                 {ISSUE_TYPES.map((it) => (
                   <option key={it} value={it}>{it}</option>
                 ))}
@@ -175,12 +199,15 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
             <div>
               <label className="block text-slate-600 font-semibold mb-0.5">Category</label>
               <select
-                value={formData.category}
+                value={canModifyClassification ? formData.category : ""}
+                disabled={!canModifyClassification}
                 onChange={(e) => handleCategoryChange(e.target.value)}
-                required
-                className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
+                required={canModifyClassification}
+                className={`w-full px-3 py-1.5 border border-slate-200 rounded-xl outline-none ${
+                  !canModifyClassification ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-slate-50 focus:border-blue-500"
+                }`}
               >
-                <option value="">Select a category</option>
+                <option value="">{canModifyClassification ? "Select a category" : "Managed by Admin/Manager"}</option>
                 {slaConfigs.map((c) => (
                   <option key={c._id || c.category} value={c.category}>
                     {c.category}
@@ -192,9 +219,9 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
             <div>
               <label className="block text-slate-600 font-semibold mb-0.5">Priority</label>
               <div className="flex items-center gap-2 w-full px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-500">
-                <span className="font-medium flex-1">{formData.priority}</span>
+                <span className="font-medium flex-1">{canModifyClassification ? formData.priority : "Pending Assignment"}</span>
                 <span className="text-red-500 font-semibold text-[11px] whitespace-nowrap">
-                  SLA: {formData.slaDeadline || "---"}
+                  SLA: {canModifyClassification ? (formData.slaDeadline || "---") : "Pending"}
                 </span>
               </div>
             </div>
@@ -231,6 +258,13 @@ export const CreateTicketModal = ({ onClose, onSubmit }) => {
               className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 resize-none"
             />
           </div>
+
+          {isSalesOp && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 p-2.5 rounded-xl text-amber-800">
+              <ShieldAlert size={14} className="mt-0.5 shrink-0 text-amber-600" />
+              <span>Note: As a Sales Op, classification parameters (Category, Issue Type, Priority) will be assigned and updated later by an Admin or Manager.</span>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-1 border-t border-slate-100">
             <button

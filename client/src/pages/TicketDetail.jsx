@@ -18,29 +18,45 @@ import {
   Cpu
 } from "lucide-react";
 
+// Available issue types matching your create modal setup
+const ISSUE_TYPES = [
+  "Vehicle Crossdock",
+  "Public Holiday",
+  "Vehicle Stoppages",
+  "Tracker Faulty",
+  "Order Stuck"
+];
+
 export const TicketDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { tickets, fetchTickets, updateLocalTicket } = useTickets();
-  const { user } = useAuth();
+  const { user, role, isAdmin, isManager } = useAuth();
 
   const [description, setDescription] = useState("");
   const [assignee, setAssignee] = useState("");
   const [subAssignment, setSubAssignment] = useState("");
   const [customSubAssignment, setCustomSubAssignment] = useState("");
+  const [issueType, setIssueType] = useState("");
+  const [category, setCategory] = useState("");
   const [companyUsers, setCompanyUsers] = useState([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [slaConfigs, setSlaConfigs] = useState([]);
   const [now, setNow] = useState(new Date());
 
+  // Determine if user is a Sales Op
+  const userRoleStr = (role || user?.role || user?.userType || "").toLowerCase();
+  const isSalesOp = userRoleStr.includes("sales");
+  const canModifyClassification = isAdmin || isManager || !isSalesOp;
+
   // Filter out any users containing "transporter", "sales", "shipper", or "ops" in their role, name, or username
   const filteredCompanyUsers = useMemo(() => {
     return companyUsers.filter((u) => {
       const name = (u.name || u.username || "").toLowerCase();
-      const role = (u.role || "").toLowerCase();
+      const r = (u.role || "").toLowerCase();
       const restrictedKeywords = ["transporter", "sales", "shipper", "ops"];
-      return !restrictedKeywords.some(keyword => name.includes(keyword) || role.includes(keyword));
+      return !restrictedKeywords.some(keyword => name.includes(keyword) || r.includes(keyword));
     });
   }, [companyUsers]);
 
@@ -81,10 +97,12 @@ export const TicketDetail = () => {
   const canDelete = checkPermission(user?.role, "canDelete");
   const canEditDesc = canEditField(user?.role, "description");
   const canEditStatus = canEditField(user?.role, "status");
-  const canEditCategory = canEditField(user?.role, "category");
+  const canEditCategoryFromConfig = canEditField(user?.role, "category");
+
+  // Combined permission check for modifying category/issueType (Admins, Managers, or non-Sales Ops)
+  const canEditClassification = canModifyClassification && canEditCategoryFromConfig;
 
   // Check if current user is restricted (i.e. not Manager or Super Admin)
-  const userRoleStr = (user?.role || "").toLowerCase();
   const isManagerOrAdmin = ["manager", "super admin", "admin"].some(r => userRoleStr.includes(r));
   const isRestricted = !isManagerOrAdmin;
 
@@ -143,6 +161,8 @@ export const TicketDetail = () => {
   useEffect(() => {
     if (ticket) {
       setDescription(ticket.description || "");
+      setCategory(ticket.category || "");
+      setIssueType(ticket.issueType || ticket.issue_type || "");
       
       let rawAssignee = ticket.assignee || ticket.assignedTo || ticket.assigned_to || "Unassigned";
       if (typeof rawAssignee === "object" && rawAssignee !== null) {
@@ -204,10 +224,8 @@ export const TicketDetail = () => {
     const subAssignedAtRaw = ticket.subAssignmentAt || ticket.sub_assigned_at || ticket.subAssignedAt || ticket.sub_assignment_at;
     const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
 
-    // Sub-assignment is officially active if a name exists OR a timestamp exists
     const isSubAssigned = hasSubName || subAssignedAtTime !== null;
 
-    // Bulletproof Primary Assignment Time: stops immediately when sub-assigned using fallback options if needed
     let primaryAssignmentMs = 0;
     if (isAssigned) {
       const subAssignmentFallbackTime = subAssignedAtTime 
@@ -218,16 +236,13 @@ export const TicketDetail = () => {
       primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
     }
 
-    // SLA Active Time (anchored strictly to assignedAt)
     const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
 
-    // Sub-Assignment Execution Time
     let subAssignmentTimeMs = 0;
     if (isSubAssigned && subAssignedAtTime) {
       subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subAssignedAtTime);
     }
 
-    // Total Resolution Time
     const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
 
     return {
@@ -238,9 +253,9 @@ export const TicketDetail = () => {
     };
   }, [ticket, now, formatDuration]);
 
-  const calculateDeadline = (category, priority) => {
+  const calculateDeadline = (cat, priority) => {
     const rule = slaConfigs.find(
-      (c) => c.category === category && c.priority === (priority || "Medium")
+      (c) => c.category === cat && c.priority === (priority || "Medium")
     );
     const hours = rule ? rule.hours : 24;
     return new Date(Date.now() + hours * 60 * 60 * 1000);
@@ -249,7 +264,6 @@ export const TicketDetail = () => {
   const handleUpdate = async (updatedFields) => {
     if (!ticket) return;
 
-    // Prevent sending requests if status is locked by sub-assignment rules
     if ('status' in updatedFields && isStatusLockedBySubAssignment) {
       alert("Action blocked: Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.");
       return;
@@ -257,7 +271,6 @@ export const TicketDetail = () => {
 
     let payload = { ...updatedFields };
 
-    // 🛑 VALIDATION: Check that assignee and sub-assignment don't match
     const targetAssignee = 'assignee' in payload ? payload.assignee : (ticket.assignee || "");
     const rawSubInput = 'subAssignment' in payload ? payload.subAssignment : (ticket.subAssignment || "");
     const targetSub = rawSubInput === "custom" ? customSubAssignment : rawSubInput;
@@ -272,7 +285,6 @@ export const TicketDetail = () => {
       }
     }
 
-    // 🛑 VALIDATION: Check that Transporters, Sales Persons, or Shipper Ops are not assigned
     const restrictedKeywords = ['transporter', 'sales', 'shipper', 'ops'];
     if (isAssignedValid) {
       const lowerAssignee = targetAssignee.toLowerCase();
@@ -298,7 +310,6 @@ export const TicketDetail = () => {
     const newPriority = payload.priority || ticket.priority;
     payload.slaDeadline = calculateDeadline(newCategory, newPriority);
 
-    // Track Primary Assignee timestamp modifications
     if ('assignee' in payload) {
       const oldAssignee = ticket.assignee || "Unassigned";
       if (payload.assignee !== oldAssignee && payload.assignee !== "Unassigned") {
@@ -331,7 +342,6 @@ export const TicketDetail = () => {
         payload.resolvedAt = null;
       }
 
-      // Ensure active subAssignment is explicitly carried over on status updates
       if (!payload.subAssignment && ticket.subAssignment) {
         payload.subAssignment = ticket.subAssignment;
       }
@@ -384,7 +394,14 @@ export const TicketDetail = () => {
           >
             <ArrowLeft size={18} className="text-slate-600" />
           </button>
-          <h2 className="text-base sm:text-lg font-bold text-slate-800 break-words">Ticket Details: {ticket.ticketId}</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base sm:text-lg font-bold text-slate-800 break-words">Ticket Details: {ticket.ticketId}</h2>
+            {isSalesOp && (
+              <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-md font-semibold">
+                Sales Op Mode (Restricted Classification)
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -424,14 +441,9 @@ export const TicketDetail = () => {
               />
             </div>
 
-            {/* Sub Assignment Panel with restriction indicator */}
+            {/* Sub Assignment Panel */}
             <div 
               className={`bg-white border border-slate-200 rounded-xl shadow-xs p-4 sm:p-5 ${isRestricted || !isPrimaryAssigned || isResolvedState ? 'cursor-not-allowed' : ''}`}
-              title={
-                isResolvedState 
-                  ? "Cannot modify sub-assignment for a resolved or closed ticket" 
-                  : (!isPrimaryAssigned ? "Please assign a primary assignee before selecting a sub-assignee" : (isRestricted ? "Only Managers and Admins can modify sub-assignments" : ""))
-              }
             >
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
@@ -457,20 +469,6 @@ export const TicketDetail = () => {
                 </div>
               )}
 
-              {isResolvedState && (
-                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg flex items-center gap-2">
-                  <AlertCircle size={14} className="shrink-0" />
-                  <span>Sub-assignment cannot be changed because this ticket is resolved or closed.</span>
-                </div>
-              )}
-
-              {!isPrimaryAssigned && !isResolvedState && (
-                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg flex items-center gap-2">
-                  <AlertCircle size={14} className="shrink-0" />
-                  <span>A primary assignee must be selected before a sub-assignee can be assigned.</span>
-                </div>
-              )}
-
               <div className="space-y-3">
                 <select
                   value={subAssignment}
@@ -478,9 +476,7 @@ export const TicketDetail = () => {
                   onChange={(e) => {
                     const val = e.target.value;
                     setSubAssignment(val);
-                    if (val !== "custom") {
-                      setCustomSubAssignment("");
-                    }
+                    if (val !== "custom") setCustomSubAssignment("");
                   }}
                   className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
@@ -502,9 +498,7 @@ export const TicketDetail = () => {
                     type="text"
                     value={customSubAssignment}
                     disabled={isRestricted || !isPrimaryAssigned || isResolvedState}
-                    onChange={(e) => {
-                      setCustomSubAssignment(e.target.value);
-                    }}
+                    onChange={(e) => setCustomSubAssignment(e.target.value)}
                     placeholder="Enter custom sub assignment text..."
                     className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                   />
@@ -516,9 +510,11 @@ export const TicketDetail = () => {
           {/* Right Column: Properties & Live Durations */}
           <div className="space-y-4">
             <div className="bg-white border border-slate-200 rounded-xl shadow-xs p-4 sm:p-5 space-y-4">
-              <h3 className="text-xs font-bold flex items-center gap-2 text-slate-700">
-                <ShieldAlert size={14} className="text-blue-600 shrink-0" /> Properties
-              </h3>
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-bold flex items-center gap-2 text-slate-700">
+                  <ShieldAlert size={14} className="text-blue-600 shrink-0" /> Properties
+                </h3>
+              </div>
 
               {/* Creator / Entry Generator Info */}
               <div className="pb-2 border-b border-slate-100">
@@ -530,7 +526,7 @@ export const TicketDetail = () => {
                 </div>
               </div>
 
-              {/* Primary Assignee Panel with Manager/Admin Restriction */}
+              {/* Primary Assignee Panel */}
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
@@ -550,7 +546,6 @@ export const TicketDetail = () => {
                   disabled={isRestricted || isResolvedState} 
                   value={assignee} 
                   onChange={(e) => setAssignee(e.target.value)}
-                  title={isRestricted ? "Only Managers and Admins can change assignees" : ""}
                   className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed bg-slate-50"
                 >
                   <option value="Unassigned">Unassigned</option>
@@ -564,19 +559,15 @@ export const TicketDetail = () => {
                     );
                   })}
                 </select>
-                {isRestricted && (
-                  <span className="text-[9px] text-slate-400 mt-0.5 block">Locked: Only Admins/Managers can reassign.</span>
-                )}
               </div>
 
-              {/* Status Section with Sub-Assignment Lock */}
+              {/* Status Section */}
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Status</label>
                 <select 
                   disabled={!canEditStatus || isStatusLockedBySubAssignment} 
                   value={ticket.status || "Open"} 
                   onChange={(e) => handleUpdate({ status: e.target.value })} 
-                  title={isStatusLockedBySubAssignment ? "Primary assignees cannot change ticket status once sub-assigned" : ""}
                   className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                   {["Open", "In Progress", "Resolved"].map((o) => <option key={o} value={o}>{o}</option>)}
@@ -586,28 +577,67 @@ export const TicketDetail = () => {
                 )}
               </div>
 
+              {/* Issue Type Field (Restricted for Sales Ops) */}
               <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Priority (Auto)</label>
-                <input disabled value={ticket.priority || "Medium"} className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-500 cursor-not-allowed" />
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Issue Type</label>
+                  {canEditClassification && (
+                    <button
+                      onClick={() => handleUpdate({ issueType })}
+                      disabled={isUpdating || isResolvedState}
+                      className="text-[10px] text-blue-600 font-semibold hover:underline cursor-pointer disabled:opacity-50"
+                    >
+                      Update
+                    </button>
+                  )}
+                </div>
+                <select
+                  disabled={!canEditClassification || isResolvedState}
+                  value={issueType}
+                  onChange={(e) => setIssueType(e.target.value)}
+                  className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                >
+                  <option value="">Select issue type...</option>
+                  {ISSUE_TYPES.map((it) => (
+                    <option key={it} value={it}>{it}</option>
+                  ))}
+                </select>
+                {!canEditClassification && (
+                  <span className="text-[9px] text-amber-600 mt-0.5 block">Restricted: Only Admin/Manager can set issue type.</span>
+                )}
               </div>
 
-              {/* Category with restriction hover & disabled states */}
+              {/* Category Field (Restricted for Sales Ops) */}
               <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Category</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Category</label>
+                  {canEditClassification && (
+                    <button
+                      onClick={() => handleUpdate({ category })}
+                      disabled={isUpdating || isResolvedState}
+                      className="text-[10px] text-blue-600 font-semibold hover:underline cursor-pointer disabled:opacity-50"
+                    >
+                      Update
+                    </button>
+                  )}
+                </div>
                 <select 
-                  disabled={!canEditCategory || isRestricted || isResolvedState} 
-                  value={ticket.category || ""} 
-                  onChange={(e) => handleUpdate({ category: e.target.value })} 
-                  title={
-                    isResolvedState 
-                      ? "Cannot modify category for a resolved or closed ticket" 
-                      : (isRestricted ? "You do not have permission to modify this category" : "")
-                  }
-                  className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                  disabled={!canEditClassification || isResolvedState} 
+                  value={category} 
+                  onChange={(e) => setCategory(e.target.value)} 
+                  className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                   <option value="">Select Category</option>
                   {categoryOptions.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
+                {!canEditClassification && (
+                  <span className="text-[9px] text-amber-600 mt-0.5 block">Restricted: Only Admin/Manager can set category.</span>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Priority (Auto)</label>
+                <input disabled value={ticket.priority || "Medium"} className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-500 cursor-not-allowed" />
               </div>
 
               <div className="pt-2 border-t border-slate-100">
