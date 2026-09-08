@@ -1219,7 +1219,6 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
       }
 
       const searchStr = searchTerm.toLowerCase();
-      // Enhanced to also match against Primary Assignee and Sub-Assignee names
       const matchesSearch =
         (t.title && t.title.toLowerCase().includes(searchStr)) ||
         (t.ticketId && t.ticketId.toLowerCase().includes(searchStr)) ||
@@ -1484,7 +1483,7 @@ export const Dashboard = ({ tickets: propTickets, onOpenCreateTicket }) => {
         </div>
       </div>
 
-      {/* Active Time & Monthly Average Card (Crash-Proofed) */}
+      {/* Active Time & Monthly Average Card */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 mt-6 transition-all duration-300">
         <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3">User Active Time & Monthly Averages</h3>
         <div className="overflow-x-auto">
