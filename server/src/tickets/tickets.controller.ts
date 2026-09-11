@@ -54,7 +54,7 @@ export class TicketsController {
   }
 
   @Post('sla-configs/categories')
-  @Roles('Manager', 'Super Admin')
+  @Roles('Super Admin')
   async createSlaCategory(
     @Req() req: AuthenticatedRequest,
     @Body() dto: CreateSlaCategoryDto,
@@ -74,7 +74,7 @@ export class TicketsController {
   }
 
   @Patch('sla-configs/:id')
-  @Roles('Manager', 'Super Admin')
+  @Roles('Super Admin')
   async updateSla(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
@@ -84,7 +84,7 @@ export class TicketsController {
   }
 
   @Delete('sla-configs/:id')
-  @Roles('Manager', 'Super Admin')
+  @Roles('Super Admin')
   async removeSla(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     return await this.ticketsService.removeSlaConfig(id, req.user.companyId);
   }
@@ -212,15 +212,15 @@ export class TicketsController {
       }
     }
 
-   // 🛑 VALIDATION: Operators cannot change status if the ticket is unassigned
-  const rawAssignee = (existingTicket as any).assignee || (existingTicket as any).assignedTo || (existingTicket as any).assigned_to || "Unassigned";
-  const assigneeName = typeof rawAssignee === "string" ? rawAssignee.trim() : (rawAssignee?.name || rawAssignee?.username || "Unassigned");
-  const isUnassigned = assigneeName.toLowerCase() === "unassigned" || assigneeName === "";
-  const isTryingToChangeStatus = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
+    // 🛑 VALIDATION: Operators cannot change status if the ticket is unassigned
+    const rawAssignee = (existingTicket as any).assignee || (existingTicket as any).assignedTo || (existingTicket as any).assigned_to || "Unassigned";
+    const assigneeName = typeof rawAssignee === "string" ? rawAssignee.trim() : (rawAssignee?.name || rawAssignee?.username || "Unassigned");
+    const isUnassigned = assigneeName.toLowerCase() === "unassigned" || assigneeName === "";
+    const isTryingToChangeStatus = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
 
-  if (isOperator && isUnassigned && isTryingToChangeStatus) {
-    throw new BadRequestException('Action forbidden: Operators cannot change the status of an unassigned ticket.');
-  }
+    if (isOperator && isUnassigned && isTryingToChangeStatus) {
+      throw new BadRequestException('Action forbidden: Operators cannot change the status of an unassigned ticket.');
+    }
 
     // 🛑 VALIDATION: Restrict assigning Transporters, Sales Persons, or Shipper Ops
     const restrictedAssignmentKeywords = ['transporter', 'sales', 'shipper', 'ops'];
@@ -263,7 +263,7 @@ export class TicketsController {
   }
 
   @Delete(':id')
-  @Roles('Manager', 'Super Admin')
+  @Roles('Super Admin')
   async remove(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     this.logger.warn(`[DELETE /tickets/${id}] Ticket removal requested by role: ${req.user.role}`);
     return await this.ticketsService.remove(id, req.user.companyId, req.user.role);
