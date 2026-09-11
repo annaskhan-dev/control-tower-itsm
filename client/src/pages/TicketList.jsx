@@ -305,7 +305,12 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       }
 
       const searchStr = searchTerm.toLowerCase();
-      const matchesSearch = !searchTerm || t.title?.toLowerCase().includes(searchStr) || t.ticketId?.toLowerCase().includes(searchStr);
+      // Updated search logic: checks Title, Ticket ID, Assignee Name, and Sub-Assignee Name
+      const matchesSearch = !searchTerm || 
+        t.title?.toLowerCase().includes(searchStr) || 
+        t.ticketId?.toLowerCase().includes(searchStr) || 
+        t.assigneeName?.toLowerCase().includes(searchStr) || 
+        t.subAssignmentName?.toLowerCase().includes(searchStr);
 
       return matchesQueue && matchesPriority && matchesSearch;
     });
@@ -370,7 +375,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           </span>
           <input
             type="text"
-            placeholder="Search by Ticket ID or Title..."
+            placeholder="Search by ID, Title, Assignee, or Sub-Assignee..."
             className="w-full pl-10 pr-4 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all shadow-2xs placeholder:text-slate-400 text-slate-800"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
