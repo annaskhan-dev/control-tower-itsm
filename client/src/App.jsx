@@ -16,7 +16,17 @@ import { Menu, X } from 'lucide-react';
 
 // Dedicated helper component to safely redirect users based on role upon login/root hit
 function RootRedirect() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+
+  // Wait for localStorage sync to complete before making redirect decisions
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-100 text-slate-500 font-medium">
+        Loading Control Tower...
+      </div>
+    );
+  }
+
   if (!user) return <Navigate to="/login" replace />;
 
   const userRole = (user?.role || '').toLowerCase();
@@ -27,61 +37,45 @@ function RootRedirect() {
   return <Navigate to={isRestrictedRole ? "/tickets?queue=all-work" : "/dashboard"} replace />;
 }
 
-function MainLayout() {
+// Layout wrapper used ONLY for authenticated screens (contains Sidebar & Navbar)
+function AuthenticatedLayout() {
   const { user, logout } = useAuth();
-  const { fetchTickets } = useTickets(); // <-- Grabbed refresh function from TicketContext
+  const { fetchTickets } = useTickets();
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const userRole = (user?.role || '').toLowerCase();
-  const isRestrictedRole = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person'].some(
-    r => userRole.includes(r)
-  );
-  const defaultHomeRoute = isRestrictedRole ? "/tickets?queue=all-work" : "/dashboard";
-
   return (
     <div className="flex h-screen bg-slate-100 relative overflow-x-hidden">
-      
-      {/* Mobile Top Header Bar (Only visible on phones/tablets) */}
-      {user && (
-        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#13203B] border-b border-slate-800 flex items-center justify-between px-4 z-30">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center font-bold text-white text-xs">CT</div>
-            <span className="font-bold text-white text-sm tracking-wide">Control Tower</span>
-          </div>
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="p-2 text-slate-200 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
-            aria-label="Toggle Menu"
-          >
-            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+      {/* Mobile Top Header Bar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#13203B] border-b border-slate-800 flex items-center justify-between px-4 z-30">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center font-bold text-white text-xs">CT</div>
+          <span className="font-bold text-white text-sm tracking-wide">Control Tower</span>
         </div>
-      )}
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="p-2 text-slate-200 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
+          aria-label="Toggle Menu"
+        >
+          {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
 
-      {/* Sidebar only shows if logged in, passes mobile props */}
-      {user && (
-        <Sidebar 
-          user={user} 
-          onOpenCreateTicket={() => setIsTicketModalOpen(true)} 
-          onLogout={logout}
-          mobileOpen={mobileOpen}
-          setMobileOpen={setMobileOpen}
-        />
-      )}
+      {/* Sidebar */}
+      <Sidebar 
+        user={user} 
+        onOpenCreateTicket={() => setIsTicketModalOpen(true)} 
+        onLogout={logout}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
       
-      <main className={`flex-1 w-full min-w-0 ${user ? 'p-4 pt-20 lg:pt-4 overflow-y-auto' : ''}`}>
+      {/* Main Content Area */}
+      <main className="flex-1 w-full min-w-0 p-4 pt-20 lg:pt-4 overflow-y-auto">
         <Routes>
-          {/* Public & Root Smart Routing */}
-          <Route path="/" element={<RootRedirect />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-
           {/* Protected Routes - Dashboard restricted to Super Admin / Manager */}
           <Route path="/dashboard" element={
-            isRestrictedRole ? <Navigate to="/tickets?queue=all-work" replace /> : (
-              <ProtectedRoute allowedRoles={['Super Admin', 'Manager']}> <Dashboard /> </ProtectedRoute>
-            )
+            <ProtectedRoute allowedRoles={['Super Admin', 'Manager']}> <Dashboard /> </ProtectedRoute>
           } />
           
           <Route path="/tickets" element={
@@ -102,15 +96,15 @@ function MainLayout() {
             <ProtectedRoute allowedRoles={['Super Admin', 'Manager']}> <SlaSettings /> </ProtectedRoute>
           } />
 
-          {/* Catch-all fallback */}
-          <Route path="*" element={<Navigate to={defaultHomeRoute} replace />} />
+          {/* Fallback inside dashboard layout */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
 
-      {user && isTicketModalOpen && (
+      {isTicketModalOpen && (
         <CreateTicketModal 
           onClose={() => setIsTicketModalOpen(false)} 
-          onSubmit={fetchTickets} // <-- Connected so dashboard/list auto-updates on ticket creation!
+          onSubmit={fetchTickets}
         />
       )}
     </div>
@@ -122,7 +116,19 @@ export default function App() {
     <AuthProvider>
       <TicketProvider> 
         <Router>
-          <MainLayout />
+          <Routes>
+            {/* Public Routes (No Sidebar) */}
+            <Route path="/" element={<RootRedirect />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+
+            {/* All Authenticated/Sidebar Routes handled inside AuthenticatedLayout */}
+            <Route path="/*" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout />
+              </ProtectedRoute>
+            } />
+          </Routes>
         </Router>
       </TicketProvider> 
     </AuthProvider>

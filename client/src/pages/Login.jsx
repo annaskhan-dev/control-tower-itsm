@@ -15,10 +15,20 @@ export const Login = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(email, password);
-      navigate('/dashboard');
+      // login() returns the user object upon success
+      const loggedInUser = await login(email, password);
+
+      // Dynamically determine the correct post-login route based on role
+      const userRole = (loggedInUser?.role || '').toLowerCase();
+      const isRestrictedRole = ['operator', 'transporter', 'agent', 'shipper ops', 'sales person'].some(
+        r => userRole.includes(r)
+      );
+
+      const targetRoute = isRestrictedRole ? "/tickets?queue=all-work" : "/dashboard";
+      navigate(targetRoute, { replace: true });
     } catch (err) {
-      alert("Login failed.");
+      console.error("Login error:", err);
+      alert(err?.response?.data?.message || "Login failed. Please check your credentials.");
     } finally {
       setLoading(false);
     }
@@ -31,7 +41,7 @@ export const Login = () => {
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-sm sm:max-w-md my-auto"
       >
-        {/* Header - Scaled up */}
+        {/* Header */}
         <div className="flex flex-col items-center mb-6">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-blue-600 flex items-center justify-center shadow-lg mb-3">
             <TowerControl size={32} className="text-white" />
@@ -39,7 +49,7 @@ export const Login = () => {
           <h1 className="text-2xl font-bold text-white">Control Tower</h1>
         </div>
 
-        {/* Login Card - More breathing room */}
+        {/* Login Card */}
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             
