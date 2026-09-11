@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Plus, Settings, Loader2, Trash2 } from 'lucide-react'; // Added Trash2
+import { Clock, Plus, Settings, Loader2, Trash2, Lock } from 'lucide-react';
 import { AddCategoryModal } from "./AddCategoryModal"; 
 import { fetchSlaConfigs, updateSlaPriority, deleteSlaCategory } from '../api/ticketApi'; 
 
@@ -7,6 +7,12 @@ export const SlaSettings = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [slaConfigs, setSlaConfigs] = useState([]);
+
+  // 🛡️ Check if current logged-in user is an Admin / Super Admin
+  // Adjust this depending on how you store user data (e.g., localStorage or auth context)
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userRole = (user.role || '').toLowerCase();
+  const isAdmin = userRole.includes('admin') || userRole.includes('super admin');
 
   useEffect(() => {
     fetchSlaData();
@@ -16,7 +22,6 @@ export const SlaSettings = () => {
     try {
       setLoading(true);
       const data = await fetchSlaConfigs();
-      console.log("Full Data Received:", data); // DEBUG: Check if 'priority' exists here
       setSlaConfigs(data || []);
     } catch (error) {
       console.error("Error fetching SLA data:", error);
@@ -26,10 +31,11 @@ export const SlaSettings = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!isAdmin) return;
     if (!window.confirm("Are you sure you want to delete this rule?")) return;
     try {
       await deleteSlaCategory(id);
-      fetchSlaData(); // Refresh list after deletion
+      fetchSlaData(); 
     } catch (error) {
       console.error("Error deleting rule:", error);
       alert("Failed to delete.");
@@ -37,6 +43,7 @@ export const SlaSettings = () => {
   };
 
   const handleUpdateHours = async (id, newHours) => {
+    if (!isAdmin) return;
     setSlaConfigs(slaConfigs.map(s => s._id === id ? { ...s, hours: newHours } : s));
     try {
       await updateSlaPriority(id, newHours);
@@ -46,7 +53,6 @@ export const SlaSettings = () => {
   };
 
   const getPriorityColor = (priority) => {
-    // If priority is missing, force a grey 'Not Set' style
     if (!priority || priority === "Not Set") return 'bg-gray-100 text-gray-500';
     
     switch (priority.toLowerCase()) {
@@ -61,14 +67,24 @@ export const SlaSettings = () => {
   return (
     <div className="p-4 md:p-6 bg-slate-50 min-h-screen">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-blue-600 rounded-lg text-white">
-            <Settings size={20} />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-600 rounded-lg text-white">
+              <Settings size={20} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">SLA Configuration</h1>
+              <p className="text-gray-500 text-xs">Manage response times and priority rules</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">SLA Configuration</h1>
-            <p className="text-gray-500 text-xs">Manage response times and priority rules</p>
-          </div>
+          
+          {/* Badge indicator if non-admin */}
+          {!isAdmin && (
+            <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-lg text-xs font-medium">
+              <Lock size={13} />
+              <span>View Only (Admin access required to edit)</span>
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -79,9 +95,11 @@ export const SlaSettings = () => {
               <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                 <Clock size={16} className="text-blue-600" /> SLA Rules
               </h2>
-              <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-blue-700 transition">
-                <Plus size={14} /> Add Rule
-              </button>
+              {isAdmin && (
+                <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-blue-700 transition">
+                  <Plus size={14} /> Add Rule
+                </button>
+              )}
             </div>
 
             <table className="w-full text-xs">
@@ -103,17 +121,26 @@ export const SlaSettings = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <input 
-                        type="number" 
-                        value={s.hours || 0}
-                        onChange={(e) => handleUpdateHours(s._id, parseInt(e.target.value))}
-                        className="w-16 border border-gray-300 rounded px-2 py-1"
-                      />
+                      <div className="relative inline-block" title={!isAdmin ? "Only Admin can change SLA settings" : ""}>
+                        <input 
+                          type="number" 
+                          value={s.hours || 0}
+                          disabled={!isAdmin}
+                          onChange={(e) => handleUpdateHours(s._id, parseInt(e.target.value))}
+                          className={`w-16 border border-gray-300 rounded px-2 py-1 ${!isAdmin ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                        />
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button onClick={() => handleDelete(s._id)} className="text-red-500 hover:text-red-700">
-                        <Trash2 size={16} />
-                      </button>
+                      {isAdmin ? (
+                        <button onClick={() => handleDelete(s._id)} className="text-red-500 hover:text-red-700 transition">
+                          <Trash2 size={16} />
+                        </button>
+                      ) : (
+                        <span title="Only Admin can delete SLA settings" className="inline-block cursor-not-allowed">
+                          <Lock size={15} className="text-gray-300 mx-auto" />
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
