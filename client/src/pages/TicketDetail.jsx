@@ -45,9 +45,10 @@ export const TicketDetail = () => {
   const [slaConfigs, setSlaConfigs] = useState([]);
   const [now, setNow] = useState(new Date());
 
-  // Determine if user is a Sales Op
+  // Determine if user is a Sales Op or Operator
   const userRoleStr = (role || user?.role || user?.userType || "").toLowerCase();
   const isSalesOp = userRoleStr.includes("sales");
+  const isOperator = userRoleStr.includes("operator");
   const canModifyClassification = isAdmin || isManager || !isSalesOp;
 
   // Filter out any users containing "transporter", "sales", "shipper", or "ops" in their role, name, or username
@@ -158,6 +159,9 @@ export const TicketDetail = () => {
   // Requirement Check: Lock status if sub-assigned AND the user is NOT the sub-assignee and NOT a manager/admin
   const isStatusLockedBySubAssignment = hasSubAssignment && !isCurrentUserSubAssigned && !isManagerOrAdmin;
 
+  // Requirement Check: Lock status if operator and ticket is unassigned
+  const isStatusLockedByUnassigned = isOperator && !isPrimaryAssigned;
+
   useEffect(() => {
     if (ticket) {
       setDescription(ticket.description || "");
@@ -264,9 +268,15 @@ export const TicketDetail = () => {
   const handleUpdate = async (updatedFields) => {
     if (!ticket) return;
 
-    if ('status' in updatedFields && isStatusLockedBySubAssignment) {
-      alert("Action blocked: Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.");
-      return;
+    if ('status' in updatedFields) {
+      if (isStatusLockedBySubAssignment) {
+        alert("Action blocked: Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.");
+        return;
+      }
+      if (isStatusLockedByUnassigned) {
+        alert("Action blocked: Operators cannot change the status of an unassigned ticket.");
+        return;
+      }
     }
 
     let payload = { ...updatedFields };
@@ -565,7 +575,7 @@ export const TicketDetail = () => {
               <div>
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Status</label>
                 <select 
-                  disabled={!canEditStatus || isStatusLockedBySubAssignment} 
+                  disabled={!canEditStatus || isStatusLockedBySubAssignment || isStatusLockedByUnassigned} 
                   value={ticket.status || "Open"} 
                   onChange={(e) => handleUpdate({ status: e.target.value })} 
                   className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
@@ -574,6 +584,9 @@ export const TicketDetail = () => {
                 </select>
                 {isStatusLockedBySubAssignment && (
                   <span className="text-[9px] text-amber-600 mt-0.5 block">Status change locked because ticket is sub-assigned.</span>
+                )}
+                {isStatusLockedByUnassigned && (
+                  <span className="text-[9px] text-amber-600 mt-0.5 block">Status change locked because operators cannot modify unassigned tickets.</span>
                 )}
               </div>
 

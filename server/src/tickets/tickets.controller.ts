@@ -183,10 +183,10 @@ export class TicketsController {
     // 🛑 VALIDATION: Restrict Sales Ops / Sales users from changing Category or Issue Type
     const isSalesOp = userRoleLower.includes('sales');
     const isManagerOrAdmin = ['manager', 'super admin', 'admin'].some(r => userRoleLower.includes(r));
+    const isOperator = userRoleLower.includes('operator');
 
     if (isSalesOp && !isManagerOrAdmin) {
       const isChangingCategory = updateTicketDto.category !== undefined && updateTicketDto.category !== existingTicket.category;
-      // Also check standard DTO properties for issue type (handling both camelCase and snake_case alternatives)
       const dtoIssueType = updateTicketDto.issueType || (updateTicketDto as any).issue_type;
       const existingIssueType = existingTicket.issueType || (existingTicket as any).issue_type;
       const isChangingIssueType = dtoIssueType !== undefined && dtoIssueType !== existingIssueType;
@@ -212,6 +212,16 @@ export class TicketsController {
       }
     }
 
+   // 🛑 VALIDATION: Operators cannot change status if the ticket is unassigned
+  const rawAssignee = (existingTicket as any).assignee || (existingTicket as any).assignedTo || (existingTicket as any).assigned_to || "Unassigned";
+  const assigneeName = typeof rawAssignee === "string" ? rawAssignee.trim() : (rawAssignee?.name || rawAssignee?.username || "Unassigned");
+  const isUnassigned = assigneeName.toLowerCase() === "unassigned" || assigneeName === "";
+  const isTryingToChangeStatus = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
+
+  if (isOperator && isUnassigned && isTryingToChangeStatus) {
+    throw new BadRequestException('Action forbidden: Operators cannot change the status of an unassigned ticket.');
+  }
+
     // 🛑 VALIDATION: Restrict assigning Transporters, Sales Persons, or Shipper Ops
     const restrictedAssignmentKeywords = ['transporter', 'sales', 'shipper', 'ops'];
     
@@ -234,12 +244,12 @@ export class TicketsController {
     }
 
     const hasSubAssignment = Boolean(existingTicket.subAssignment);
-    const isTryingToChangeStatus = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
+    const isTryingToChangeStatusWithSubAssignment = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
 
     const isSubAssignee = existingTicket.subAssignment && 
       existingTicket.subAssignment.trim().toLowerCase() === currentUserName.trim().toLowerCase();
 
-    if (hasSubAssignment && isTryingToChangeStatus && !isManagerOrAdmin && !isSubAssignee) {
+    if (hasSubAssignment && isTryingToChangeStatusWithSubAssignment && !isManagerOrAdmin && !isSubAssignee) {
       throw new BadRequestException('Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.');
     }
 
