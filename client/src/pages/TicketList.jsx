@@ -31,7 +31,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
   }, [isAdmin, isManager, currentRole]);
 
   const isOperatorOnly = useMemo(() => {
-    return currentRole.includes('operator') && 
+    return (currentRole.includes('operator') || currentRole.includes('agent')) && 
            !currentRole.includes('shipper') && 
            !currentRole.includes('sales') && 
            !currentRole.includes('transporter');
@@ -59,7 +59,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           const isSales = r.includes('sales');
           const isCustomer = r.includes('customer');
           
-          const isValidRole = r.includes('admin') || r.includes('manager') || r.includes('operator');
+          const isValidRole = r.includes('admin') || r.includes('manager') || r.includes('operator') || r.includes('agent');
           
           return isValidRole && !isShipper && !isTransporter && !isSales && !isCustomer;
         });
@@ -165,7 +165,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
 
       const subAssignedAtRaw = t.subAssignmentAt || t.sub_assigned_at || t.subAssignedAt || t.sub_assignment_at || (isSubAssigned ? (t.updatedAt || t.createdAt) : null);
-      const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
 
       const subAssignmentFallbackTime = t.subAssignmentAt 
         ? new Date(t.subAssignmentAt).getTime() 
@@ -191,6 +190,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       let subStartFormatted = "—";
       let subEndFormatted = "—";
 
+      const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
       if (isSubAssigned && subAssignedAtTime) {
         subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subAssignedAtTime);
         subStartFormatted = formatDate(subAssignedAtRaw);
@@ -200,7 +200,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
       const entrySource = t.generator || t.source || "System / Direct";
       const priority = (t.priority || "medium").toLowerCase();
-      const issueType = t.issueType || t.type || t.category || "General";
       const category = t.category || t.department || t.serviceArea || "General";
 
       return {
@@ -211,7 +210,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
         slaStatus,
         entrySource,
         priority,
-        issueType,
         category,
         isResolved,
         primaryStartFormatted,
@@ -305,7 +303,6 @@ export const TicketList = ({ onOpenCreateTicket }) => {
       }
 
       const searchStr = searchTerm.toLowerCase();
-      // Updated search logic: checks Title, Ticket ID, Assignee Name, and Sub-Assignee Name
       const matchesSearch = !searchTerm || 
         t.title?.toLowerCase().includes(searchStr) || 
         t.ticketId?.toLowerCase().includes(searchStr) || 
@@ -418,7 +415,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
           </div>
         ) : (
           <>
-            {/* Mobile / Tablet Card Layout (Visible on screens smaller than xl) */}
+            {/* Mobile / Tablet Card Layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 xl:hidden">
               {filteredTickets.map((t) => {
                 const mongoId = t._id || t.id;
@@ -528,7 +525,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
               })}
             </div>
 
-            {/* Desktop / Large Screen Table Layout (Visible on xl screens and up) */}
+            {/* Desktop Table Layout */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden hidden xl:block">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-600 border-collapse min-w-[1700px]">
@@ -628,7 +625,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                             )}
                           </td>
 
-                          {/* Primary Assignment Timeline (Start & End) */}
+                          {/* Primary Assignment Timeline */}
                           <td className="py-3.5 px-4 whitespace-nowrap">
                             {t.isAssigned ? (
                               <div className="flex flex-col text-[11px] bg-slate-50/80 p-1.5 rounded-md border border-slate-200/60 gap-0.5">
@@ -654,7 +651,7 @@ export const TicketList = ({ onOpenCreateTicket }) => {
                             </span>
                           </td>
 
-                          {/* Sub-Assignment Timeline (Start & End) */}
+                          {/* Sub-Assignment Timeline */}
                           <td className="py-3.5 px-4 whitespace-nowrap">
                             {t.subAssignmentName ? (
                               <div className="flex flex-col text-[11px] bg-purple-50/40 p-1.5 rounded-md border border-purple-100 gap-0.5">

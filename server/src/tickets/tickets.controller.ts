@@ -180,11 +180,12 @@ export class TicketsController {
     const userRole = req.user.role || '';
     const userRoleLower = userRole.toLowerCase();
 
-    // 🛑 VALIDATION: Restrict Sales Ops / Sales users from changing Category or Issue Type
+    // 🛑 ROBUST ROLE FLAGS (Supports variations like "Support Operator", "Agent", etc.)
     const isSalesOp = userRoleLower.includes('sales');
     const isManagerOrAdmin = ['manager', 'super admin', 'admin'].some(r => userRoleLower.includes(r));
-    const isOperator = userRoleLower.includes('operator');
+    const isOperator = userRoleLower.includes('operator') || userRoleLower.includes('agent');
 
+    // 🛑 VALIDATION: Restrict Sales Ops / Sales users from changing Category or Issue Type
     if (isSalesOp && !isManagerOrAdmin) {
       const isChangingCategory = updateTicketDto.category !== undefined && updateTicketDto.category !== existingTicket.category;
       const dtoIssueType = updateTicketDto.issueType || (updateTicketDto as any).issue_type;
@@ -253,7 +254,8 @@ export class TicketsController {
       throw new BadRequestException('Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.');
     }
 
-    if (userRole === 'Operator' && updateTicketDto.assignee !== undefined) {
+    // ✅ FIXED: Flexible check for any operator role variant instead of strict equality === 'Operator'
+    if (isOperator && updateTicketDto.assignee !== undefined) {
       updateTicketDto.assignee = currentUserName;
     }
     
