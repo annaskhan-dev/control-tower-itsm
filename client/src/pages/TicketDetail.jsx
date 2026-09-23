@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useTickets } from "../context/TicketContext";
 import { useAuth } from "../context/AuthContext";
 import { checkPermission, canEditField } from "../config/permissions";
-import { fetchSlaConfigs } from "../api/ticketApi";
+import { fetchSlaConfigs, updateTicket as apiUpdateTicket } from "../api/ticketApi";
 import axiosInstance from "../api/axiosInstance";
 import {
   ArrowLeft,
@@ -523,7 +523,7 @@ export const TicketDetail = () => {
     setIsUpdating(true);
     updateLocalTicket(targetId, payload);
     try {
-      await axiosInstance.patch(`/tickets/${targetId}`, payload);
+      await apiUpdateTicket(targetId, payload);
       await fetchTickets();
     } catch (err) {
       console.error("Full update error details:", err.response?.data);
