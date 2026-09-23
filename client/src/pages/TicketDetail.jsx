@@ -393,13 +393,13 @@ export const TicketDetail = () => {
     if ("status" in updatedFields) {
       if (isStatusLockedBySubAssignment) {
         alert(
-          "Action blocked: Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.",
+          "Action blocked: Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned."
         );
         return;
       }
       if (isStatusLockedByUnassigned) {
         alert(
-          "Action blocked: Operators cannot change the status of an unassigned ticket.",
+          "Action blocked: Operators cannot change the status of an unassigned ticket."
         );
         return;
       }
@@ -431,7 +431,7 @@ export const TicketDetail = () => {
         targetAssignee.trim().toLowerCase() === targetSub.trim().toLowerCase()
       ) {
         alert(
-          "Validation Error: The assignee and sub-assignee cannot be the same person.",
+          "Validation Error: The assignee and sub-assignee cannot be the same person."
         );
         return;
       }
@@ -442,7 +442,7 @@ export const TicketDetail = () => {
       const lowerAssignee = targetAssignee.toLowerCase();
       if (restrictedKeywords.some((kw) => lowerAssignee.includes(kw))) {
         alert(
-          "Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be assigned tickets.",
+          "Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be assigned tickets."
         );
         return;
       }
@@ -451,7 +451,7 @@ export const TicketDetail = () => {
       const lowerSub = targetSub.toLowerCase();
       if (restrictedKeywords.some((kw) => lowerSub.includes(kw))) {
         alert(
-          "Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be given sub-assignments.",
+          "Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be given sub-assignments."
         );
         return;
       }
@@ -521,10 +521,18 @@ export const TicketDetail = () => {
 
     const targetId = ticket._id || ticket.id;
     setIsUpdating(true);
+
+    // 1. Instantly update UI locally (Optimistic update)
     updateLocalTicket(targetId, payload);
+
     try {
-      await apiUpdateTicket(targetId, payload);
-      await fetchTickets();
+      // 2. Send request in background without blocking UI reload with fetchTickets()
+      const response = await apiUpdateTicket(targetId, payload);
+      
+      // If your API returns the updated ticket, sync it locally to ensure exact server state
+      if (response?.data) {
+        updateLocalTicket(targetId, response.data);
+      }
     } catch (err) {
       console.error("Full update error details:", err.response?.data);
       const dataMsg = err.response?.data?.message;
@@ -532,6 +540,7 @@ export const TicketDetail = () => {
         ? dataMsg.join(", ")
         : dataMsg || err.message || "Update failed. Check your permissions.";
       alert(errorMsg);
+      // Revert or re-fetch only if an error happens
       await fetchTickets();
     } finally {
       setIsUpdating(false);
