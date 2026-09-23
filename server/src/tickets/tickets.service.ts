@@ -13,6 +13,7 @@ import { SlaConfig, SlaConfigDocument } from './schemas/sla-config.schema';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { TicketsGateway } from './tickets.gateway';
+import { EmailNotificationService } from '../utils/email-notification.service';
 
 @Injectable()
 export class TicketsService {
@@ -23,6 +24,7 @@ export class TicketsService {
     @InjectModel(SlaConfig.name) private slaConfigModel: Model<SlaConfigDocument>,
     @InjectModel('User') private userModel: Model<any>,
     private readonly ticketsGateway: TicketsGateway,
+    private readonly emailNotificationService: EmailNotificationService,
   ) {}
 
   private authorize(userRole: string, allowedRoles: string[]) {
@@ -88,7 +90,7 @@ export class TicketsService {
           throw new ForbiddenException('Sales Ops are not allowed to choose the incident type.');
         }
       }
-      
+
       // 🛑 VALIDATION: Restrict assigning Transporters, Sales Persons, or Shipper Ops
       const restrictedAssignmentKeywords = ['transporter', 'sales', 'shipper', 'ops'];
 
@@ -107,7 +109,7 @@ export class TicketsService {
           throw new BadRequestException('Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be given sub-assignments.');
         }
       }
-      
+
       const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
       const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
 
@@ -117,7 +119,7 @@ export class TicketsService {
           throw new BadRequestException('The assignee and sub-assignee cannot be the same person.');
         }
       }
-      
+
       const category = createTicketDto.category || null;
       let deadline: Date | null = null;
       let ticketPriority = createTicketDto.priority || 'Medium';
@@ -130,7 +132,7 @@ export class TicketsService {
           ticketPriority = slaConfig.priority;
         }
       }
-      
+
       const resolvedUserName = userName && userName !== 'User' ? userName : 'Ali';
       const ticketGenerator = createTicketDto.generator || `${resolvedUserName} (${userRole || 'Super Admin'})`;
 
@@ -273,7 +275,7 @@ export class TicketsService {
     }
 
     const updateData: any = { ...updateTicketDto };
-    
+
     if (updateData.category !== undefined) {
       if (updateData.category) {
         const slaConfig = await this.slaConfigModel.findOne({ category: updateData.category, companyId }).exec();
@@ -334,6 +336,34 @@ export class TicketsService {
 
     if (!updatedTicket) {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
+    }
+
+    // 📧 Trigger email notification using emailNotificationService with proper object payload
+    if (updateData.assignee !== undefined && updateData.assignee !== existingTicket.assignee) {
+      const newAssigneeName = updateData.assignee;
+      if (newAssigneeName && newAssigneeName !== 'Unassigned') {
+        try {
+          const assignedUser = await this.userModel.findOne({
+            companyId,
+            $or: [
+              { name: new RegExp(`^${newAssigneeName}$`, 'i') },
+              { fullName: new RegExp(`^${newAssigneeName}$`, 'i') },
+              { email: new RegExp(`^${newAssigneeName}$`, 'i') }
+            ]
+          });
+
+          if (assignedUser?.email) {
+            await this.emailNotificationService.sendEmail({
+              to: assignedUser.email,
+              subject: 'New Ticket Assigned',
+              html: `<p>You have been assigned to ticket <strong>#${updatedTicket.ticketId || updatedTicket._id}</strong>.</p>`,
+            });
+            this.logger.log(`Assignment email sent successfully to ${assignedUser.email}`);
+          }
+        } catch (emailErr: any) {
+          this.logger.error(`Failed to send assignment email: ${emailErr.message}`);
+        }
+      }
     }
 
     if (isNewResolved && !isAlreadyResolved) {

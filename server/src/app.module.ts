@@ -26,7 +26,7 @@ import { AuthController } from './auth/auth.controller';
       envFilePath: '.env',
     }),
 
-    // 2. Enable NestJS Task Scheduling (Cron jobs)
+    // 2. Enable NestJS Task Scheduling (Required for @Cron in EmailSyncService)
     ScheduleModule.forRoot(),
     
     // 3. Safely resolve environment variables post-configuration load with explicit fail-fast timeouts and IPv4 forcing
@@ -65,6 +65,8 @@ export class AppModule {
     console.log('--- DEBUG: AppModule initialized ---');
     console.log('JWT_SECRET is defined:', !!process.env.JWT_SECRET);
     console.log('MONGODB_URI is defined:', !!process.env.MONGODB_URI);
+    console.log('MICROSOFT_CLIENT_ID is defined:', !!process.env.MICROSOFT_CLIENT_ID);
+    console.log('SMTP_HOST is defined:', !!process.env.SMTP_HOST);
   }
 
   configure(consumer: MiddlewareConsumer) {
