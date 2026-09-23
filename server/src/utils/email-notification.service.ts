@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 
 interface MailOptions {
   to: string;
@@ -10,29 +10,14 @@ interface MailOptions {
 @Injectable()
 export class EmailNotificationService {
   private readonly logger = new Logger(EmailNotificationService.name);
-  private transporter: nodemailer.Transporter;
+  private sesClient: SESClient;
 
   constructor() {
-    const port = parseInt(process.env.SMTP_PORT || '465', 10);
-    // Fixed: port 465 means secure should be true
-    const isSecure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465;
-
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: port,
-      secure: isSecure, 
-      requireTLS: !isSecure, // true for STARTTLS (port 587), false for implicit TLS (port 465)
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-      // Fix for cloud container timeouts (fails fast instead of hanging)
-      connectionTimeout: 15000, // 15 seconds
-      greetingTimeout: 15000,
-      socketTimeout: 15000,
-      tls: {
-        // Disabled strict verification to prevent handshake timeouts in cloud hosting environments like Railway
-        rejectUnauthorized: false,
+    this.sesClient = new SESClient({
+      region: process.env.AWS_REGION || process.env.AWS_SES_REGION || 'us-east-1',
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || process.env.SMTP_USER || '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || process.env.SMTP_PASS || '',
       },
     });
   }
@@ -105,16 +90,33 @@ export class EmailNotificationService {
 
   async sendEmail({ to, subject, html }: MailOptions) {
     if (!to) return;
+    
+    const senderEmail = process.env.EMAIL_FROM || process.env.AWS_SES_FROM_EMAIL || process.env.SMTP_USER;
+    
     try {
-      const info = await this.transporter.sendMail({
-        from: `"OpenPort Control Tower" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
-        to,
-        subject,
-        html,
+      const command = new SendEmailCommand({
+        Destination: {
+          ToAddresses: [to],
+        },
+        Message: {
+          Body: {
+            Html: {
+              Data: html,
+              Charset: 'UTF-8',
+            },
+          },
+          Subject: {
+            Data: subject,
+            Charset: 'UTF-8',
+          },
+        },
+        Source: senderEmail,
       });
-      this.logger.log(`Email sent successfully: ${info.messageId}`);
+
+      const response = await this.sesClient.send(command);
+      this.logger.log(`Email sent successfully via AWS SES API: ${response.MessageId}`);
     } catch (error: any) {
-      this.logger.error(`Error sending email via AWS SES Mail Manager SMTP: ${error.message}`);
+      this.logger.error(`Error sending email via AWS SES API: ${error.message}`);
     }
   }
 }
