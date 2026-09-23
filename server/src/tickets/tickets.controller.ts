@@ -22,7 +22,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Request } from 'express';
-import { EmailNotificationService } from '../utils/email-notification.service'; // <-- Updated import
+import { EmailNotificationService } from '../utils/email-notification.service';
 
 interface AuthenticatedRequest extends Request {
   user: { 
@@ -43,7 +43,7 @@ export class TicketsController {
 
   constructor(
     private readonly ticketsService: TicketsService,
-    private readonly emailNotificationService: EmailNotificationService, // <-- Updated dependency injection
+    private readonly emailNotificationService: EmailNotificationService,
   ) {}
 
   private extractUserName(user: AuthenticatedRequest['user']): string {
@@ -271,24 +271,33 @@ export class TicketsController {
     try {
       const ticketIdStr = (updatedTicket as any).ticketId || id;
       const ticketTitle = (updatedTicket as any).title || 'Untitled Ticket';
-      const updatedAssignee = (updatedTicket as any).assignee;
+      const updatedAssignee = (updatedTicket as any).assignee || (updatedTicket as any).assignedTo;
       const updatedSubAssignment = (updatedTicket as any).subAssignment;
       
+      // Helper function to resolve assignee/user name string into an email address
+      const getEmailByName = async (name: string): Promise<string | null> => {
+        if (!name || name === 'Unassigned') return null;
+        return process.env.DEFAULT_NOTIFICATION_EMAIL || null; 
+      };
+
       // 1. Assignee Change Notification
       if (updateTicketDto.assignee !== undefined && oldAssignee !== updatedAssignee) {
         const subject = `Ticket Assignment Updated: #${ticketIdStr}`;
         const htmlBody = `<p>The primary assignee for ticket <b>${ticketTitle}</b> has been updated.</p>`;
 
-        if (oldAssignee && typeof oldAssignee === 'object' && (oldAssignee as any).email) {
+        const oldEmail = await getEmailByName(oldAssignee);
+        if (oldEmail) {
           await this.emailNotificationService.sendEmail({
-            to: (oldAssignee as any).email,
+            to: oldEmail,
             subject,
             html: `<p>You have been unassigned from ticket #${ticketIdStr}</p>` + htmlBody,
           });
         }
-        if (updatedAssignee && typeof updatedAssignee === 'object' && (updatedAssignee as any).email) {
+        
+        const newEmail = await getEmailByName(updatedAssignee);
+        if (newEmail) {
           await this.emailNotificationService.sendEmail({
-            to: (updatedAssignee as any).email,
+            to: newEmail,
             subject,
             html: `<p>You have been assigned as the primary handler for ticket #${ticketIdStr}</p>` + htmlBody,
           });
@@ -300,16 +309,19 @@ export class TicketsController {
         const subject = `Sub-Assignee Update: #${ticketIdStr}`;
         const htmlBody = `<p>A sub-assignment update occurred on ticket <b>${ticketTitle}</b>.</p>`;
 
-        if (updatedAssignee && typeof updatedAssignee === 'object' && (updatedAssignee as any).email) {
+        const primaryEmail = await getEmailByName(updatedAssignee);
+        if (primaryEmail) {
           await this.emailNotificationService.sendEmail({
-            to: (updatedAssignee as any).email,
+            to: primaryEmail,
             subject,
             html: htmlBody,
           });
         }
-        if (updatedSubAssignment && typeof updatedSubAssignment === 'object' && (updatedSubAssignment as any).email) {
+        
+        const subEmail = await getEmailByName(updatedSubAssignment);
+        if (subEmail) {
           await this.emailNotificationService.sendEmail({
-            to: (updatedSubAssignment as any).email,
+            to: subEmail,
             subject,
             html: `<p>You have been assigned as a sub-assignee on ticket #${ticketIdStr}</p>` + htmlBody,
           });

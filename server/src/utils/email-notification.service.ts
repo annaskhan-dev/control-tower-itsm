@@ -1,10 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
+interface MailOptions {
+  to: string;
+  subject: string;
+  html: string;
+}
+
 @Injectable()
 export class EmailNotificationService {
   private readonly logger = new Logger(EmailNotificationService.name);
-  private transporter;
+  private transporter: nodemailer.Transporter;
 
   constructor() {
     this.transporter = nodemailer.createTransport({
@@ -101,11 +107,11 @@ export class EmailNotificationService {
   /**
    * Universal email sender utility
    */
-  async sendEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
+  async sendEmail({ to, subject, html }: MailOptions) {
     if (!to) return;
     try {
       const info = await this.transporter.sendMail({
-        from: `"OpenPort Control Tower" <${process.env.EMAIL_FROM}>`,
+        from: `"OpenPort Control Tower" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
         to,
         subject,
         html,
