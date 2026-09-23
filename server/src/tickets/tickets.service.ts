@@ -40,27 +40,22 @@ export class TicketsService {
     }
   }
 
-  // Strictly enforces that subAssignment ALWAYS takes precedence for resolution credit if it exists
   private getEffectiveResolver(ticket: any, fallbackTicket?: any, updatePayload?: any): string {
-    // 1. Check incoming update payload subAssignment first
     const payloadSub = updatePayload?.subAssignment;
     if (payloadSub && typeof payloadSub === 'string' && payloadSub !== 'Unassigned' && payloadSub.trim() !== '' && payloadSub !== 'null') {
       return payloadSub.trim();
     }
 
-    // 2. Check the updated ticket document's subAssignment
     const ticketSub = ticket?.subAssignment;
     if (ticketSub && typeof ticketSub === 'string' && ticketSub !== 'Unassigned' && ticketSub.trim() !== '' && ticketSub !== 'null') {
       return ticketSub.trim();
     }
 
-    // 3. Check fallback ticket subAssignment
     const fallbackSub = fallbackTicket?.subAssignment;
     if (fallbackSub && typeof fallbackSub === 'string' && fallbackSub !== 'Unassigned' && fallbackSub.trim() !== '' && fallbackSub !== 'null') {
       return fallbackSub.trim();
     }
 
-    // 4. ONLY if no sub-assignment exists anywhere, fallback to primary assignee
     const assignee = ticket?.assignee || ticket?.assignedTo || fallbackTicket?.assignee || fallbackTicket?.assignedTo;
     if (assignee && typeof assignee === 'string' && assignee !== 'Unassigned' && assignee.trim() !== '' && assignee !== 'null') {
       return assignee.trim();
@@ -81,7 +76,6 @@ export class TicketsService {
       const normalizedRole = (userRole || '').replace(/\s+/g, '_').toLowerCase();
       const isSalesRole = normalizedRole.includes('sales');
 
-      // 🛑 VALIDATION: Restrict Sales Ops from choosing category or incident type upon creation
       if (isSalesRole) {
         if (createTicketDto.category) {
           throw new ForbiddenException('Sales Ops are not allowed to choose the category.');
@@ -91,7 +85,6 @@ export class TicketsService {
         }
       }
 
-      // 🛑 VALIDATION: Restrict assigning Transporters, Sales Persons, or Shipper Ops
       const restrictedAssignmentKeywords = ['transporter', 'sales', 'shipper', 'ops'];
 
       if (createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned') {
@@ -113,7 +106,6 @@ export class TicketsService {
       const isAssigned = createTicketDto.assignee && createTicketDto.assignee !== 'Unassigned';
       const isSubAssigned = createTicketDto.subAssignment && createTicketDto.subAssignment !== 'Unassigned' && createTicketDto.subAssignment !== '';
 
-      // Prevent same person as assignee and sub-assignee
       if (isAssigned && isSubAssigned) {
         if (createTicketDto.assignee?.trim().toLowerCase() === createTicketDto.subAssignment?.trim().toLowerCase()) {
           throw new BadRequestException('The assignee and sub-assignee cannot be the same person.');
@@ -216,7 +208,6 @@ export class TicketsService {
       }
     }
 
-    // 🛑 VALIDATION: Restrict assigning Transporters, Sales Persons, or Shipper Ops during updates
     const restrictedAssignmentKeywords = ['transporter', 'sales', 'shipper', 'ops'];
 
     if (updateTicketDto.assignee && updateTicketDto.assignee !== 'Unassigned') {
@@ -243,7 +234,6 @@ export class TicketsService {
     const oldSubAssignmentName = existingTicket.subAssignment;
     const oldSlaStatus = (existingTicket as any).slaStatus;
 
-    // Prevent same person as assignee and sub-assignee during updates
     const targetAssignee = updateTicketDto.assignee !== undefined ? updateTicketDto.assignee : existingTicket.assignee;
     const targetSubAssignment = updateTicketDto.subAssignment !== undefined ? updateTicketDto.subAssignment : existingTicket.subAssignment;
 
@@ -342,8 +332,10 @@ export class TicketsService {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
     }
 
-    // 📧 Trigger email notification safely with fallback object generation if documents are missing
+    // 📧 Trigger email notification with robust debug logs
     try {
+      this.logger.debug(`[Email Debug] Checking updates - Assignee changed from "${oldPrimaryAssigneeName}" to "${updateData.assignee}"`);
+
       const resolveUserObj = async (identifier: string | null | undefined) => {
         if (!identifier || identifier === 'Unassigned') return null;
         const foundUser = await this.userModel.findOne({ 
@@ -355,9 +347,13 @@ export class TicketsService {
             { email: new RegExp(`^${identifier}$`, 'i') }
           ] 
         });
-        if (foundUser) return foundUser;
-        // Fallback mock structure containing the string identifier as email/name if no document exists
-        return { name: identifier, email: identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s+/g, '')}@example.com` };
+        if (foundUser) {
+          this.logger.debug(`[Email Debug] Resolved user object for "${identifier}": email -> ${foundUser.email}`);
+          return foundUser;
+        }
+        const fallbackObj = { name: identifier, email: identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s+/g, '')}@example.com` };
+        this.logger.debug(`[Email Debug] User not found in DB for "${identifier}", using fallback object: email -> ${fallbackObj.email}`);
+        return fallbackObj;
       };
 
       // 1. Primary Assignee Changed Notification
@@ -366,6 +362,7 @@ export class TicketsService {
         const newAssigneeObj = await resolveUserObj(updateData.assignee);
 
         if (typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
+          this.logger.log(`[Email Debug] Dispatching sendPrimaryAssigneeChangedEmail...`);
           await this.emailNotificationService.sendPrimaryAssigneeChangedEmail(oldAssigneeObj, newAssigneeObj, updatedTicket);
         }
       }
@@ -376,6 +373,7 @@ export class TicketsService {
         const subAssigneeObj = await resolveUserObj(updateData.subAssignment);
 
         if (subAssigneeObj && typeof this.emailNotificationService.sendSubAssigneeAddedEmail === 'function') {
+          this.logger.log(`[Email Debug] Dispatching sendSubAssigneeAddedEmail...`);
           await this.emailNotificationService.sendSubAssigneeAddedEmail(primaryAssigneeObj, subAssigneeObj, updatedTicket);
         }
       }
@@ -384,6 +382,7 @@ export class TicketsService {
       const newSlaStatus = (updatedTicket as any).slaStatus;
       if (oldSlaStatus !== 'Breached' && newSlaStatus === 'Breached') {
         if (typeof this.emailNotificationService.sendBreachEmailToManager === 'function') {
+          this.logger.log(`[Email Debug] Dispatching sendBreachEmailToManager...`);
           await this.emailNotificationService.sendBreachEmailToManager(updatedTicket);
         }
       }
