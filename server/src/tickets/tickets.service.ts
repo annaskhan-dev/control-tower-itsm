@@ -334,7 +334,7 @@ export class TicketsService {
 
     // 📧 Trigger email notification with robust debug logs
     try {
-      this.logger.debug(`[Email Debug] Checking updates - Assignee changed from "${oldPrimaryAssigneeName}" to "${updateData.assignee}"`);
+      this.logger.debug(`[Email Debug] Checking updates - Assignee changed from "${oldPrimaryAssigneeName}" to "${updatedTicket.assignee}"`);
 
       const resolveUserObj = async (identifier: string | null | undefined) => {
         if (!identifier || identifier === 'Unassigned') return null;
@@ -357,9 +357,9 @@ export class TicketsService {
       };
 
       // 1. Primary Assignee Changed Notification
-      if (updateData.assignee !== undefined && updateData.assignee !== oldPrimaryAssigneeName) {
+      if (updateData.assignee !== undefined && updatedTicket.assignee !== oldPrimaryAssigneeName) {
         const oldAssigneeObj = await resolveUserObj(oldPrimaryAssigneeName);
-        const newAssigneeObj = await resolveUserObj(updateData.assignee);
+        const newAssigneeObj = await resolveUserObj(updatedTicket.assignee);
 
         if (typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
           this.logger.log(`[Email Debug] Dispatching sendPrimaryAssigneeChangedEmail...`);
@@ -368,9 +368,9 @@ export class TicketsService {
       }
 
       // 2. Sub-Assignee Added / Changed Notification
-      if (updateData.subAssignment !== undefined && updateData.subAssignment !== oldSubAssignmentName) {
+      if (updateData.subAssignment !== undefined && updatedTicket.subAssignment !== oldSubAssignmentName) {
         const primaryAssigneeObj = await resolveUserObj(updatedTicket.assignee);
-        const subAssigneeObj = await resolveUserObj(updateData.subAssignment);
+        const subAssigneeObj = await resolveUserObj(updatedTicket.subAssignment);
 
         if (subAssigneeObj && typeof this.emailNotificationService.sendSubAssigneeAddedEmail === 'function') {
           this.logger.log(`[Email Debug] Dispatching sendSubAssigneeAddedEmail...`);
