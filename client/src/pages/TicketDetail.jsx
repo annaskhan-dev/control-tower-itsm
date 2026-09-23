@@ -15,7 +15,7 @@ import {
   AlertCircle,
   UserPlus,
   UserCheck,
-  Cpu
+  Cpu,
 } from "lucide-react";
 
 // Available issue types matching your create modal setup
@@ -24,7 +24,7 @@ const ISSUE_TYPES = [
   "Public Holiday",
   "Vehicle Stoppages",
   "Tracker Faulty",
-  "Order Stuck"
+  "Order Stuck",
 ];
 
 export const TicketDetail = () => {
@@ -46,7 +46,12 @@ export const TicketDetail = () => {
   const [now, setNow] = useState(new Date());
 
   // Determine if user is a Sales Op or Operator
-  const userRoleStr = (role || user?.role || user?.userType || "").toLowerCase();
+  const userRoleStr = (
+    role ||
+    user?.role ||
+    user?.userType ||
+    ""
+  ).toLowerCase();
   const isSalesOp = userRoleStr.includes("sales");
   const isOperator = userRoleStr.includes("operator");
   const canModifyClassification = isAdmin || isManager || !isSalesOp;
@@ -57,7 +62,9 @@ export const TicketDetail = () => {
       const name = (u.name || u.username || "").toLowerCase();
       const r = (u.role || "").toLowerCase();
       const restrictedKeywords = ["transporter", "sales", "shipper", "ops"];
-      return !restrictedKeywords.some(keyword => name.includes(keyword) || r.includes(keyword));
+      return !restrictedKeywords.some(
+        (keyword) => name.includes(keyword) || r.includes(keyword),
+      );
     });
   }, [companyUsers]);
 
@@ -101,46 +108,77 @@ export const TicketDetail = () => {
   const canEditCategoryFromConfig = canEditField(user?.role, "category");
 
   // Combined permission check for modifying category/issueType (Admins, Managers, or non-Sales Ops)
-  const canEditClassification = canModifyClassification && canEditCategoryFromConfig;
+  const canEditClassification =
+    canModifyClassification && canEditCategoryFromConfig;
 
   // Check if current user is restricted (i.e. not Manager or Super Admin)
-  const isManagerOrAdmin = ["manager", "super admin", "admin"].some(r => userRoleStr.includes(r));
+  const isManagerOrAdmin = ["manager", "super admin", "admin"].some((r) =>
+    userRoleStr.includes(r),
+  );
   const isRestricted = !isManagerOrAdmin;
 
   const ticket = useMemo(() => {
     if (!tickets) return null;
     return tickets.find(
-      (t) => String(t._id) === String(id) || String(t.ticketId) === String(id)
+      (t) => String(t._id) === String(id) || String(t.ticketId) === String(id),
     );
   }, [tickets, id]);
 
-  const isResolvedState = ["closed", "resolved", "completed", "done"].includes((ticket?.status || "").toLowerCase());
+  const isResolvedState = ["closed", "resolved", "completed", "done"].includes(
+    (ticket?.status || "").toLowerCase(),
+  );
 
   // Compute if primary assignee is present
   const isPrimaryAssigned = useMemo(() => {
     if (!ticket) return false;
-    let rawAssignee = ticket.assignee || ticket.assignedTo || ticket.assigned_to || "Unassigned";
+    let rawAssignee =
+      ticket.assignee ||
+      ticket.assignedTo ||
+      ticket.assigned_to ||
+      "Unassigned";
     if (typeof rawAssignee === "object" && rawAssignee !== null) {
-      rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
+      rawAssignee =
+        rawAssignee.name ||
+        rawAssignee.fullName ||
+        rawAssignee.email ||
+        "Unassigned";
     }
-    const assigneeName = typeof rawAssignee === "string" ? rawAssignee.trim() : "Unassigned";
+    const assigneeName =
+      typeof rawAssignee === "string" ? rawAssignee.trim() : "Unassigned";
     return assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
   }, [ticket]);
 
   // Check if current user is the primary assignee
-  const currentUserName = (user?.name || user?.username || "").trim().toLowerCase();
-  
-  let rawAssigneeObj = ticket?.assignee || ticket?.assignedTo || ticket?.assigned_to || "";
+  const currentUserName = (user?.name || user?.username || "")
+    .trim()
+    .toLowerCase();
+
+  let rawAssigneeObj =
+    ticket?.assignee || ticket?.assignedTo || ticket?.assigned_to || "";
   if (typeof rawAssigneeObj === "object" && rawAssigneeObj !== null) {
-    rawAssigneeObj = rawAssigneeObj.name || rawAssigneeObj.fullName || rawAssigneeObj.email || "";
+    rawAssigneeObj =
+      rawAssigneeObj.name ||
+      rawAssigneeObj.fullName ||
+      rawAssigneeObj.email ||
+      "";
   }
-  const primaryAssigneeName = (typeof rawAssigneeObj === "string" ? rawAssigneeObj : "").trim().toLowerCase();
-  const isCurrentUserPrimaryAssigned = primaryAssigneeName !== "" && currentUserName === primaryAssigneeName;
+  const primaryAssigneeName = (
+    typeof rawAssigneeObj === "string" ? rawAssigneeObj : ""
+  )
+    .trim()
+    .toLowerCase();
+  const isCurrentUserPrimaryAssigned =
+    primaryAssigneeName !== "" && currentUserName === primaryAssigneeName;
 
   // Check if ticket has a sub-assignment active
   const hasSubAssignment = useMemo(() => {
     if (!ticket) return false;
-    let rawSub = ticket.subAssignment || ticket.sub_assignment || ticket.subAssignedTo || ticket.sub_assigned_to || "";
+    let rawSub =
+      ticket.subAssignment ||
+      ticket.sub_assignment ||
+      ticket.subAssignedTo ||
+      ticket.sub_assigned_to ||
+      "";
     if (typeof rawSub === "object" && rawSub !== null) {
       rawSub = rawSub.name || rawSub.fullName || rawSub.email || "";
     }
@@ -149,15 +187,30 @@ export const TicketDetail = () => {
   }, [ticket]);
 
   // Check if current user is the sub-assignee
-  let rawSubAssigneeObj = ticket?.subAssignment || ticket?.sub_assignment || ticket?.subAssignedTo || ticket?.sub_assigned_to || "";
+  let rawSubAssigneeObj =
+    ticket?.subAssignment ||
+    ticket?.sub_assignment ||
+    ticket?.subAssignedTo ||
+    ticket?.sub_assigned_to ||
+    "";
   if (typeof rawSubAssigneeObj === "object" && rawSubAssigneeObj !== null) {
-    rawSubAssigneeObj = rawSubAssigneeObj.name || rawSubAssigneeObj.fullName || rawSubAssigneeObj.email || "";
+    rawSubAssigneeObj =
+      rawSubAssigneeObj.name ||
+      rawSubAssigneeObj.fullName ||
+      rawSubAssigneeObj.email ||
+      "";
   }
-  const subAssigneeName = (typeof rawSubAssigneeObj === "string" ? rawSubAssigneeObj : "").trim().toLowerCase();
-  const isCurrentUserSubAssigned = subAssigneeName !== "" && currentUserName === subAssigneeName;
+  const subAssigneeName = (
+    typeof rawSubAssigneeObj === "string" ? rawSubAssigneeObj : ""
+  )
+    .trim()
+    .toLowerCase();
+  const isCurrentUserSubAssigned =
+    subAssigneeName !== "" && currentUserName === subAssigneeName;
 
   // Requirement Check: Lock status if sub-assigned AND the user is NOT the sub-assignee and NOT a manager/admin
-  const isStatusLockedBySubAssignment = hasSubAssignment && !isCurrentUserSubAssigned && !isManagerOrAdmin;
+  const isStatusLockedBySubAssignment =
+    hasSubAssignment && !isCurrentUserSubAssigned && !isManagerOrAdmin;
 
   // Requirement Check: Lock status if operator and ticket is unassigned
   const isStatusLockedByUnassigned = isOperator && !isPrimaryAssigned;
@@ -167,15 +220,25 @@ export const TicketDetail = () => {
       setDescription(ticket.description || "");
       setCategory(ticket.category || "");
       setIssueType(ticket.issueType || ticket.issue_type || "");
-      
-      let rawAssignee = ticket.assignee || ticket.assignedTo || ticket.assigned_to || "Unassigned";
+
+      let rawAssignee =
+        ticket.assignee ||
+        ticket.assignedTo ||
+        ticket.assigned_to ||
+        "Unassigned";
       if (typeof rawAssignee === "object" && rawAssignee !== null) {
-        rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
+        rawAssignee =
+          rawAssignee.name ||
+          rawAssignee.fullName ||
+          rawAssignee.email ||
+          "Unassigned";
       }
       setAssignee(typeof rawAssignee === "string" ? rawAssignee : "Unassigned");
 
       const val = ticket.subAssignment || "";
-      const isExistingUser = companyUsers.some(u => (u.name || u.email) === val);
+      const isExistingUser = companyUsers.some(
+        (u) => (u.name || u.email) === val,
+      );
       if (val && !isExistingUser) {
         setSubAssignment("custom");
         setCustomSubAssignment(val);
@@ -200,66 +263,125 @@ export const TicketDetail = () => {
   const calculatedMetrics = useMemo(() => {
     if (!ticket) return {};
 
-    const isResolved = ["closed", "resolved", "completed", "done"].includes((ticket.status || "").toLowerCase());
-    const resolvedAtRaw = ticket.resolvedAt || ticket.resolved_at || ticket.closedAt;
-    const resolvedAtTime = isResolved ? (resolvedAtRaw ? new Date(resolvedAtRaw).getTime() : now.getTime()) : null;
+    const isResolved = ["closed", "resolved", "completed", "done"].includes(
+      (ticket.status || "").toLowerCase(),
+    );
+    const resolvedAtRaw =
+      ticket.resolvedAt || ticket.resolved_at || ticket.closedAt;
+    const resolvedAtTime = isResolved
+      ? resolvedAtRaw
+        ? new Date(resolvedAtRaw).getTime()
+        : now.getTime()
+      : null;
     const currentOrResolveTime = isResolved ? resolvedAtTime : now.getTime();
 
     // Parse Assignee safely
-    let rawAssignee = ticket.assignee || ticket.assignedTo || ticket.assigned_to || "Unassigned";
+    let rawAssignee =
+      ticket.assignee ||
+      ticket.assignedTo ||
+      ticket.assigned_to ||
+      "Unassigned";
     if (typeof rawAssignee === "object" && rawAssignee !== null) {
-      rawAssignee = rawAssignee.name || rawAssignee.fullName || rawAssignee.email || "Unassigned";
+      rawAssignee =
+        rawAssignee.name ||
+        rawAssignee.fullName ||
+        rawAssignee.email ||
+        "Unassigned";
     }
-    const assigneeName = typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
-    const isAssigned = assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
+    const assigneeName =
+      typeof rawAssignee === "string" ? rawAssignee : "Unassigned";
+    const isAssigned =
+      assigneeName.toLowerCase() !== "unassigned" && assigneeName !== "";
 
     // Parse Sub-Assignee safely
-    let rawSubAssignee = ticket.subAssignment || ticket.sub_assignment || ticket.subAssignedTo || ticket.sub_assigned_to || "";
+    let rawSubAssignee =
+      ticket.subAssignment ||
+      ticket.sub_assignment ||
+      ticket.subAssignedTo ||
+      ticket.sub_assigned_to ||
+      "";
     if (typeof rawSubAssignee === "object" && rawSubAssignee !== null) {
-      rawSubAssignee = rawSubAssignee.name || rawSubAssignee.fullName || rawSubAssignee.email || "";
+      rawSubAssignee =
+        rawSubAssignee.name ||
+        rawSubAssignee.fullName ||
+        rawSubAssignee.email ||
+        "";
     }
-    const subAssignmentName = typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
-    const hasSubName = subAssignmentName !== "" && subAssignmentName.toLowerCase() !== "unassigned" && subAssignmentName !== null;
+    const subAssignmentName =
+      typeof rawSubAssignee === "string" ? rawSubAssignee.trim() : "";
+    const hasSubName =
+      subAssignmentName !== "" &&
+      subAssignmentName.toLowerCase() !== "unassigned" &&
+      subAssignmentName !== null;
 
-    const createdAtTime = new Date(ticket.createdAt || ticket.created_at || ticket.timestamp || now).getTime();
-    const assignedAtRaw = ticket.assignedAt || ticket.assigned_at || ticket.assignmentTime;
-    const assignedAtTime = assignedAtRaw ? new Date(assignedAtRaw).getTime() : createdAtTime;
+    const createdAtTime = new Date(
+      ticket.createdAt || ticket.created_at || ticket.timestamp || now,
+    ).getTime();
+    const assignedAtRaw =
+      ticket.assignedAt || ticket.assigned_at || ticket.assignmentTime;
+    const assignedAtTime = assignedAtRaw
+      ? new Date(assignedAtRaw).getTime()
+      : createdAtTime;
 
-    const subAssignedAtRaw = ticket.subAssignmentAt || ticket.sub_assigned_at || ticket.subAssignedAt || ticket.sub_assignment_at;
-    const subAssignedAtTime = subAssignedAtRaw ? new Date(subAssignedAtRaw).getTime() : null;
+    const subAssignedAtRaw =
+      ticket.subAssignmentAt ||
+      ticket.sub_assigned_at ||
+      ticket.subAssignedAt ||
+      ticket.sub_assignment_at;
+    const subAssignedAtTime = subAssignedAtRaw
+      ? new Date(subAssignedAtRaw).getTime()
+      : null;
 
     const isSubAssigned = hasSubName || subAssignedAtTime !== null;
 
     let primaryAssignmentMs = 0;
     if (isAssigned) {
-      const subAssignmentFallbackTime = subAssignedAtTime 
-        ? subAssignedAtTime 
-        : (isSubAssigned ? new Date(ticket.updatedAt || ticket.createdAt || now).getTime() : null);
+      const subAssignmentFallbackTime = subAssignedAtTime
+        ? subAssignedAtTime
+        : isSubAssigned
+          ? new Date(ticket.updatedAt || ticket.createdAt || now).getTime()
+          : null;
 
-      const primaryEndTime = (isSubAssigned && subAssignmentFallbackTime) ? subAssignmentFallbackTime : currentOrResolveTime;
+      const primaryEndTime =
+        isSubAssigned && subAssignmentFallbackTime
+          ? subAssignmentFallbackTime
+          : currentOrResolveTime;
       primaryAssignmentMs = Math.max(0, primaryEndTime - assignedAtTime);
     }
 
-    const slaTimeMs = isAssigned ? Math.max(0, currentOrResolveTime - assignedAtTime) : 0;
+    const slaTimeMs = isAssigned
+      ? Math.max(0, currentOrResolveTime - assignedAtTime)
+      : 0;
 
     let subAssignmentTimeMs = 0;
     if (isSubAssigned && subAssignedAtTime) {
-      subAssignmentTimeMs = Math.max(0, currentOrResolveTime - subAssignedAtTime);
+      subAssignmentTimeMs = Math.max(
+        0,
+        currentOrResolveTime - subAssignedAtTime,
+      );
     }
 
-    const finalResolutionTimeMs = isResolved ? Math.max(0, resolvedAtTime - createdAtTime) : null;
+    const finalResolutionTimeMs = isResolved
+      ? Math.max(0, resolvedAtTime - createdAtTime)
+      : null;
 
     return {
-      assignmentTimeFormatted: isAssigned ? formatDuration(primaryAssignmentMs) : "Unassigned",
+      assignmentTimeFormatted: isAssigned
+        ? formatDuration(primaryAssignmentMs)
+        : "Unassigned",
       slaTimeFormatted: isAssigned ? formatDuration(slaTimeMs) : "N/A",
-      subAssignmentTimeFormatted: isSubAssigned ? formatDuration(subAssignmentTimeMs) : "Not Sub-Assigned",
-      finalResolutionTimeFormatted: isResolved ? formatDuration(finalResolutionTimeMs) : "Pending",
+      subAssignmentTimeFormatted: isSubAssigned
+        ? formatDuration(subAssignmentTimeMs)
+        : "Not Sub-Assigned",
+      finalResolutionTimeFormatted: isResolved
+        ? formatDuration(finalResolutionTimeMs)
+        : "Pending",
     };
   }, [ticket, now, formatDuration]);
 
   const calculateDeadline = (cat, priority) => {
     const rule = slaConfigs.find(
-      (c) => c.category === cat && c.priority === (priority || "Medium")
+      (c) => c.category === cat && c.priority === (priority || "Medium"),
     );
     const hours = rule ? rule.hours : 24;
     return new Date(Date.now() + hours * 60 * 60 * 1000);
@@ -268,45 +390,69 @@ export const TicketDetail = () => {
   const handleUpdate = async (updatedFields) => {
     if (!ticket) return;
 
-    if ('status' in updatedFields) {
+    if ("status" in updatedFields) {
       if (isStatusLockedBySubAssignment) {
-        alert("Action blocked: Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.");
+        alert(
+          "Action blocked: Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.",
+        );
         return;
       }
       if (isStatusLockedByUnassigned) {
-        alert("Action blocked: Operators cannot change the status of an unassigned ticket.");
+        alert(
+          "Action blocked: Operators cannot change the status of an unassigned ticket.",
+        );
         return;
       }
     }
 
     let payload = { ...updatedFields };
 
-    const targetAssignee = 'assignee' in payload ? payload.assignee : (ticket.assignee || "");
-    const rawSubInput = 'subAssignment' in payload ? payload.subAssignment : (ticket.subAssignment || "");
-    const targetSub = rawSubInput === "custom" ? customSubAssignment : rawSubInput;
+    const targetAssignee =
+      "assignee" in payload ? payload.assignee : ticket.assignee || "";
+    const rawSubInput =
+      "subAssignment" in payload
+        ? payload.subAssignment
+        : ticket.subAssignment || "";
+    const targetSub =
+      rawSubInput === "custom" ? customSubAssignment : rawSubInput;
 
-    const isAssignedValid = targetAssignee && targetAssignee !== 'Unassigned' && targetAssignee !== '';
-    const isSubAssignedValid = targetSub && targetSub !== 'Unassigned' && targetSub !== '' && targetSub !== null;
+    const isAssignedValid =
+      targetAssignee &&
+      targetAssignee !== "Unassigned" &&
+      targetAssignee !== "";
+    const isSubAssignedValid =
+      targetSub &&
+      targetSub !== "Unassigned" &&
+      targetSub !== "" &&
+      targetSub !== null;
 
     if (isAssignedValid && isSubAssignedValid) {
-      if (targetAssignee.trim().toLowerCase() === targetSub.trim().toLowerCase()) {
-        alert("Validation Error: The assignee and sub-assignee cannot be the same person.");
+      if (
+        targetAssignee.trim().toLowerCase() === targetSub.trim().toLowerCase()
+      ) {
+        alert(
+          "Validation Error: The assignee and sub-assignee cannot be the same person.",
+        );
         return;
       }
     }
 
-    const restrictedKeywords = ['transporter', 'sales', 'shipper', 'ops'];
+    const restrictedKeywords = ["transporter", "sales", "shipper", "ops"];
     if (isAssignedValid) {
       const lowerAssignee = targetAssignee.toLowerCase();
-      if (restrictedKeywords.some(kw => lowerAssignee.includes(kw))) {
-        alert("Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be assigned tickets.");
+      if (restrictedKeywords.some((kw) => lowerAssignee.includes(kw))) {
+        alert(
+          "Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be assigned tickets.",
+        );
         return;
       }
     }
     if (isSubAssignedValid) {
       const lowerSub = targetSub.toLowerCase();
-      if (restrictedKeywords.some(kw => lowerSub.includes(kw))) {
-        alert("Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be given sub-assignments.");
+      if (restrictedKeywords.some((kw) => lowerSub.includes(kw))) {
+        alert(
+          "Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be given sub-assignments.",
+        );
         return;
       }
     }
@@ -320,19 +466,25 @@ export const TicketDetail = () => {
     const newPriority = payload.priority || ticket.priority;
     payload.slaDeadline = calculateDeadline(newCategory, newPriority);
 
-    if ('assignee' in payload) {
+    if ("assignee" in payload) {
       const oldAssignee = ticket.assignee || "Unassigned";
-      if (payload.assignee !== oldAssignee && payload.assignee !== "Unassigned") {
+      if (
+        payload.assignee !== oldAssignee &&
+        payload.assignee !== "Unassigned"
+      ) {
         payload.assignedAt = new Date().toISOString();
       } else if (payload.assignee === "Unassigned") {
         payload.assignedAt = null;
       }
     }
 
-    if ('subAssignment' in payload) {
-      const finalVal = payload.subAssignment === "custom" ? customSubAssignment : payload.subAssignment;
+    if ("subAssignment" in payload) {
+      const finalVal =
+        payload.subAssignment === "custom"
+          ? customSubAssignment
+          : payload.subAssignment;
       payload.subAssignment = finalVal;
-      
+
       if (finalVal && !ticket.subAssignment) {
         payload.subAssignmentAt = new Date().toISOString();
       } else if (finalVal && ticket.subAssignment !== finalVal) {
@@ -342,9 +494,19 @@ export const TicketDetail = () => {
       }
     }
 
-    if ('status' in payload) {
-      const isNewResolved = ["closed", "resolved", "completed", "done"].includes(payload.status.toLowerCase());
-      const isOldResolved = ["closed", "resolved", "completed", "done"].includes((ticket.status || "").toLowerCase());
+    if ("status" in payload) {
+      const isNewResolved = [
+        "closed",
+        "resolved",
+        "completed",
+        "done",
+      ].includes(payload.status.toLowerCase());
+      const isOldResolved = [
+        "closed",
+        "resolved",
+        "completed",
+        "done",
+      ].includes((ticket.status || "").toLowerCase());
 
       if (isNewResolved && !isOldResolved) {
         payload.resolvedAt = new Date().toISOString();
@@ -364,7 +526,8 @@ export const TicketDetail = () => {
       await axiosInstance.patch(`/tickets/${targetId}`, payload);
       await fetchTickets();
     } catch (err) {
-      const errorMsg = err.response?.data?.message || "Update failed. Check your permissions.";
+      const errorMsg =
+        err.response?.data?.message || "Update failed. Check your permissions.";
       alert(errorMsg);
       await fetchTickets();
     } finally {
@@ -387,25 +550,33 @@ export const TicketDetail = () => {
     }
   };
 
-  if (!ticket) return <div className="p-4 text-center text-slate-500 text-sm">Loading...</div>;
+  if (!ticket)
+    return (
+      <div className="p-4 text-center text-slate-500 text-sm">Loading...</div>
+    );
 
-  const isOverdue = ticket.slaDeadline && new Date(ticket.slaDeadline) < new Date() && !isResolvedState;
-  const ticketGenerator = ticket.generator || ticket.source || "System / Direct";
+  const isOverdue =
+    ticket.slaDeadline &&
+    new Date(ticket.slaDeadline) < new Date() &&
+    !isResolvedState;
+  const ticketGenerator =
+    ticket.generator || ticket.source || "System / Direct";
 
   return (
     <div className="h-full bg-slate-50 overflow-y-auto p-3 sm:p-6 [-webkit-text-size-adjust:100%]">
       <div className="max-w-5xl mx-auto pb-10">
-        
         {/* Header with Back Button */}
         <div className="flex items-center gap-3 sm:gap-4 mb-6">
-          <button 
-            onClick={() => navigate(-1)} 
+          <button
+            onClick={() => navigate(-1)}
             className="p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-100 transition cursor-pointer shrink-0"
           >
             <ArrowLeft size={18} className="text-slate-600" />
           </button>
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-base sm:text-lg font-bold text-slate-800 break-words">Ticket Details: {ticket.ticketId}</h2>
+            <h2 className="text-base sm:text-lg font-bold text-slate-800 break-words">
+              Ticket Details: {ticket.ticketId}
+            </h2>
             {isSalesOp && (
               <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-md font-semibold">
                 Sales Op Mode (Restricted Classification)
@@ -415,14 +586,15 @@ export const TicketDetail = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
           {/* Left Column: Description Panel & Sub Assignment */}
           <div className="lg:col-span-2 space-y-6">
-            <div 
-              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-4 sm:p-5 ${!canEditDesc ? 'cursor-not-allowed' : ''}`}
+            <div
+              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-4 sm:p-5 ${!canEditDesc ? "cursor-not-allowed" : ""}`}
             >
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-3 border-b border-slate-100">
-                <h3 className="font-bold text-slate-800 text-sm">Description</h3>
+                <h3 className="font-bold text-slate-800 text-sm">
+                  Description
+                </h3>
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                   <button
                     onClick={handleDelete}
@@ -436,7 +608,11 @@ export const TicketDetail = () => {
                     disabled={isUpdating || !canEditDesc}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer"
                   >
-                    {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    {isUpdating ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Save size={14} />
+                    )}
                     Save
                   </button>
                 </div>
@@ -452,22 +628,35 @@ export const TicketDetail = () => {
             </div>
 
             {/* Sub Assignment Panel */}
-            <div 
-              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-4 sm:p-5 ${isRestricted || !isPrimaryAssigned || isResolvedState ? 'cursor-not-allowed' : ''}`}
+            <div
+              className={`bg-white border border-slate-200 rounded-xl shadow-xs p-4 sm:p-5 ${isRestricted || !isPrimaryAssigned || isResolvedState ? "cursor-not-allowed" : ""}`}
             >
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                  <UserPlus size={16} className="text-blue-600 shrink-0" /> Sub Assignment
+                  <UserPlus size={16} className="text-blue-600 shrink-0" /> Sub
+                  Assignment
                 </h3>
                 <button
                   onClick={() => {
-                    const finalSubValue = subAssignment === "custom" ? customSubAssignment : subAssignment;
+                    const finalSubValue =
+                      subAssignment === "custom"
+                        ? customSubAssignment
+                        : subAssignment;
                     handleUpdate({ subAssignment: finalSubValue });
                   }}
-                  disabled={isUpdating || isRestricted || !isPrimaryAssigned || isResolvedState}
+                  disabled={
+                    isUpdating ||
+                    isRestricted ||
+                    !isPrimaryAssigned ||
+                    isResolvedState
+                  }
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer self-end sm:self-auto"
                 >
-                  {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  {isUpdating ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Save size={14} />
+                  )}
                   Assign
                 </button>
               </div>
@@ -475,14 +664,18 @@ export const TicketDetail = () => {
               {isRestricted && (
                 <div className="mb-3 p-3 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg flex items-center gap-2">
                   <AlertCircle size={14} className="shrink-0" />
-                  <span>Only Managers and Admins can modify sub-assignments.</span>
+                  <span>
+                    Only Managers and Admins can modify sub-assignments.
+                  </span>
                 </div>
               )}
 
               <div className="space-y-3">
                 <select
                   value={subAssignment}
-                  disabled={isRestricted || !isPrimaryAssigned || isResolvedState}
+                  disabled={
+                    isRestricted || !isPrimaryAssigned || isResolvedState
+                  }
                   onChange={(e) => {
                     const val = e.target.value;
                     setSubAssignment(val);
@@ -493,7 +686,7 @@ export const TicketDetail = () => {
                   <option value="">Select Company User</option>
                   {filteredCompanyUsers.map((u) => {
                     const userName = u.name || u.username;
-                    const userRole = u.role || 'Member';
+                    const userRole = u.role || "Member";
                     return (
                       <option key={u._id || u.id} value={userName}>
                         {userName} ({userRole})
@@ -507,7 +700,9 @@ export const TicketDetail = () => {
                   <input
                     type="text"
                     value={customSubAssignment}
-                    disabled={isRestricted || !isPrimaryAssigned || isResolvedState}
+                    disabled={
+                      isRestricted || !isPrimaryAssigned || isResolvedState
+                    }
                     onChange={(e) => setCustomSubAssignment(e.target.value)}
                     placeholder="Enter custom sub assignment text..."
                     className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
@@ -522,7 +717,8 @@ export const TicketDetail = () => {
             <div className="bg-white border border-slate-200 rounded-xl shadow-xs p-4 sm:p-5 space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-xs font-bold flex items-center gap-2 text-slate-700">
-                  <ShieldAlert size={14} className="text-blue-600 shrink-0" /> Properties
+                  <ShieldAlert size={14} className="text-blue-600 shrink-0" />{" "}
+                  Properties
                 </h3>
               </div>
 
@@ -540,28 +736,24 @@ export const TicketDetail = () => {
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                    <UserCheck size={10} className="shrink-0" /> Assignee (Primary)
+                    <UserCheck size={10} className="shrink-0" /> Assignee
+                    (Primary)
                   </label>
-                  {!isRestricted && (
-                    <button
-                      onClick={() => handleUpdate({ assignee })}
-                      disabled={isUpdating || isResolvedState}
-                      className="text-[10px] text-blue-600 font-semibold hover:underline cursor-pointer disabled:opacity-50"
-                    >
-                      Update
-                    </button>
-                  )}
                 </div>
-                <select 
-                  disabled={isRestricted || isResolvedState} 
-                  value={assignee} 
-                  onChange={(e) => setAssignee(e.target.value)}
+                <select
+                  disabled={isRestricted || isResolvedState || isUpdating}
+                  value={assignee}
+                  onChange={(e) => {
+                    const newAssignee = e.target.value;
+                    setAssignee(newAssignee);
+                    handleUpdate({ assignee: newAssignee }); // Automatically triggers save on change!
+                  }}
                   className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed bg-slate-50"
                 >
                   <option value="Unassigned">Unassigned</option>
                   {filteredCompanyUsers.map((u) => {
                     const userName = u.name || u.username;
-                    const userRole = u.role || 'Member';
+                    const userRole = u.role || "Member";
                     return (
                       <option key={u._id || u.id} value={userName}>
                         {userName} ({userRole})
@@ -573,27 +765,44 @@ export const TicketDetail = () => {
 
               {/* Status Section */}
               <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Status</label>
-                <select 
-                  disabled={!canEditStatus || isStatusLockedBySubAssignment || isStatusLockedByUnassigned} 
-                  value={ticket.status || "Open"} 
-                  onChange={(e) => handleUpdate({ status: e.target.value })} 
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                  Status
+                </label>
+                <select
+                  disabled={
+                    !canEditStatus ||
+                    isStatusLockedBySubAssignment ||
+                    isStatusLockedByUnassigned
+                  }
+                  value={ticket.status || "Open"}
+                  onChange={(e) => handleUpdate({ status: e.target.value })}
                   className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
-                  {["Open", "In Progress", "Resolved"].map((o) => <option key={o} value={o}>{o}</option>)}
+                  {["Open", "In Progress", "Resolved"].map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
                 </select>
                 {isStatusLockedBySubAssignment && (
-                  <span className="text-[9px] text-amber-600 mt-0.5 block">Status change locked because ticket is sub-assigned.</span>
+                  <span className="text-[9px] text-amber-600 mt-0.5 block">
+                    Status change locked because ticket is sub-assigned.
+                  </span>
                 )}
                 {isStatusLockedByUnassigned && (
-                  <span className="text-[9px] text-amber-600 mt-0.5 block">Status change locked because operators cannot modify unassigned tickets.</span>
+                  <span className="text-[9px] text-amber-600 mt-0.5 block">
+                    Status change locked because operators cannot modify
+                    unassigned tickets.
+                  </span>
                 )}
               </div>
 
               {/* Issue Type Field (Restricted for Sales Ops) */}
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Issue Type</label>
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Issue Type
+                  </label>
                   {canEditClassification && (
                     <button
                       onClick={() => handleUpdate({ issueType })}
@@ -612,18 +821,24 @@ export const TicketDetail = () => {
                 >
                   <option value="">Select issue type...</option>
                   {ISSUE_TYPES.map((it) => (
-                    <option key={it} value={it}>{it}</option>
+                    <option key={it} value={it}>
+                      {it}
+                    </option>
                   ))}
                 </select>
                 {!canEditClassification && (
-                  <span className="text-[9px] text-amber-600 mt-0.5 block">Restricted: Only Admin/Manager can set issue type.</span>
+                  <span className="text-[9px] text-amber-600 mt-0.5 block">
+                    Restricted: Only Admin/Manager can set issue type.
+                  </span>
                 )}
               </div>
 
               {/* Category Field (Restricted for Sales Ops) */}
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Category</label>
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Category
+                  </label>
                   {canEditClassification && (
                     <button
                       onClick={() => handleUpdate({ category })}
@@ -634,60 +849,86 @@ export const TicketDetail = () => {
                     </button>
                   )}
                 </div>
-                <select 
-                  disabled={!canEditClassification || isResolvedState} 
-                  value={category} 
-                  onChange={(e) => setCategory(e.target.value)} 
+                <select
+                  disabled={!canEditClassification || isResolvedState}
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
                   className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                   <option value="">Select Category</option>
-                  {categoryOptions.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  {categoryOptions.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
                 </select>
                 {!canEditClassification && (
-                  <span className="text-[9px] text-amber-600 mt-0.5 block">Restricted: Only Admin/Manager can set category.</span>
+                  <span className="text-[9px] text-amber-600 mt-0.5 block">
+                    Restricted: Only Admin/Manager can set category.
+                  </span>
                 )}
               </div>
 
               <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Priority (Auto)</label>
-                <input disabled value={ticket.priority || "Medium"} className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-500 cursor-not-allowed" />
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                  Priority (Auto)
+                </label>
+                <input
+                  disabled
+                  value={ticket.priority || "Medium"}
+                  className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 text-slate-500 cursor-not-allowed"
+                />
               </div>
 
               <div className="pt-2 border-t border-slate-100">
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
                   <Calendar size={10} className="shrink-0" /> SLA Deadline
                 </label>
-                <div className={`w-full p-2 border rounded-lg text-xs font-medium flex items-center gap-2 break-all ${isOverdue ? "bg-red-50 text-red-700 border-red-200" : "bg-slate-50 text-slate-600 border-slate-200"}`}>
+                <div
+                  className={`w-full p-2 border rounded-lg text-xs font-medium flex items-center gap-2 break-all ${isOverdue ? "bg-red-50 text-red-700 border-red-200" : "bg-slate-50 text-slate-600 border-slate-200"}`}
+                >
                   {isOverdue && <AlertCircle size={12} className="shrink-0" />}
-                  <span>{ticket.slaDeadline ? new Date(ticket.slaDeadline).toLocaleString() : "No Deadline Set"}</span>
+                  <span>
+                    {ticket.slaDeadline
+                      ? new Date(ticket.slaDeadline).toLocaleString()
+                      : "No Deadline Set"}
+                  </span>
                 </div>
               </div>
 
               {/* Synchronized Active Duration Trackers */}
               <div className="pt-2 border-t border-slate-100 space-y-2">
                 <div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Primary Assignment Duration</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Primary Assignment Duration
+                  </span>
                   <div className="text-xs font-semibold text-slate-700 mt-0.5 bg-slate-50 p-2 border border-slate-200 rounded-lg break-all">
                     {calculatedMetrics.assignmentTimeFormatted}
                   </div>
                 </div>
 
                 <div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">SLA Active Time</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                    SLA Active Time
+                  </span>
                   <div className="text-xs font-semibold text-blue-700 mt-0.5 bg-blue-50/50 p-2 border border-blue-100 rounded-lg break-all">
                     {calculatedMetrics.slaTimeFormatted}
                   </div>
                 </div>
 
                 <div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Sub-Assignment Active Time</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Sub-Assignment Active Time
+                  </span>
                   <div className="text-xs font-semibold text-purple-700 mt-0.5 bg-purple-50/50 p-2 border border-purple-100 rounded-lg break-all">
                     {calculatedMetrics.subAssignmentTimeFormatted}
                   </div>
                 </div>
 
                 <div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Total Resolution Duration</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Total Resolution Duration
+                  </span>
                   <div className="text-xs font-semibold text-emerald-700 mt-0.5 bg-emerald-50/50 p-2 border border-emerald-100 rounded-lg break-all">
                     {calculatedMetrics.finalResolutionTimeFormatted}
                   </div>
@@ -696,10 +937,13 @@ export const TicketDetail = () => {
 
               <div className="pt-2 border-t border-slate-100">
                 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <Calendar size={10} className="shrink-0" /> Sub Assignment Timestamp
+                  <Calendar size={10} className="shrink-0" /> Sub Assignment
+                  Timestamp
                 </label>
                 <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600 break-all">
-                  {ticket.subAssignmentAt ? new Date(ticket.subAssignmentAt).toLocaleString() : "Not Sub-assigned Yet"}
+                  {ticket.subAssignmentAt
+                    ? new Date(ticket.subAssignmentAt).toLocaleString()
+                    : "Not Sub-assigned Yet"}
                 </div>
               </div>
 
@@ -708,7 +952,9 @@ export const TicketDetail = () => {
                   <Calendar size={10} className="shrink-0" /> Resolved Timestamp
                 </label>
                 <div className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-slate-50 text-slate-600 break-all">
-                  {ticket.resolvedAt ? new Date(ticket.resolvedAt).toLocaleString() : "Not Resolved Yet"}
+                  {ticket.resolvedAt
+                    ? new Date(ticket.resolvedAt).toLocaleString()
+                    : "Not Resolved Yet"}
                 </div>
               </div>
             </div>
