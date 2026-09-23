@@ -28,8 +28,9 @@ export class TicketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     // Optional: Extract companyId from handshake query if clients pass it on connect
     const companyId = client.handshake.query.companyId;
     if (companyId && typeof companyId === 'string') {
-      client.join(`company_${companyId}`);
-      this.logger.debug(`Client ${client.id} automatically joined room: company_${companyId}`);
+      const roomName = `company_${companyId}`;
+      client.join(roomName);
+      this.logger.debug(`Client ${client.id} automatically joined room: ${roomName}`);
     }
   }
 
@@ -55,10 +56,26 @@ export class TicketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
   }
 
   /**
+   * Allows clients to leave a company room
+   */
+  @SubscribeMessage('leaveCompanyRoom')
+  handleLeaveCompanyRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { companyId: string },
+  ) {
+    if (data && data.companyId) {
+      const roomName = `company_${data.companyId}`;
+      client.leave(roomName);
+      this.logger.debug(`Socket ${client.id} left room: ${roomName}`);
+      return { status: 'success', room: roomName };
+    }
+    return { status: 'error', message: 'Missing companyId' };
+  }
+
+  /**
    * Broadcast when a new ticket is created, scoped optionally by companyId
    */
   emitTicketCreated(ticket: any, companyId?: string) {
-    const payload = { event: 'ticketCreated', data: ticket };
     if (companyId) {
       this.server.to(`company_${companyId}`).emit('ticketCreated', ticket);
       this.logger.debug(`Emitted 'ticketCreated' to room company_${companyId}`);

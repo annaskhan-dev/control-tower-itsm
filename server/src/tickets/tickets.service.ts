@@ -332,7 +332,7 @@ export class TicketsService {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
     }
 
-    // 📧 Trigger email notification with robust debug logs
+    // Email notification dispatch
     try {
       this.logger.debug(`[Email Debug] Checking updates - Assignee changed from "${oldPrimaryAssigneeName}" to "${updatedTicket.assignee}"`);
 
@@ -348,41 +348,32 @@ export class TicketsService {
           ] 
         });
         if (foundUser) {
-          this.logger.debug(`[Email Debug] Resolved user object for "${identifier}": email -> ${foundUser.email}`);
           return foundUser;
         }
-        const fallbackObj = { name: identifier, email: identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s+/g, '')}@example.com` };
-        this.logger.debug(`[Email Debug] User not found in DB for "${identifier}", using fallback object: email -> ${fallbackObj.email}`);
-        return fallbackObj;
+        return { name: identifier, email: identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s+/g, '')}@example.com` };
       };
 
-      // 1. Primary Assignee Changed Notification
       if (updateData.assignee !== undefined && updatedTicket.assignee !== oldPrimaryAssigneeName) {
         const oldAssigneeObj = await resolveUserObj(oldPrimaryAssigneeName);
         const newAssigneeObj = await resolveUserObj(updatedTicket.assignee);
 
         if (typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
-          this.logger.log(`[Email Debug] Dispatching sendPrimaryAssigneeChangedEmail...`);
           await this.emailNotificationService.sendPrimaryAssigneeChangedEmail(oldAssigneeObj, newAssigneeObj, updatedTicket);
         }
       }
 
-      // 2. Sub-Assignee Added / Changed Notification
       if (updateData.subAssignment !== undefined && updatedTicket.subAssignment !== oldSubAssignmentName) {
         const primaryAssigneeObj = await resolveUserObj(updatedTicket.assignee);
         const subAssigneeObj = await resolveUserObj(updatedTicket.subAssignment);
 
         if (subAssigneeObj && typeof this.emailNotificationService.sendSubAssigneeAddedEmail === 'function') {
-          this.logger.log(`[Email Debug] Dispatching sendSubAssigneeAddedEmail...`);
           await this.emailNotificationService.sendSubAssigneeAddedEmail(primaryAssigneeObj, subAssigneeObj, updatedTicket);
         }
       }
 
-      // 3. Manager SLA Breach Alert Notification
       const newSlaStatus = (updatedTicket as any).slaStatus;
       if (oldSlaStatus !== 'Breached' && newSlaStatus === 'Breached') {
         if (typeof this.emailNotificationService.sendBreachEmailToManager === 'function') {
-          this.logger.log(`[Email Debug] Dispatching sendBreachEmailToManager...`);
           await this.emailNotificationService.sendBreachEmailToManager(updatedTicket);
         }
       }

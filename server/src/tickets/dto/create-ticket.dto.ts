@@ -21,6 +21,20 @@ class IsNotRestrictedAssigneeConstraint implements ValidatorConstraintInterface 
   }
 }
 
+// Custom validator to ensure assignee and sub-assignee are not the same person
+@ValidatorConstraint({ name: 'isNotSameAsAssignee', async: false })
+class IsNotSameAsAssigneeConstraint implements ValidatorConstraintInterface {
+  validate(value: string, args: ValidationArguments) {
+    const object = args.object as CreateTicketDto;
+    if (!value || !object.assignee) return true;
+    return value.trim().toLowerCase() !== object.assignee.trim().toLowerCase();
+  }
+
+  defaultMessage(args: ValidationArguments) {
+    return `The assignee and sub-assignee cannot be the same person.`;
+  }
+}
+
 export class CreateTicketDto {
   @IsString()
   @IsNotEmpty()
@@ -63,10 +77,11 @@ export class CreateTicketDto {
   @Validate(IsNotRestrictedAssigneeConstraint)
   assignee?: string;
 
-  @ValidateIf((o) => o.assignee && o.assignee.trim() !== '' && o.assignee.toLowerCase() !== 'unassigned')
+  @ValidateIf((o) => o.subAssignment && o.subAssignment.trim() !== '' && o.subAssignment !== 'Unassigned')
   @IsString()
   @IsNotEmpty()
   @Validate(IsNotRestrictedAssigneeConstraint)
+  @Validate(IsNotSameAsAssigneeConstraint)
   subAssignment?: string;
 
   @IsOptional()

@@ -71,6 +71,8 @@ export const TicketSchema = SchemaFactory.createForClass(Ticket);
 TicketSchema.index({ companyId: 1, status: 1 });
 TicketSchema.index({ companyId: 1, createdAt: -1 });
 TicketSchema.index({ companyId: 1, generator: 1 });
+TicketSchema.index({ companyId: 1, assignee: 1, status: 1 });
+TicketSchema.index({ companyId: 1, subAssignment: 1 });
 
 // Mongoose pre-save hook to calculate SLA deadline automatically when category is present/modified
 TicketSchema.pre('save', async function () {
