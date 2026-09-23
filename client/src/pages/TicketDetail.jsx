@@ -806,20 +806,15 @@ export const TicketDetail = () => {
                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
                     Issue Type
                   </label>
-                  {canEditClassification && (
-                    <button
-                      onClick={() => handleUpdate({ issueType })}
-                      disabled={isUpdating || isResolvedState}
-                      className="text-[10px] text-blue-600 font-semibold hover:underline cursor-pointer disabled:opacity-50"
-                    >
-                      Update
-                    </button>
-                  )}
                 </div>
                 <select
-                  disabled={!canEditClassification || isResolvedState}
+                  disabled={!canEditClassification || isResolvedState || isUpdating}
                   value={issueType}
-                  onChange={(e) => setIssueType(e.target.value)}
+                  onChange={(e) => {
+                    const newIssueType = e.target.value;
+                    setIssueType(newIssueType);
+                    handleUpdate({ issueType: newIssueType });
+                  }}
                   className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                   <option value="">Select issue type...</option>
@@ -842,20 +837,15 @@ export const TicketDetail = () => {
                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
                     Category
                   </label>
-                  {canEditClassification && (
-                    <button
-                      onClick={() => handleUpdate({ category })}
-                      disabled={isUpdating || isResolvedState}
-                      className="text-[10px] text-blue-600 font-semibold hover:underline cursor-pointer disabled:opacity-50"
-                    >
-                      Update
-                    </button>
-                  )}
                 </div>
                 <select
-                  disabled={!canEditClassification || isResolvedState}
+                  disabled={!canEditClassification || isResolvedState || isUpdating}
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => {
+                    const newCategory = e.target.value;
+                    setCategory(newCategory);
+                    handleUpdate({ category: newCategory });
+                  }}
                   className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-slate-50 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                   <option value="">Select Category</option>

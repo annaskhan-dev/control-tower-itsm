@@ -5,7 +5,7 @@ const apiBaseUrl = import.meta.env?.VITE_API_URL || process.env?.REACT_APP_API_U
 
 const axiosInstance = axios.create({
   baseURL: `${apiBaseUrl}/api`,
-  timeout: 10000,
+  timeout: 30000, // 30 seconds to handle Railway backend cold starts
 });
 
 console.log("Axios Base URL is set to:", axiosInstance.defaults.baseURL);
@@ -34,10 +34,19 @@ axiosInstance.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
-// Response Interceptor (Safely handles 401 without forcing hard page reloads that cause loops)
+// Response Interceptor (Handles automatic cold-start retries, error logging, and 401 management)
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error.config;
+
+    // Automatically retry once if request timed out or network failed (handles backend cold starts)
+    if (config && (error.code === 'ECONNABORTED' || !error.response) && !config.__isRetry) {
+      config.__isRetry = true;
+      console.warn("Request timed out or network failed. Retrying once due to potential cold start...");
+      return axiosInstance(config);
+    }
+
     if (error.response) {
       console.error(`API Error [${error.config?.url}]:`, error.response.status, error.response.data);
     }
