@@ -14,25 +14,29 @@ export class EmailNotificationService {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
+      host: process.env.SMTP_HOST, // e.g., mwru85p6e7i6.fips.wmjb.mail-manager-smtp.amazonaws.com
       port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: false, // true for 465, false for 587
+      secure: false, // false for port 587 (STARTTLS)
       requireTLS: true,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      // Fix for cloud container timeouts (fails fast instead of hanging)
+      connectionTimeout: 15000, // 15 seconds
+      greetingTimeout: 15000,
+      socketTimeout: 15000,
+      tls: {
+        // Required for AWS FIPS SMTP endpoints to secure the handshake
+        rejectUnauthorized: true,
+      },
     });
   }
 
-  /**
-   * 1. Primary Assignee Changed Notification
-   */
   async sendPrimaryAssigneeChangedEmail(oldAssignee: any, newAssignee: any, ticket: any) {
     const ticketRef = ticket.ticketId || ticket._id;
     const subject = `Ticket Assignment Updated: #${ticketRef}`;
     
-    // Notify old assignee if they existed
     if (oldAssignee?.email) {
       const htmlOld = `
         <div style="font-family: Arial, sans-serif; color: #333;">
@@ -42,7 +46,6 @@ export class EmailNotificationService {
       await this.sendEmail({ to: oldAssignee.email, subject, html: htmlOld });
     }
 
-    // Notify new assignee if they exist
     if (newAssignee?.email) {
       const htmlNew = `
         <div style="font-family: Arial, sans-serif; color: #333;">
@@ -53,14 +56,10 @@ export class EmailNotificationService {
     }
   }
 
-  /**
-   * 2. Sub-Assignee Added Notification
-   */
   async sendSubAssigneeAddedEmail(primaryAssignee: any, subAssignee: any, ticket: any) {
     const ticketRef = ticket.ticketId || ticket._id;
     const subject = `Sub-Assignee Attached: #${ticketRef}`;
 
-    // Notify primary assignee
     if (primaryAssignee?.email) {
       const htmlPrimary = `
         <div style="font-family: Arial, sans-serif; color: #333;">
@@ -70,7 +69,6 @@ export class EmailNotificationService {
       await this.sendEmail({ to: primaryAssignee.email, subject, html: htmlPrimary });
     }
 
-    // Notify the newly added sub-assignee
     if (subAssignee?.email) {
       const htmlSub = `
         <div style="font-family: Arial, sans-serif; color: #333;">
@@ -81,9 +79,6 @@ export class EmailNotificationService {
     }
   }
 
-  /**
-   * 3. Manager SLA Breach Alert
-   */
   async sendBreachEmailToManager(ticket: any) {
     const managerEmail = process.env.MANAGER_EMAIL;
     if (!managerEmail) {
@@ -104,9 +99,6 @@ export class EmailNotificationService {
     await this.sendEmail({ to: managerEmail, subject, html });
   }
 
-  /**
-   * Universal email sender utility
-   */
   async sendEmail({ to, subject, html }: MailOptions) {
     if (!to) return;
     try {
@@ -118,7 +110,7 @@ export class EmailNotificationService {
       });
       this.logger.log(`Email sent successfully: ${info.messageId}`);
     } catch (error: any) {
-      this.logger.error(`Error sending email via AWS SES SMTP: ${error.message}`);
+      this.logger.error(`Error sending email via AWS SES Mail Manager SMTP: ${error.message}`);
     }
   }
 }
