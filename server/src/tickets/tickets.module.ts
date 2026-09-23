@@ -20,7 +20,7 @@ import { AuthModule } from '../auth/auth.module';
   providers: [
     TicketsService,
     TicketsGateway,
-    EmailService, // Registered here so TicketsController can inject it properly
+    EmailService,
   ],
   exports: [
     TicketsService, 

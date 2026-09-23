@@ -76,6 +76,18 @@ export class TicketsService {
   ): Promise<Ticket> {
     try {
       const resolvedCompanyId = companyId || createTicketDto.companyId || 'openport123';
+      const normalizedRole = (userRole || '').replace(/\s+/g, '_').toLowerCase();
+      const isSalesRole = normalizedRole.includes('sales');
+
+      // 🛑 VALIDATION: Restrict Sales Ops from choosing category or incident type upon creation
+      if (isSalesRole) {
+        if (createTicketDto.category) {
+          throw new ForbiddenException('Sales Ops are not allowed to choose the category.');
+        }
+        if (createTicketDto.issueType) {
+          throw new ForbiddenException('Sales Ops are not allowed to choose the incident type.');
+        }
+      }
       
       // 🛑 VALIDATION: Restrict assigning Transporters, Sales Persons, or Shipper Ops
       const restrictedAssignmentKeywords = ['transporter', 'sales', 'shipper', 'ops'];
@@ -150,7 +162,7 @@ export class TicketsService {
       this.ticketsGateway.emitTicketCreated(savedTicket, resolvedCompanyId);
       return savedTicket;
     } catch (error: any) {
-      if (error instanceof BadRequestException) throw error;
+      if (error instanceof BadRequestException || error instanceof ForbiddenException) throw error;
       this.logger.error(`Failed to create ticket: ${error.message}`);
       throw new InternalServerErrorException(`Could not create ticket: ${error.message}`);
     }
@@ -179,11 +191,16 @@ export class TicketsService {
     currentUserName?: string
   ): Promise<Ticket> {
     const normalizedRole = userRole.replace(/\s+/g, '_').toLowerCase();
-    const restrictedUpdateRoles = ['operator', 'transporter', 'shipper_ops', 'sales_person'];
+    const isSalesRole = normalizedRole.includes('sales');
+    const restrictedUpdateRoles = ['operator', 'transporter', 'shipper_ops', 'sales_person', 'sales'];
 
-    if (restrictedUpdateRoles.includes(normalizedRole)) {
+    if (isSalesRole || restrictedUpdateRoles.some(r => normalizedRole.includes(r))) {
       if (updateTicketDto.category !== undefined) {
         throw new ForbiddenException('You are not allowed to update Category.');
+      }
+
+      if (updateTicketDto.issueType !== undefined) {
+        throw new ForbiddenException('You are not allowed to update Incident Type.');
       }
 
       if (updateTicketDto.assignee !== undefined) {
@@ -390,7 +407,7 @@ export class TicketsService {
     }
 
     if (search) {
-      query.title = { $regex: search, $options: 'i' };
+      query.title = { $regex: search,$options: 'i' };
     }
 
     const tickets = await this.ticketModel.find(query).sort({ createdAt: -1 }).exec();
