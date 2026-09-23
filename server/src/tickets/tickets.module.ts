@@ -3,7 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { TicketsController } from './tickets.controller';
 import { TicketsService } from './tickets.service';
 import { TicketsGateway } from './tickets.gateway';
-import { EmailService } from '../services/emailService'; // <-- Adjust path if your EmailService is located elsewhere
+import { EmailService } from '../services/emailService';
 import { Ticket, TicketSchema } from './schemas/ticket.schema';
 import { SlaConfig, SlaConfigSchema } from './schemas/sla-config.schema';
 import { AuthModule } from '../auth/auth.module';
@@ -20,13 +20,13 @@ import { AuthModule } from '../auth/auth.module';
   providers: [
     TicketsService,
     TicketsGateway,
-    EmailService, // <-- Added EmailService here so it can inject the Ticket model properly
+    EmailService, // Registered here so TicketsController can inject it properly
   ],
   exports: [
     TicketsService, 
     TicketsGateway,
-    EmailService, // <-- Exported just in case
-    MongooseModule, // Exported to allow other modules to query Ticket/SlaConfig models
+    EmailService, 
+    MongooseModule, 
   ],
 })
 export class TicketsModule {}

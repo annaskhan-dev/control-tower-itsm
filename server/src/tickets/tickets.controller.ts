@@ -22,6 +22,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Request } from 'express';
+import { EmailService } from '../email/email.service';
 
 interface AuthenticatedRequest extends Request {
   user: { 
@@ -40,7 +41,10 @@ interface AuthenticatedRequest extends Request {
 export class TicketsController {
   private readonly logger = new Logger(TicketsController.name);
 
-  constructor(private readonly ticketsService: TicketsService) {}
+  constructor(
+    private readonly ticketsService: TicketsService,
+    private readonly emailService: EmailService,
+  ) {}
 
   private extractUserName(user: AuthenticatedRequest['user']): string {
     if (user?.name) return user.name;
@@ -176,11 +180,15 @@ export class TicketsController {
       throw new NotFoundException(`Ticket with ID ${id} not found`);
     }
 
+    const oldAssignee = (existingTicket as any).assignee;
+    const oldSubAssignment = (existingTicket as any).subAssignment;
+    const oldSlaStatus = (existingTicket as any).slaStatus || (existingTicket as any).sla_status;
+
     const currentUserName = this.extractUserName(req.user);
     const userRole = req.user.role || '';
     const userRoleLower = userRole.toLowerCase();
 
-    // 🛑 ROBUST ROLE FLAGS (Supports variations like "Support Operator", "Agent", etc.)
+    // 🛑 ROBUST ROLE FLAGS
     const isSalesOp = userRoleLower.includes('sales');
     const isManagerOrAdmin = ['manager', 'super admin', 'admin'].some(r => userRoleLower.includes(r));
     const isOperator = userRoleLower.includes('operator') || userRoleLower.includes('agent');
@@ -200,7 +208,6 @@ export class TicketsController {
     const currentStatus = (existingTicket.status || '').toLowerCase();
     const isAlreadyResolved = ['resolved', 'completed', 'done'].includes(currentStatus);
 
-    // Rule: Once a ticket is resolved, it cannot be modified or opened again
     if (isAlreadyResolved) {
       const isTryingToChangeStatus = updateTicketDto.status !== undefined && 
         !['resolved', 'completed', 'done'].includes(updateTicketDto.status.toLowerCase());
@@ -213,7 +220,6 @@ export class TicketsController {
       }
     }
 
-    // 🛑 VALIDATION: Operators cannot change status if the ticket is unassigned
     const rawAssignee = (existingTicket as any).assignee || (existingTicket as any).assignedTo || (existingTicket as any).assigned_to || "Unassigned";
     const assigneeName = typeof rawAssignee === "string" ? rawAssignee.trim() : (rawAssignee?.name || rawAssignee?.username || "Unassigned");
     const isUnassigned = assigneeName.toLowerCase() === "unassigned" || assigneeName === "";
@@ -223,7 +229,6 @@ export class TicketsController {
       throw new BadRequestException('Action forbidden: Operators cannot change the status of an unassigned ticket.');
     }
 
-    // 🛑 VALIDATION: Restrict assigning Transporters, Sales Persons, or Shipper Ops
     const restrictedAssignmentKeywords = ['transporter', 'sales', 'shipper', 'ops'];
     
     const targetAssignee = updateTicketDto.assignee;
@@ -244,24 +249,90 @@ export class TicketsController {
       }
     }
 
-    const hasSubAssignment = Boolean(existingTicket.subAssignment);
+    const hasSubAssignment = Boolean(oldSubAssignment);
     const isTryingToChangeStatusWithSubAssignment = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
 
-    const isSubAssignee = existingTicket.subAssignment && 
-      existingTicket.subAssignment.trim().toLowerCase() === currentUserName.trim().toLowerCase();
+    const isSubAssignee = oldSubAssignment && 
+      oldSubAssignment.trim().toLowerCase() === currentUserName.trim().toLowerCase();
 
     if (hasSubAssignment && isTryingToChangeStatusWithSubAssignment && !isManagerOrAdmin && !isSubAssignee) {
       throw new BadRequestException('Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.');
     }
 
-    // ✅ FIXED: Flexible check for any operator role variant instead of strict equality === 'Operator'
     if (isOperator && updateTicketDto.assignee !== undefined) {
       updateTicketDto.assignee = currentUserName;
     }
     
     this.logger.debug(`[PATCH/PUT /tickets/${id}] Updating ticket state by: ${currentUserName}`);
 
-    return this.ticketsService.update(id, updateTicketDto, req.user.companyId, userRole, currentUserName);
+    const updatedTicket = await this.ticketsService.update(id, updateTicketDto, req.user.companyId, userRole, currentUserName);
+
+    // --- 📧 NOTIFICATION HOOKS ---
+    try {
+      const ticketIdStr = (updatedTicket as any).ticketId || id;
+      const ticketTitle = (updatedTicket as any).title || 'Untitled Ticket';
+      const updatedAssignee = (updatedTicket as any).assignee;
+      const updatedSubAssignment = (updatedTicket as any).subAssignment;
+      
+      // 1. Assignee Change Notification
+      if (updateTicketDto.assignee !== undefined && oldAssignee !== updatedAssignee) {
+        const subject = `Ticket Assignment Updated: #${ticketIdStr}`;
+        const htmlBody = `<p>The primary assignee for ticket <b>${ticketTitle}</b> has been updated.</p>`;
+
+        if (oldAssignee && typeof oldAssignee === 'object' && (oldAssignee as any).email) {
+          await this.emailService.sendEmail({
+            to: (oldAssignee as any).email,
+            subject,
+            html: `<p>You have been unassigned from ticket #${ticketIdStr}</p>` + htmlBody,
+          });
+        }
+        if (updatedAssignee && typeof updatedAssignee === 'object' && (updatedAssignee as any).email) {
+          await this.emailService.sendEmail({
+            to: (updatedAssignee as any).email,
+            subject,
+            html: `<p>You have been assigned as the primary handler for ticket #${ticketIdStr}</p>` + htmlBody,
+          });
+        }
+      }
+
+      // 2. Sub-Assignment Notification
+      if (updateTicketDto.subAssignment !== undefined && oldSubAssignment !== updatedSubAssignment) {
+        const subject = `Sub-Assignee Update: #${ticketIdStr}`;
+        const htmlBody = `<p>A sub-assignment update occurred on ticket <b>${ticketTitle}</b>.</p>`;
+
+        if (updatedAssignee && typeof updatedAssignee === 'object' && (updatedAssignee as any).email) {
+          await this.emailService.sendEmail({
+            to: (updatedAssignee as any).email,
+            subject,
+            html: htmlBody,
+          });
+        }
+        if (updatedSubAssignment && typeof updatedSubAssignment === 'object' && (updatedSubAssignment as any).email) {
+          await this.emailService.sendEmail({
+            to: (updatedSubAssignment as any).email,
+            subject,
+            html: `<p>You have been assigned as a sub-assignee on ticket #${ticketIdStr}</p>` + htmlBody,
+          });
+        }
+      }
+
+      // 3. Manager SLA Breach Alert
+      const newSlaStatus = (updatedTicket as any).slaStatus || (updatedTicket as any).sla_status;
+      if (oldSlaStatus !== 'Breached' && newSlaStatus === 'Breached') {
+        const managerEmail = process.env.MANAGER_EMAIL;
+        if (managerEmail) {
+          await this.emailService.sendEmail({
+            to: managerEmail,
+            subject: `🚨 SLA BREACH ALERT: Ticket #${ticketIdStr}`,
+            html: `<p>Warning: Ticket <b>${ticketTitle}</b> (ID: ${ticketIdStr}) has breached its SLA deadline.</p>`,
+          });
+        }
+      }
+    } catch (emailErr) {
+      this.logger.error('Failed to dispatch ticket notification emails:', emailErr);
+    }
+
+    return updatedTicket;
   }
 
   @Delete(':id')
