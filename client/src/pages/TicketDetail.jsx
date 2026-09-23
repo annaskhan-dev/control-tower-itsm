@@ -526,8 +526,11 @@ export const TicketDetail = () => {
       await axiosInstance.patch(`/tickets/${targetId}`, payload);
       await fetchTickets();
     } catch (err) {
-      const errorMsg =
-        err.response?.data?.message || "Update failed. Check your permissions.";
+      console.error("Full update error details:", err.response?.data);
+      const dataMsg = err.response?.data?.message;
+      const errorMsg = Array.isArray(dataMsg)
+        ? dataMsg.join(", ")
+        : dataMsg || err.message || "Update failed. Check your permissions.";
       alert(errorMsg);
       await fetchTickets();
     } finally {
@@ -746,7 +749,7 @@ export const TicketDetail = () => {
                   onChange={(e) => {
                     const newAssignee = e.target.value;
                     setAssignee(newAssignee);
-                    handleUpdate({ assignee: newAssignee }); // Automatically triggers save on change!
+                    handleUpdate({ assignee: newAssignee });
                   }}
                   className="w-full p-2 border border-slate-200 rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed bg-slate-50"
                 >
