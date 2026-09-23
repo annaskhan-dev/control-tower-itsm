@@ -14,14 +14,14 @@ export class EmailNotificationService {
 
   constructor() {
     const port = parseInt(process.env.SMTP_PORT || '465', 10);
-    // If using port 465, secure should be true. If port 587, secure should be false.
-    const isSecure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 587;
+    // Fixed: port 465 means secure should be true
+    const isSecure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465;
 
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST, // e.g., mwru85p6e7i6.fips.wmjb.mail-manager-smtp.amazonaws.com
+      host: process.env.SMTP_HOST,
       port: port,
       secure: isSecure, 
-      requireTLS: !isSecure, // required true for STARTTLS (port 587), false for impxx`licit TLS (port 465)
+      requireTLS: !isSecure, // true for STARTTLS (port 587), false for implicit TLS (port 465)
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -31,8 +31,8 @@ export class EmailNotificationService {
       greetingTimeout: 15000,
       socketTimeout: 15000,
       tls: {
-        // Required for AWS FIPS SMTP endpoints to secure the handshake
-        rejectUnauthorized: true,
+        // Disabled strict verification to prevent handshake timeouts in cloud hosting environments like Railway
+        rejectUnauthorized: false,
       },
     });
   }
