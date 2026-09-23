@@ -239,6 +239,10 @@ export class TicketsService {
     const existingTicket = await this.ticketModel.findOne({ ...baseQuery, companyId });
     if (!existingTicket) throw new NotFoundException(`Ticket with ID ${id} not found`);
 
+    const oldPrimaryAssigneeName = existingTicket.assignee;
+    const oldSubAssignmentName = existingTicket.subAssignment;
+    const oldSlaStatus = (existingTicket as any).slaStatus;
+
     // Prevent same person as assignee and sub-assignee during updates
     const targetAssignee = updateTicketDto.assignee !== undefined ? updateTicketDto.assignee : existingTicket.assignee;
     const targetSubAssignment = updateTicketDto.subAssignment !== undefined ? updateTicketDto.subAssignment : existingTicket.subAssignment;
@@ -338,32 +342,43 @@ export class TicketsService {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
     }
 
-    // 📧 Trigger email notification using emailNotificationService with proper object payload
-    if (updateData.assignee !== undefined && updateData.assignee !== existingTicket.assignee) {
-      const newAssigneeName = updateData.assignee;
-      if (newAssigneeName && newAssigneeName !== 'Unassigned') {
-        try {
-          const assignedUser = await this.userModel.findOne({
-            companyId,
-            $or: [
-              { name: new RegExp(`^${newAssigneeName}$`, 'i') },
-              { fullName: new RegExp(`^${newAssigneeName}$`, 'i') },
-              { email: new RegExp(`^${newAssigneeName}$`, 'i') }
-            ]
-          });
+    // 📧 Trigger email notification using emailNotificationService helpers with safe casting
+    try {
+      // 1. Primary Assignee Changed Notification
+      if (updateData.assignee !== undefined && updateData.assignee !== oldPrimaryAssigneeName) {
+        const oldAssigneeObj = oldPrimaryAssigneeName && oldPrimaryAssigneeName !== 'Unassigned' 
+          ? await this.userModel.findOne({ companyId, $or: [{ name: new RegExp(`^${oldPrimaryAssigneeName}$`, 'i') }, { email: new RegExp(`^${oldPrimaryAssigneeName}$`, 'i') }] }) 
+          : null;
+        
+        const newAssigneeObj = updateData.assignee && updateData.assignee !== 'Unassigned' 
+          ? await this.userModel.findOne({ companyId, $or: [{ name: new RegExp(`^${updateData.assignee}$`, 'i') }, { email: new RegExp(`^${updateData.assignee}$`, 'i') }] }) 
+          : null;
 
-          if (assignedUser?.email) {
-            await this.emailNotificationService.sendEmail({
-              to: assignedUser.email,
-              subject: 'New Ticket Assigned',
-              html: `<p>You have been assigned to ticket <strong>#${updatedTicket.ticketId || updatedTicket._id}</strong>.</p>`,
-            });
-            this.logger.log(`Assignment email sent successfully to ${assignedUser.email}`);
-          }
-        } catch (emailErr: any) {
-          this.logger.error(`Failed to send assignment email: ${emailErr.message}`);
+        await this.emailNotificationService.sendPrimaryAssigneeChangedEmail(oldAssigneeObj, newAssigneeObj, updatedTicket);
+      }
+
+      // 2. Sub-Assignee Added / Changed Notification
+      if (updateData.subAssignment !== undefined && updateData.subAssignment !== oldSubAssignmentName) {
+        const primaryAssigneeObj = updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned' 
+          ? await this.userModel.findOne({ companyId, $or: [{ name: new RegExp(`^${updatedTicket.assignee}$`, 'i') }, { email: new RegExp(`^${updatedTicket.assignee}$`, 'i') }] }) 
+          : null;
+        
+        const subAssigneeObj = updateData.subAssignment && updateData.subAssignment !== 'Unassigned' 
+          ? await this.userModel.findOne({ companyId, $or: [{ name: new RegExp(`^${updateData.subAssignment}$`, 'i') }, { email: new RegExp(`^${updateData.subAssignment}$`, 'i') }] }) 
+          : null;
+
+        if (subAssigneeObj) {
+          await this.emailNotificationService.sendSubAssigneeAddedEmail(primaryAssigneeObj, subAssigneeObj, updatedTicket);
         }
       }
+
+      // 3. Manager SLA Breach Alert Notification
+      const newSlaStatus = (updatedTicket as any).slaStatus;
+      if (oldSlaStatus !== 'Breached' && newSlaStatus === 'Breached') {
+        await this.emailNotificationService.sendBreachEmailToManager(updatedTicket);
+      }
+    } catch (emailErr: any) {
+      this.logger.error(`Failed to dispatch email notifications: ${emailErr.message}`);
     }
 
     if (isNewResolved && !isAlreadyResolved) {
