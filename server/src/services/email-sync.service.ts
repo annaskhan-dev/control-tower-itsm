@@ -6,8 +6,8 @@ import { ConfidentialClientApplication } from '@azure/msal-node';
 import { Ticket } from '../tickets/schemas/ticket.schema';
 
 @Injectable()
-export class EmailService {
-  private readonly logger = new Logger(EmailService.name);
+export class EmailSyncService {
+  private readonly logger = new Logger(EmailSyncService.name);
   private isSyncing = false;
   private isAppReady = false;
   

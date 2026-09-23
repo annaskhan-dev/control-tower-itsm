@@ -22,7 +22,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Request } from 'express';
-import { EmailService } from '../email/email.service';
+import { EmailNotificationService } from '../utils/email-notification.service'; // <-- Updated import
 
 interface AuthenticatedRequest extends Request {
   user: { 
@@ -43,7 +43,7 @@ export class TicketsController {
 
   constructor(
     private readonly ticketsService: TicketsService,
-    private readonly emailService: EmailService,
+    private readonly emailNotificationService: EmailNotificationService, // <-- Updated dependency injection
   ) {}
 
   private extractUserName(user: AuthenticatedRequest['user']): string {
@@ -280,14 +280,14 @@ export class TicketsController {
         const htmlBody = `<p>The primary assignee for ticket <b>${ticketTitle}</b> has been updated.</p>`;
 
         if (oldAssignee && typeof oldAssignee === 'object' && (oldAssignee as any).email) {
-          await this.emailService.sendEmail({
+          await this.emailNotificationService.sendEmail({
             to: (oldAssignee as any).email,
             subject,
             html: `<p>You have been unassigned from ticket #${ticketIdStr}</p>` + htmlBody,
           });
         }
         if (updatedAssignee && typeof updatedAssignee === 'object' && (updatedAssignee as any).email) {
-          await this.emailService.sendEmail({
+          await this.emailNotificationService.sendEmail({
             to: (updatedAssignee as any).email,
             subject,
             html: `<p>You have been assigned as the primary handler for ticket #${ticketIdStr}</p>` + htmlBody,
@@ -301,14 +301,14 @@ export class TicketsController {
         const htmlBody = `<p>A sub-assignment update occurred on ticket <b>${ticketTitle}</b>.</p>`;
 
         if (updatedAssignee && typeof updatedAssignee === 'object' && (updatedAssignee as any).email) {
-          await this.emailService.sendEmail({
+          await this.emailNotificationService.sendEmail({
             to: (updatedAssignee as any).email,
             subject,
             html: htmlBody,
           });
         }
         if (updatedSubAssignment && typeof updatedSubAssignment === 'object' && (updatedSubAssignment as any).email) {
-          await this.emailService.sendEmail({
+          await this.emailNotificationService.sendEmail({
             to: (updatedSubAssignment as any).email,
             subject,
             html: `<p>You have been assigned as a sub-assignee on ticket #${ticketIdStr}</p>` + htmlBody,
@@ -321,7 +321,7 @@ export class TicketsController {
       if (oldSlaStatus !== 'Breached' && newSlaStatus === 'Breached') {
         const managerEmail = process.env.MANAGER_EMAIL;
         if (managerEmail) {
-          await this.emailService.sendEmail({
+          await this.emailNotificationService.sendEmail({
             to: managerEmail,
             subject: `🚨 SLA BREACH ALERT: Ticket #${ticketIdStr}`,
             html: `<p>Warning: Ticket <b>${ticketTitle}</b> (ID: ${ticketIdStr}) has breached its SLA deadline.</p>`,
