@@ -150,7 +150,8 @@ export class EmailNotificationService {
       const response = await this.sesClient.send(command);
       this.logger.log(`✅ [EmailDebug] Email sent successfully via AWS SES API! MessageId: ${response.MessageId}`);
     } catch (error: any) {
-      this.logger.error(`❌ [EmailDebug] Error sending email via AWS SES API: ${error.message}`);
+      // Enhanced logging block to surface full stack trace and AWS metadata
+      this.logger.error(`❌ [EmailDebug] Error sending email via AWS SES API: ${error.message}`, error.stack);
       if (error.$metadata) {
         this.logger.error(`[EmailDebug] AWS Error Metadata: ${JSON.stringify(error.$metadata)}`);
       }
