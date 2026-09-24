@@ -334,10 +334,15 @@ export class TicketsService {
 
     // Email notification dispatch
     try {
-      this.logger.debug(`[Email Debug] Checking updates - Assignee present: "${updatedTicket.assignee}"`);
+      this.logger.debug(`[Email Debug] Starting email dispatch check for ticket ID: ${updatedTicket._id}`);
 
       const resolveUserObj = async (identifier: string | null | undefined) => {
-        if (!identifier || identifier === 'Unassigned') return null;
+        if (!identifier || identifier === 'Unassigned') {
+          this.logger.debug(`[Email Debug] Identifier is empty or Unassigned.`);
+          return null;
+        }
+        
+        this.logger.debug(`[Email Debug] Searching user model for identifier: "${identifier}" in company: "${companyId}"`);
         const foundUser = await this.userModel.findOne({ 
           companyId, 
           $or: [
@@ -346,24 +351,36 @@ export class TicketsService {
             { username: new RegExp(`^${identifier}$`, 'i') },
             { email: new RegExp(`^${identifier}$`, 'i') }
           ] 
-        });
+        }).lean();
+        
         if (foundUser) {
+          this.logger.debug(`[Email Debug] Found user in DB: ${JSON.stringify(foundUser)}`);
           return foundUser;
         }
-        return { name: identifier, email: identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s+/g, '')}@example.com` };
+        
+        this.logger.warn(`[Email Debug] User not found in DB for "${identifier}". Using fallback object.`);
+        return { 
+          name: identifier, 
+          fullName: identifier,
+          email: identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s+/g, '')}@example.com` 
+        };
       };
 
-      // Trigger notification whenever an assignee is saved/present on update
-      if (updateData.assignee !== undefined && updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned') {
+      // Force trigger if an assignee is currently set on the ticket
+      if (updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned') {
+        this.logger.debug(`[Email Debug] Processing assignee change email for: "${updatedTicket.assignee}"`);
         const oldAssigneeObj = await resolveUserObj(oldPrimaryAssigneeName);
         const newAssigneeObj = await resolveUserObj(updatedTicket.assignee);
 
-        if (typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
+        if (this.emailNotificationService && typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
           await this.emailNotificationService.sendPrimaryAssigneeChangedEmail(oldAssigneeObj, newAssigneeObj, updatedTicket);
+          this.logger.debug(`[Email Debug] sendPrimaryAssigneeChangedEmail executed successfully.`);
+        } else {
+          this.logger.error(`[Email Debug] sendPrimaryAssigneeChangedEmail is not a function or service is missing.`);
         }
       }
 
-      if (updateData.subAssignment !== undefined && updatedTicket.subAssignment && updatedTicket.subAssignment !== 'Unassigned') {
+      if (updatedTicket.subAssignment && updatedTicket.subAssignment !== 'Unassigned') {
         const primaryAssigneeObj = await resolveUserObj(updatedTicket.assignee);
         const subAssigneeObj = await resolveUserObj(updatedTicket.subAssignment);
 
@@ -379,7 +396,7 @@ export class TicketsService {
         }
       }
     } catch (emailErr: any) {
-      this.logger.error(`Failed to dispatch email notifications: ${emailErr.message}`);
+      this.logger.error(`[Email Debug Error] Failed to dispatch email notifications: ${emailErr.message} stack: ${emailErr.stack}`);
     }
 
     if (isNewResolved && !isAlreadyResolved) {
