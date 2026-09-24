@@ -334,7 +334,7 @@ export class TicketsService {
 
     // Email notification dispatch
     try {
-      this.logger.debug(`[Email Debug] Checking updates - Assignee changed from "${oldPrimaryAssigneeName}" to "${updatedTicket.assignee}"`);
+      this.logger.debug(`[Email Debug] Checking updates - Assignee present: "${updatedTicket.assignee}"`);
 
       const resolveUserObj = async (identifier: string | null | undefined) => {
         if (!identifier || identifier === 'Unassigned') return null;
@@ -353,7 +353,8 @@ export class TicketsService {
         return { name: identifier, email: identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s+/g, '')}@example.com` };
       };
 
-      if (updateData.assignee !== undefined && updatedTicket.assignee !== oldPrimaryAssigneeName) {
+      // Trigger notification whenever an assignee is saved/present on update
+      if (updateData.assignee !== undefined && updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned') {
         const oldAssigneeObj = await resolveUserObj(oldPrimaryAssigneeName);
         const newAssigneeObj = await resolveUserObj(updatedTicket.assignee);
 
@@ -362,7 +363,7 @@ export class TicketsService {
         }
       }
 
-      if (updateData.subAssignment !== undefined && updatedTicket.subAssignment !== oldSubAssignmentName) {
+      if (updateData.subAssignment !== undefined && updatedTicket.subAssignment && updatedTicket.subAssignment !== 'Unassigned') {
         const primaryAssigneeObj = await resolveUserObj(updatedTicket.assignee);
         const subAssigneeObj = await resolveUserObj(updatedTicket.subAssignment);
 
