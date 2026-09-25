@@ -10,40 +10,44 @@ export class EmailNotificationService {
     const port = Number(process.env.SMTP_PORT) || 587;
 
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
+      host: process.env.SMTP_HOST, // mwru85p6e7i6.fips.wmjb.mail-manager-smtp.amazonaws.com
       port: port,
-      secure: false, // false for port 587 (uses STARTTLS upgrade)
-      requireTLS: true, // force STARTTLS upgrade for port 587 security
+      secure: false,  // Must be false for port 587 (uses STARTTLS upgrade)
+      requireTLS: true, // Forces STARTTLS upgrade for port 587 security compliance
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
-      // Safeguards against cloud container connection timeouts on Railway
+      // Safeguards against cloud container connection timeouts on Railway/AWS
       connectionTimeout: 15000, // 15 seconds
       greetingTimeout: 15000,
       socketTimeout: 15000,
       tls: {
-        rejectUnauthorized: false, // avoids strict handshake verification errors in cloud environments
+        rejectUnauthorized: false, // Prevents strict self-signed or FIPS chain verification errors in cloud environments
       },
     });
   }
 
   async sendEmail(to: string, subject: string, htmlBody: string) {
-    if (!to) return;
+    if (!to) {
+      this.logger.warn(`[Email Service] Skipped sendEmail: 'to' address is empty.`);
+      return;
+    }
+
     try {
-      const senderEmail = process.env.EMAIL_FROM || 'alert@openport.com';
+      const senderEmail = process.env.EMAIL_FROM || process.env.SMTP_USER;
 
       const info = await this.transporter.sendMail({
         from: `"Control Tower ITSM" <${senderEmail}>`,
-        to: to, // The registered user's email address
+        to: to,
         subject: subject,
         html: htmlBody,
       });
 
-      this.logger.log(`Email sent successfully to ${to}: ${info.messageId}`);
+      this.logger.log(`✅ [Email Service] Email sent successfully to ${to}: ${info.messageId}`);
       return { success: true, messageId: info.messageId };
     } catch (error: any) {
-      this.logger.error(`Error sending email via SMTP: ${error.message}`, error.stack);
+      this.logger.error(`❌ [Email Service Error] Failed to send email via SMTP: ${error.message}`, error.stack);
       throw error;
     }
   }
@@ -52,16 +56,18 @@ export class EmailNotificationService {
   async sendPrimaryAssigneeChangedEmail(userEmail: string, ticketId: string, assigneeName: string) {
     const subject = `Ticket Assigned: ${ticketId}`;
     const body = `
-      <h3>Hello,</h3>
-      <p>You have been assigned as the primary assignee for ticket <b>${ticketId}</b>.</p>
-      <p>Assigned to: <b>${assigneeName}</b></p>
-      <br/>
-      <p>Best regards,<br/>Control Tower ITSM Team</p>
+      <div style="font-family: Arial, sans-serif; color: #333;">
+        <h3>Hello,</h3>
+        <p>You have been assigned as the primary assignee for ticket <b>${ticketId}</b>.</p>
+        <p>Assigned to: <b>${assigneeName}</b></p>
+        <br/>
+        <p>Best regards,<br/>Control Tower ITSM Team</p>
+      </div>
     `;
     return this.sendEmail(userEmail, subject, body);
   }
 
-  // Added helper function for SLA breaches
+  // Helper function for SLA breaches
   async sendBreachEmailToManager(ticket: any) {
     try {
       const managerEmail = process.env.MANAGER_DEFAULT_EMAIL || process.env.SMTP_USER;
@@ -73,14 +79,16 @@ export class EmailNotificationService {
       const ticketIdentifier = ticket.ticketId || ticket._id;
       const subject = `[Control Tower] SLA Breached: Ticket #${ticketIdentifier}`;
       const htmlBody = `
-        <h3>SLA Breach Alert</h3>
-        <p>The ticket <b>${ticket.title || 'Untitled'}</b> (ID: ${ticketIdentifier}) has breached its SLA deadline.</p>
-        <p><b>Priority:</b> ${ticket.priority || 'Medium'}</p>
-        <p><b>Assignee:</b> ${ticket.assignee || 'Unassigned'}</p>
-        <p><b>Category:</b> ${ticket.category || 'N/A'}</p>
-        <br/>
-        <p>Please review this ticket immediately in the Control Tower dashboard.</p>
-        <p>Best regards,<br/>Control Tower ITSM Team</p>
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <h3 style="color: #d9534f;">SLA Breach Alert</h3>
+          <p>The ticket <b>${ticket.title || 'Untitled'}</b> (ID: ${ticketIdentifier}) has breached its SLA deadline.</p>
+          <p><b>Priority:</b> ${ticket.priority || 'Medium'}</p>
+          <p><b>Assignee:</b> ${ticket.assignee || 'Unassigned'}</p>
+          <p><b>Category:</b> ${ticket.category || 'N/A'}</p>
+          <br/>
+          <p>Please review this ticket immediately in the Control Tower dashboard.</p>
+          <p>Best regards,<br/>Control Tower ITSM Team</p>
+        </div>
       `;
 
       return await this.sendEmail(managerEmail, subject, htmlBody);
