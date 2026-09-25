@@ -4,96 +4,115 @@ import * as nodemailer from 'nodemailer';
 @Injectable()
 export class EmailNotificationService {
   private readonly logger = new Logger(EmailNotificationService.name);
-  private transporter: nodemailer.Transporter;
+  private transporter;
 
   constructor() {
-    const port = Number(process.env.SMTP_PORT) || 587;
-
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST, // mwru85p6e7i6.fips.wmjb.mail-manager-smtp.amazonaws.com
-      port: port,
-      secure: false,  // Must be false for port 587 (uses STARTTLS upgrade)
-      requireTLS: true, // Forces STARTTLS upgrade for port 587 security compliance
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: false, // true for 465, false for 587
+      requireTLS: true,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
-      // Safeguards against cloud container connection timeouts on Railway/AWS
-      connectionTimeout: 15000, // 15 seconds
-      greetingTimeout: 15000,
-      socketTimeout: 15000,
-      tls: {
-        rejectUnauthorized: false, // Prevents strict self-signed or FIPS chain verification errors in cloud environments
-      },
     });
   }
 
-  async sendEmail(to: string, subject: string, htmlBody: string) {
-    if (!to) {
-      this.logger.warn(`[Email Service] Skipped sendEmail: 'to' address is empty.`);
+  /**
+   * 1. Primary Assignee Changed Notification
+   */
+  async sendPrimaryAssigneeChangedEmail(oldAssignee: any, newAssignee: any, ticket: any) {
+    const ticketRef = ticket.ticketId || ticket._id;
+    const subject = `Ticket Assignment Updated: #${ticketRef}`;
+    
+    // Notify old assignee if they existed
+    if (oldAssignee?.email) {
+      const htmlOld = `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <p>You have been unassigned from ticket <b>#${ticketRef}</b> (${ticket.title || 'Untitled'}).</p>
+        </div>
+      `;
+      await this.sendEmail({ to: oldAssignee.email, subject, html: htmlOld });
+    }
+
+    // Notify new assignee if they exist
+    if (newAssignee?.email) {
+      const htmlNew = `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <p>You have been assigned as the primary handler for ticket <b>#${ticketRef}</b> (${ticket.title || 'Untitled'}).</p>
+        </div>
+      `;
+      await this.sendEmail({ to: newAssignee.email, subject, html: htmlNew });
+    }
+  }
+
+  /**
+   * 2. Sub-Assignee Added Notification
+   */
+  async sendSubAssigneeAddedEmail(primaryAssignee: any, subAssignee: any, ticket: any) {
+    const ticketRef = ticket.ticketId || ticket._id;
+    const subject = `Sub-Assignee Attached: #${ticketRef}`;
+
+    // Notify primary assignee
+    if (primaryAssignee?.email) {
+      const htmlPrimary = `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <p>A sub-assignee has been attached to your managed ticket <b>#${ticketRef}</b> (${ticket.title || 'Untitled'}).</p>
+        </div>
+      `;
+      await this.sendEmail({ to: primaryAssignee.email, subject, html: htmlPrimary });
+    }
+
+    // Notify the newly added sub-assignee
+    if (subAssignee?.email) {
+      const htmlSub = `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <p>You have been added as a sub-assignee on ticket <b>#${ticketRef}</b> (${ticket.title || 'Untitled'}).</p>
+        </div>
+      `;
+      await this.sendEmail({ to: subAssignee.email, subject, html: htmlSub });
+    }
+  }
+
+  /**
+   * 3. Manager SLA Breach Alert
+   */
+  async sendBreachEmailToManager(ticket: any) {
+    const managerEmail = process.env.MANAGER_EMAIL;
+    if (!managerEmail) {
+      this.logger.warn('MANAGER_EMAIL is not defined in environment variables. Skipping breach notification email.');
       return;
     }
 
-    try {
-      const senderEmail = process.env.EMAIL_FROM || process.env.SMTP_USER;
-
-      const info = await this.transporter.sendMail({
-        from: `"Control Tower ITSM" <${senderEmail}>`,
-        to: to,
-        subject: subject,
-        html: htmlBody,
-      });
-
-      this.logger.log(`✅ [Email Service] Email sent successfully to ${to}: ${info.messageId}`);
-      return { success: true, messageId: info.messageId };
-    } catch (error: any) {
-      this.logger.error(`❌ [Email Service Error] Failed to send email via SMTP: ${error.message}`, error.stack);
-      throw error;
-    }
-  }
-
-  // Helper function for assignee changes
-  async sendPrimaryAssigneeChangedEmail(userEmail: string, ticketId: string, assigneeName: string) {
-    const subject = `Ticket Assigned: ${ticketId}`;
-    const body = `
+    const ticketRef = ticket.ticketId || ticket._id;
+    const subject = `🚨 SLA BREACH ALERT: Ticket #${ticketRef}`;
+    const html = `
       <div style="font-family: Arial, sans-serif; color: #333;">
-        <h3>Hello,</h3>
-        <p>You have been assigned as the primary assignee for ticket <b>${ticketId}</b>.</p>
-        <p>Assigned to: <b>${assigneeName}</b></p>
-        <br/>
-        <p>Best regards,<br/>Control Tower ITSM Team</p>
+        <h2 style="color: #d9534f;">SLA Breach Notice</h2>
+        <p>Warning: Ticket <b>#${ticketRef}</b> (<b>${ticket.title || 'Untitled'}</b>) has breached its SLA threshold deadline.</p>
+        <p>Please review the control tower portal immediately.</p>
       </div>
     `;
-    return this.sendEmail(userEmail, subject, body);
+
+    await this.sendEmail({ to: managerEmail, subject, html });
   }
 
-  // Helper function for SLA breaches
-  async sendBreachEmailToManager(ticket: any) {
+  /**
+   * Universal email sender utility
+   */
+  async sendEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
+    if (!to) return;
     try {
-      const managerEmail = process.env.MANAGER_DEFAULT_EMAIL || process.env.SMTP_USER;
-      if (!managerEmail) {
-        this.logger.warn(`[Email Service] Skipped breach email: No manager email or SMTP user defined.`);
-        return;
-      }
-
-      const ticketIdentifier = ticket.ticketId || ticket._id;
-      const subject = `[Control Tower] SLA Breached: Ticket #${ticketIdentifier}`;
-      const htmlBody = `
-        <div style="font-family: Arial, sans-serif; color: #333;">
-          <h3 style="color: #d9534f;">SLA Breach Alert</h3>
-          <p>The ticket <b>${ticket.title || 'Untitled'}</b> (ID: ${ticketIdentifier}) has breached its SLA deadline.</p>
-          <p><b>Priority:</b> ${ticket.priority || 'Medium'}</p>
-          <p><b>Assignee:</b> ${ticket.assignee || 'Unassigned'}</p>
-          <p><b>Category:</b> ${ticket.category || 'N/A'}</p>
-          <br/>
-          <p>Please review this ticket immediately in the Control Tower dashboard.</p>
-          <p>Best regards,<br/>Control Tower ITSM Team</p>
-        </div>
-      `;
-
-      return await this.sendEmail(managerEmail, subject, htmlBody);
+      const info = await this.transporter.sendMail({
+        from: `"OpenPort Control Tower" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
+        to,
+        subject,
+        html,
+      });
+      this.logger.log(`Email sent successfully: ${info.messageId}`);
     } catch (error: any) {
-      this.logger.error(`[Email Service Error] Failed to send breach email: ${error.message}`, error.stack);
+      this.logger.error(`Error sending email via AWS SES SMTP: ${error.message}`);
     }
   }
 }
