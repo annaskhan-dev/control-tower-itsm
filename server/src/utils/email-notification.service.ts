@@ -48,7 +48,7 @@ export class EmailNotificationService {
     }
   }
 
-  // Example helper function for assignee changes
+  // Helper function for assignee changes
   async sendPrimaryAssigneeChangedEmail(userEmail: string, ticketId: string, assigneeName: string) {
     const subject = `Ticket Assigned: ${ticketId}`;
     const body = `
@@ -59,5 +59,33 @@ export class EmailNotificationService {
       <p>Best regards,<br/>Control Tower ITSM Team</p>
     `;
     return this.sendEmail(userEmail, subject, body);
+  }
+
+  // Added helper function for SLA breaches
+  async sendBreachEmailToManager(ticket: any) {
+    try {
+      const managerEmail = process.env.MANAGER_DEFAULT_EMAIL || process.env.SMTP_USER;
+      if (!managerEmail) {
+        this.logger.warn(`[Email Service] Skipped breach email: No manager email or SMTP user defined.`);
+        return;
+      }
+
+      const ticketIdentifier = ticket.ticketId || ticket._id;
+      const subject = `[Control Tower] SLA Breached: Ticket #${ticketIdentifier}`;
+      const htmlBody = `
+        <h3>SLA Breach Alert</h3>
+        <p>The ticket <b>${ticket.title || 'Untitled'}</b> (ID: ${ticketIdentifier}) has breached its SLA deadline.</p>
+        <p><b>Priority:</b> ${ticket.priority || 'Medium'}</p>
+        <p><b>Assignee:</b> ${ticket.assignee || 'Unassigned'}</p>
+        <p><b>Category:</b> ${ticket.category || 'N/A'}</p>
+        <br/>
+        <p>Please review this ticket immediately in the Control Tower dashboard.</p>
+        <p>Best regards,<br/>Control Tower ITSM Team</p>
+      `;
+
+      return await this.sendEmail(managerEmail, subject, htmlBody);
+    } catch (error: any) {
+      this.logger.error(`[Email Service Error] Failed to send breach email: ${error.message}`, error.stack);
+    }
   }
 }
