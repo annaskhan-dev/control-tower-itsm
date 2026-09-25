@@ -332,17 +332,15 @@ export class TicketsService {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
     }
 
-    // Email notification dispatch
+    // Email notification dispatch wrapped safely to prevent blocking updates on connection timeout
     try {
       this.logger.debug(`[Email Debug] Starting email dispatch check for ticket ID: ${updatedTicket._id}`);
 
       const resolveUserObj = async (identifier: string | null | undefined) => {
         if (!identifier || identifier === 'Unassigned') {
-          this.logger.debug(`[Email Debug] Identifier is empty or Unassigned.`);
           return null;
         }
         
-        this.logger.debug(`[Email Debug] Searching user model for identifier: "${identifier}" in company: "${companyId}"`);
         const foundUser = await this.userModel.findOne({ 
           companyId, 
           $or: [
@@ -354,11 +352,9 @@ export class TicketsService {
         }).lean();
         
         if (foundUser) {
-          this.logger.debug(`[Email Debug] Found user in DB: ${JSON.stringify(foundUser)}`);
           return foundUser;
         }
         
-        this.logger.warn(`[Email Debug] User not found in DB for "${identifier}". Using fallback object.`);
         return { 
           name: identifier, 
           fullName: identifier,
@@ -366,17 +362,14 @@ export class TicketsService {
         };
       };
 
-      // Force trigger if an assignee is currently set on the ticket
       if (updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned') {
-        this.logger.debug(`[Email Debug] Processing assignee change email for: "${updatedTicket.assignee}"`);
         const oldAssigneeObj = await resolveUserObj(oldPrimaryAssigneeName);
         const newAssigneeObj = await resolveUserObj(updatedTicket.assignee);
 
         if (this.emailNotificationService && typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
-          await this.emailNotificationService.sendPrimaryAssigneeChangedEmail(oldAssigneeObj, newAssigneeObj, updatedTicket);
-          this.logger.debug(`[Email Debug] sendPrimaryAssigneeChangedEmail executed successfully.`);
-        } else {
-          this.logger.error(`[Email Debug] sendPrimaryAssigneeChangedEmail is not a function or service is missing.`);
+          // Fire and safely catch timeouts so it doesn't break response execution
+          this.emailNotificationService.sendPrimaryAssigneeChangedEmail(oldAssigneeObj, newAssigneeObj, updatedTicket)
+            .catch(mailErr => this.logger.error(`[Email Timeout Warning] SMTP connection timed out or failed: ${mailErr.message}`));
         }
       }
 
@@ -385,18 +378,20 @@ export class TicketsService {
         const subAssigneeObj = await resolveUserObj(updatedTicket.subAssignment);
 
         if (subAssigneeObj && typeof this.emailNotificationService.sendSubAssigneeAddedEmail === 'function') {
-          await this.emailNotificationService.sendSubAssigneeAddedEmail(primaryAssigneeObj, subAssigneeObj, updatedTicket);
+          this.emailNotificationService.sendSubAssigneeAddedEmail(primaryAssigneeObj, subAssigneeObj, updatedTicket)
+            .catch(mailErr => this.logger.error(`[Email Timeout Warning] Sub-assignee email failed: ${mailErr.message}`));
         }
       }
 
       const newSlaStatus = (updatedTicket as any).slaStatus;
       if (oldSlaStatus !== 'Breached' && newSlaStatus === 'Breached') {
         if (typeof this.emailNotificationService.sendBreachEmailToManager === 'function') {
-          await this.emailNotificationService.sendBreachEmailToManager(updatedTicket);
+          this.emailNotificationService.sendBreachEmailToManager(updatedTicket)
+            .catch(mailErr => this.logger.error(`[Email Timeout Warning] Breach email failed: ${mailErr.message}`));
         }
       }
     } catch (emailErr: any) {
-      this.logger.error(`[Email Debug Error] Failed to dispatch email notifications: ${emailErr.message} stack: ${emailErr.stack}`);
+      this.logger.error(`[Email Debug Error] Failed to dispatch email notifications: ${emailErr.message}`);
     }
 
     if (isNewResolved && !isAlreadyResolved) {
