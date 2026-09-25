@@ -40,7 +40,6 @@ export class TicketsService {
     }
   }
 
-  // Strictly enforces that subAssignment ALWAYS takes precedence for resolution credit if it exists
   private getEffectiveResolver(ticket: any, fallbackTicket?: any, updatePayload?: any): string {
     const payloadSub = updatePayload?.subAssignment;
     if (payloadSub && typeof payloadSub === 'string' && payloadSub !== 'Unassigned' && payloadSub.trim() !== '' && payloadSub !== 'null') {
@@ -333,11 +332,17 @@ export class TicketsService {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
     }
 
-    // 📧 Trigger email notifications and handle user lookup logging
+    // Email notification dispatch
     try {
+      this.logger.debug(`[Email Debug] Starting email dispatch check for ticket ID: ${updatedTicket._id}`);
+
       const resolveUserObj = async (identifier: string | null | undefined) => {
-        if (!identifier || identifier === 'Unassigned') return null;
-        this.logger.debug(`[Email Debug] Searching user model for identifier: "${identifier}"`);
+        if (!identifier || identifier === 'Unassigned') {
+          this.logger.debug(`[Email Debug] Identifier is empty or Unassigned.`);
+          return null;
+        }
+        
+        this.logger.debug(`[Email Debug] Searching user model for identifier: "${identifier}" in company: "${companyId}"`);
         const foundUser = await this.userModel.findOne({ 
           companyId, 
           $or: [
@@ -346,36 +351,44 @@ export class TicketsService {
             { username: new RegExp(`^${identifier}$`, 'i') },
             { email: new RegExp(`^${identifier}$`, 'i') }
           ] 
-        });
+        }).lean();
+        
         if (foundUser) {
           this.logger.debug(`[Email Debug] Found user in DB: ${JSON.stringify(foundUser)}`);
           return foundUser;
         }
-        return { name: identifier, email: identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s+/g, '')}@example.com` };
+        
+        this.logger.warn(`[Email Debug] User not found in DB for "${identifier}". Using fallback object.`);
+        return { 
+          name: identifier, 
+          fullName: identifier,
+          email: identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s+/g, '')}@example.com` 
+        };
       };
 
-      // 1. Primary Assignee Changed Notification
-      if (updateData.assignee !== undefined) {
-        this.logger.debug(`[Email Debug] Processing assignee change email for: "${updateData.assignee}"`);
+      // Force trigger if an assignee is currently set on the ticket
+      if (updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned') {
+        this.logger.debug(`[Email Debug] Processing assignee change email for: "${updatedTicket.assignee}"`);
         const oldAssigneeObj = await resolveUserObj(oldPrimaryAssigneeName);
-        const newAssigneeObj = await resolveUserObj(updateData.assignee);
+        const newAssigneeObj = await resolveUserObj(updatedTicket.assignee);
 
-        if (typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
+        if (this.emailNotificationService && typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
           await this.emailNotificationService.sendPrimaryAssigneeChangedEmail(oldAssigneeObj, newAssigneeObj, updatedTicket);
+          this.logger.debug(`[Email Debug] sendPrimaryAssigneeChangedEmail executed successfully.`);
+        } else {
+          this.logger.error(`[Email Debug] sendPrimaryAssigneeChangedEmail is not a function or service is missing.`);
         }
       }
 
-      // 2. Sub-Assignee Added / Changed Notification
-      if (updateData.subAssignment !== undefined && updateData.subAssignment !== oldSubAssignmentName) {
+      if (updatedTicket.subAssignment && updatedTicket.subAssignment !== 'Unassigned') {
         const primaryAssigneeObj = await resolveUserObj(updatedTicket.assignee);
-        const subAssigneeObj = await resolveUserObj(updateData.subAssignment);
+        const subAssigneeObj = await resolveUserObj(updatedTicket.subAssignment);
 
         if (subAssigneeObj && typeof this.emailNotificationService.sendSubAssigneeAddedEmail === 'function') {
           await this.emailNotificationService.sendSubAssigneeAddedEmail(primaryAssigneeObj, subAssigneeObj, updatedTicket);
         }
       }
 
-      // 3. Manager SLA Breach Alert Notification
       const newSlaStatus = (updatedTicket as any).slaStatus;
       if (oldSlaStatus !== 'Breached' && newSlaStatus === 'Breached') {
         if (typeof this.emailNotificationService.sendBreachEmailToManager === 'function') {
@@ -383,7 +396,7 @@ export class TicketsService {
         }
       }
     } catch (emailErr: any) {
-      this.logger.error(`Failed to dispatch email notifications: ${emailErr.message}`);
+      this.logger.error(`[Email Debug Error] Failed to dispatch email notifications: ${emailErr.message} stack: ${emailErr.stack}`);
     }
 
     if (isNewResolved && !isAlreadyResolved) {
