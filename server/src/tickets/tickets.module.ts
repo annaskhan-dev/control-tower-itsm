@@ -7,7 +7,7 @@ import { EmailSyncService } from '../services/email-sync.service';
 import { EmailNotificationService } from '../utils/email-notification.service';
 import { Ticket, TicketSchema } from './schemas/ticket.schema';
 import { SlaConfig, SlaConfigSchema } from './schemas/sla-config.schema';
-import { User, UserSchema } from '../users/schemas/user.schema'; // 👈 Make sure this path points to your actual user schema
+import { User, UserSchema } from '../users/schemas/user.schema';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -15,7 +15,7 @@ import { AuthModule } from '../auth/auth.module';
     MongooseModule.forFeature([
       { name: Ticket.name, schema: TicketSchema },
       { name: SlaConfig.name, schema: SlaConfigSchema },
-      { name: 'User', schema: UserSchema }, // 👈 Added this so userModel can be injected in TicketsService
+      { name: 'User', schema: UserSchema },
     ]),
     AuthModule,
   ],
