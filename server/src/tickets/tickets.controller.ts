@@ -283,48 +283,48 @@ export class TicketsController {
       // 1. Assignee Change Notification
       if (updateTicketDto.assignee !== undefined && oldAssignee !== updatedAssignee) {
         const subject = `Ticket Assignment Updated: #${ticketIdStr}`;
-        const baseHtml = `<p>The primary assignee for ticket <b>${ticketTitle}</b> has been updated.</p>`;
+        const htmlBody = `<p>The primary assignee for ticket <b>${ticketTitle}</b> has been updated.</p>`;
 
         const oldEmail = await getEmailByName(oldAssignee);
         if (oldEmail) {
-          await this.emailNotificationService.sendEmail(
-            oldEmail,
+          await this.emailNotificationService.sendEmail({
+            to: oldEmail,
             subject,
-            `<p>You have been unassigned from ticket #${ticketIdStr}</p>` + baseHtml
-          );
+            html: `<p>You have been unassigned from ticket #${ticketIdStr}</p>` + htmlBody,
+          });
         }
         
         const newEmail = await getEmailByName(updatedAssignee);
         if (newEmail) {
-          await this.emailNotificationService.sendEmail(
-            newEmail,
+          await this.emailNotificationService.sendEmail({
+            to: newEmail,
             subject,
-            `<p>You have been assigned as the primary handler for ticket #${ticketIdStr}</p>` + baseHtml
-          );
+            html: `<p>You have been assigned as the primary handler for ticket #${ticketIdStr}</p>` + htmlBody,
+          });
         }
       }
 
       // 2. Sub-Assignment Notification
       if (updateTicketDto.subAssignment !== undefined && oldSubAssignment !== updatedSubAssignment) {
         const subject = `Sub-Assignee Update: #${ticketIdStr}`;
-        const baseHtml = `<p>A sub-assignment update occurred on ticket <b>${ticketTitle}</b>.</p>`;
+        const htmlBody = `<p>A sub-assignment update occurred on ticket <b>${ticketTitle}</b>.</p>`;
 
         const primaryEmail = await getEmailByName(updatedAssignee);
         if (primaryEmail) {
-          await this.emailNotificationService.sendEmail(
-            primaryEmail,
+          await this.emailNotificationService.sendEmail({
+            to: primaryEmail,
             subject,
-            baseHtml
-          );
+            html: htmlBody,
+          });
         }
         
         const subEmail = await getEmailByName(updatedSubAssignment);
         if (subEmail) {
-          await this.emailNotificationService.sendEmail(
-            subEmail,
+          await this.emailNotificationService.sendEmail({
+            to: subEmail,
             subject,
-            `<p>You have been assigned as a sub-assignee on ticket #${ticketIdStr}</p>` + baseHtml
-          );
+            html: `<p>You have been assigned as a sub-assignee on ticket #${ticketIdStr}</p>` + htmlBody,
+          });
         }
       }
 
@@ -333,11 +333,11 @@ export class TicketsController {
       if (oldSlaStatus !== 'Breached' && newSlaStatus === 'Breached') {
         const managerEmail = process.env.MANAGER_EMAIL;
         if (managerEmail) {
-          await this.emailNotificationService.sendEmail(
-            managerEmail,
-            `🚨 SLA BREACH ALERT: Ticket #${ticketIdStr}`,
-            `<p>Warning: Ticket <b>${ticketTitle}</b> (ID: ${ticketIdStr}) has breached its SLA deadline.</p>`
-          );
+          await this.emailNotificationService.sendEmail({
+            to: managerEmail,
+            subject: `🚨 SLA BREACH ALERT: Ticket #${ticketIdStr}`,
+            html: `<p>Warning: Ticket <b>${ticketTitle}</b> (ID: ${ticketIdStr}) has breached its SLA deadline.</p>`,
+          });
         }
       }
     } catch (emailErr) {

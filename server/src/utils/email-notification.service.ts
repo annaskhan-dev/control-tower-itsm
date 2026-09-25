@@ -1,6 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
+interface SendEmailOptions {
+  to: string;
+  subject: string;
+  html: string;
+}
+
 @Injectable()
 export class EmailNotificationService {
   private readonly logger = new Logger(EmailNotificationService.name);
@@ -16,6 +22,9 @@ export class EmailNotificationService {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 15000,
     });
   }
 
@@ -101,7 +110,7 @@ export class EmailNotificationService {
   /**
    * Universal email sender utility
    */
-  async sendEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
+  async sendEmail({ to, subject, html }: SendEmailOptions) {
     if (!to) return;
     try {
       const info = await this.transporter.sendMail({
@@ -112,7 +121,7 @@ export class EmailNotificationService {
       });
       this.logger.log(`Email sent successfully: ${info.messageId}`);
     } catch (error: any) {
-      this.logger.error(`Error sending email via AWS SES SMTP: ${error.message}`);
+      this.logger.error(`Error sending email via SMTP: ${error.message}`);
     }
   }
 }
