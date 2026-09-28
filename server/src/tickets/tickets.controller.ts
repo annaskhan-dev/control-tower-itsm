@@ -108,15 +108,15 @@ export class TicketsController {
       source: formattedSource,
     };
 
-    this.logger.debug(`[POST /tickets] Creating ticket by user: ${userName}, role: ${userRole}, generator: ${enrichedTicketDto.generator}`);
-
-    return await this.ticketsService.create(
+    const savedTicket = await this.ticketsService.create(
       enrichedTicketDto, 
       req.user.companyId, 
       userRole, 
       userName, 
       userId
     );
+
+    return savedTicket;
   }
 
   @Get('stats')
@@ -124,11 +124,7 @@ export class TicketsController {
   async getStats(@Req() req: AuthenticatedRequest) {
     const userRole = req.user.role || '';
     const userName = this.extractUserName(req.user);
-    
-    this.logger.debug(`[GET /tickets/stats] Fetching operational statistics for company: ${req.user.companyId}`);
-
-    const statsResult = await this.ticketsService.getStats(req.user.companyId, userRole, userName);
-    return statsResult;
+    return await this.ticketsService.getStats(req.user.companyId, userRole, userName);
   }
 
   @Get()
@@ -140,9 +136,6 @@ export class TicketsController {
   ) {
     const userRole = req.user.role || '';
     const userName = this.extractUserName(req.user);
-    
-    this.logger.debug(`[GET /tickets] Request received from user: ${userName}, role: ${userRole}, queue: ${queue}`);
-
     return this.ticketsService.findAll(search, queue, req.user.companyId, userRole, userName);
   }
 
@@ -180,20 +173,14 @@ export class TicketsController {
       throw new NotFoundException(`Ticket with ID ${id} not found`);
     }
 
-    const oldAssignee = (existingTicket as any).assignee;
-    const oldSubAssignment = (existingTicket as any).subAssignment;
-    const oldSlaStatus = (existingTicket as any).slaStatus || (existingTicket as any).sla_status;
-
     const currentUserName = this.extractUserName(req.user);
     const userRole = req.user.role || '';
     const userRoleLower = userRole.toLowerCase();
 
-    // 🛑 ROBUST ROLE FLAGS
     const isSalesOp = userRoleLower.includes('sales');
     const isManagerOrAdmin = ['manager', 'super admin', 'admin'].some(r => userRoleLower.includes(r));
     const isOperator = userRoleLower.includes('operator') || userRoleLower.includes('agent');
 
-    // 🛑 VALIDATION: Restrict Sales Ops / Sales users from changing Category or Issue Type
     if (isSalesOp && !isManagerOrAdmin) {
       const isChangingCategory = updateTicketDto.category !== undefined && updateTicketDto.category !== existingTicket.category;
       const dtoIssueType = updateTicketDto.issueType || (updateTicketDto as any).issue_type;
@@ -220,129 +207,11 @@ export class TicketsController {
       }
     }
 
-    const rawAssignee = (existingTicket as any).assignee || (existingTicket as any).assignedTo || (existingTicket as any).assigned_to || "Unassigned";
-    const assigneeName = typeof rawAssignee === "string" ? rawAssignee.trim() : (rawAssignee?.name || rawAssignee?.username || "Unassigned");
-    const isUnassigned = assigneeName.toLowerCase() === "unassigned" || assigneeName === "";
-    const isTryingToChangeStatus = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
-
-    if (isOperator && isUnassigned && isTryingToChangeStatus) {
-      throw new BadRequestException('Action forbidden: Operators cannot change the status of an unassigned ticket.');
-    }
-
-    const restrictedAssignmentKeywords = ['transporter', 'sales', 'shipper', 'ops'];
-    
-    const targetAssignee = updateTicketDto.assignee;
-    if (targetAssignee && targetAssignee !== 'Unassigned') {
-      const lowerAssignee = targetAssignee.toLowerCase();
-      const isRestricted = restrictedAssignmentKeywords.some(keyword => lowerAssignee.includes(keyword));
-      if (isRestricted) {
-        throw new BadRequestException('Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be assigned tickets.');
-      }
-    }
-
-    const targetSubAssignment = updateTicketDto.subAssignment;
-    if (targetSubAssignment && targetSubAssignment !== '' && targetSubAssignment !== 'Unassigned') {
-      const lowerSub = targetSubAssignment.toLowerCase();
-      const isRestrictedSub = restrictedAssignmentKeywords.some(keyword => lowerSub.includes(keyword));
-      if (isRestrictedSub) {
-        throw new BadRequestException('Action forbidden: Transporters, Sales Persons, and Shipper Ops cannot be given sub-assignments.');
-      }
-    }
-
-    const hasSubAssignment = Boolean(oldSubAssignment);
-    const isTryingToChangeStatusWithSubAssignment = updateTicketDto.status !== undefined && updateTicketDto.status !== existingTicket.status;
-
-    const isSubAssignee = oldSubAssignment && 
-      oldSubAssignment.trim().toLowerCase() === currentUserName.trim().toLowerCase();
-
-    if (hasSubAssignment && isTryingToChangeStatusWithSubAssignment && !isManagerOrAdmin && !isSubAssignee) {
-      throw new BadRequestException('Primary assignees are no longer able to change the ticket status once a ticket is sub-assigned.');
-    }
-
     if (isOperator && updateTicketDto.assignee !== undefined) {
       updateTicketDto.assignee = currentUserName;
     }
     
-    this.logger.debug(`[PATCH/PUT /tickets/${id}] Updating ticket state by: ${currentUserName}`);
-
     const updatedTicket = await this.ticketsService.update(id, updateTicketDto, req.user.companyId, userRole, currentUserName);
-
-    // --- 📧 NOTIFICATION HOOKS ---
-    try {
-      const ticketIdStr = (updatedTicket as any).ticketId || id;
-      const ticketTitle = (updatedTicket as any).title || 'Untitled Ticket';
-      const updatedAssignee = (updatedTicket as any).assignee || (updatedTicket as any).assignedTo;
-      const updatedSubAssignment = (updatedTicket as any).subAssignment;
-      
-      // Helper function to resolve assignee/user name string into an email address
-      const getEmailByName = async (name: string): Promise<string | null> => {
-        if (!name || name === 'Unassigned') return null;
-        return process.env.DEFAULT_NOTIFICATION_EMAIL || null; 
-      };
-
-      // 1. Assignee Change Notification
-      if (updateTicketDto.assignee !== undefined && oldAssignee !== updatedAssignee) {
-        const subject = `Ticket Assignment Updated: #${ticketIdStr}`;
-        const htmlBody = `<p>The primary assignee for ticket <b>${ticketTitle}</b> has been updated.</p>`;
-
-        const oldEmail = await getEmailByName(oldAssignee);
-        if (oldEmail) {
-          await this.emailNotificationService.sendEmail({
-            to: oldEmail,
-            subject,
-            html: `<p>You have been unassigned from ticket #${ticketIdStr}</p>` + htmlBody,
-          });
-        }
-        
-        const newEmail = await getEmailByName(updatedAssignee);
-        if (newEmail) {
-          await this.emailNotificationService.sendEmail({
-            to: newEmail,
-            subject,
-            html: `<p>You have been assigned as the primary handler for ticket #${ticketIdStr}</p>` + htmlBody,
-          });
-        }
-      }
-
-      // 2. Sub-Assignment Notification
-      if (updateTicketDto.subAssignment !== undefined && oldSubAssignment !== updatedSubAssignment) {
-        const subject = `Sub-Assignee Update: #${ticketIdStr}`;
-        const htmlBody = `<p>A sub-assignment update occurred on ticket <b>${ticketTitle}</b>.</p>`;
-
-        const primaryEmail = await getEmailByName(updatedAssignee);
-        if (primaryEmail) {
-          await this.emailNotificationService.sendEmail({
-            to: primaryEmail,
-            subject,
-            html: htmlBody,
-          });
-        }
-        
-        const subEmail = await getEmailByName(updatedSubAssignment);
-        if (subEmail) {
-          await this.emailNotificationService.sendEmail({
-            to: subEmail,
-            subject,
-            html: `<p>You have been assigned as a sub-assignee on ticket #${ticketIdStr}</p>` + htmlBody,
-          });
-        }
-      }
-
-      // 3. Manager SLA Breach Alert
-      const newSlaStatus = (updatedTicket as any).slaStatus || (updatedTicket as any).sla_status;
-      if (oldSlaStatus !== 'Breached' && newSlaStatus === 'Breached') {
-        const managerEmail = process.env.MANAGER_EMAIL;
-        if (managerEmail) {
-          await this.emailNotificationService.sendEmail({
-            to: managerEmail,
-            subject: `🚨 SLA BREACH ALERT: Ticket #${ticketIdStr}`,
-            html: `<p>Warning: Ticket <b>${ticketTitle}</b> (ID: ${ticketIdStr}) has breached its SLA deadline.</p>`,
-          });
-        }
-      }
-    } catch (emailErr) {
-      this.logger.error('Failed to dispatch ticket notification emails:', emailErr);
-    }
 
     return updatedTicket;
   }

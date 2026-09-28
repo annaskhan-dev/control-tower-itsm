@@ -64,6 +64,48 @@ export class TicketsService {
     return 'Unassigned';
   }
 
+  private async resolveUserObj(companyId: string, identifier: string | null | undefined) {
+    if (!identifier || identifier === 'Unassigned') {
+      return null;
+    }
+    
+    const foundUser = await this.userModel.findOne({ 
+      companyId, 
+      $or: [
+        { name: new RegExp(`^${identifier}$`, 'i') }, 
+        { fullName: new RegExp(`^${identifier}$`, 'i') },
+        { username: new RegExp(`^${identifier}$`, 'i') },
+        { email: new RegExp(`^${identifier}$`, 'i') }
+      ] 
+    }).lean();
+    
+    if (foundUser) {
+      return foundUser;
+    }
+    
+    return { 
+      name: identifier, 
+      fullName: identifier,
+      email: identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s+/g, '')}@example.com` 
+    };
+  }
+
+  private async sendCreationNotification(savedTicket: TicketDocument, companyId: string) {
+    try {
+      if (!this.emailNotificationService) return;
+      const assigneeName = (savedTicket as any).assignee;
+      if (assigneeName && assigneeName !== 'Unassigned') {
+        const assigneeObj = await this.resolveUserObj(companyId, assigneeName);
+        if (assigneeObj && typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
+          this.emailNotificationService.sendPrimaryAssigneeChangedEmail(null, assigneeObj, savedTicket)
+            .catch(mailErr => this.logger.error(`[Email Timeout Warning] Creation assignment email failed: ${mailErr.message}`));
+        }
+      }
+    } catch (err: any) {
+      this.logger.error(`[Email Debug Error] Failed to dispatch ticket creation notifications: ${err.message}`);
+    }
+  }
+
   async create(
     createTicketDto: CreateTicketDto, 
     companyId: string, 
@@ -152,6 +194,9 @@ export class TicketsService {
 
       const createdTicket = new this.ticketModel(ticketData);
       const savedTicket = await createdTicket.save();
+
+      // Trigger asynchronous non-blocking email notification for creation
+      this.sendCreationNotification(savedTicket, resolvedCompanyId);
 
       this.ticketsGateway.emitTicketCreated(savedTicket, resolvedCompanyId);
       return savedTicket;
@@ -336,46 +381,46 @@ export class TicketsService {
     try {
       this.logger.debug(`[Email Debug] Starting email dispatch check for ticket ID: ${updatedTicket._id}`);
 
-      const resolveUserObj = async (identifier: string | null | undefined) => {
-        if (!identifier || identifier === 'Unassigned') {
-          return null;
-        }
-        
-        const foundUser = await this.userModel.findOne({ 
-          companyId, 
-          $or: [
-            { name: new RegExp(`^${identifier}$`, 'i') }, 
-            { fullName: new RegExp(`^${identifier}$`, 'i') },
-            { username: new RegExp(`^${identifier}$`, 'i') },
-            { email: new RegExp(`^${identifier}$`, 'i') }
-          ] 
-        }).lean();
-        
-        if (foundUser) {
-          return foundUser;
-        }
-        
-        return { 
-          name: identifier, 
-          fullName: identifier,
-          email: identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s+/g, '')}@example.com` 
-        };
-      };
+      const normalizedOldAssignee = (oldPrimaryAssigneeName || 'Unassigned').trim().toLowerCase();
+      const normalizedNewAssignee = (updatedTicket.assignee || 'Unassigned').trim().toLowerCase();
+      
+      const isAssignedToSomeone = normalizedNewAssignee !== 'unassigned' && normalizedNewAssignee !== '';
+      const wasAssignedToSomeone = normalizedOldAssignee !== 'unassigned' && normalizedOldAssignee !== '';
+      const hasAssigneeChanged = normalizedOldAssignee !== normalizedNewAssignee;
 
-      if (updatedTicket.assignee && updatedTicket.assignee !== 'Unassigned') {
-        const oldAssigneeObj = await resolveUserObj(oldPrimaryAssigneeName);
-        const newAssigneeObj = await resolveUserObj(updatedTicket.assignee);
+      const normalizedOldSub = (oldSubAssignmentName || 'Unassigned').trim().toLowerCase();
+      const normalizedNewSub = (updatedTicket.subAssignment || 'Unassigned').trim().toLowerCase();
+      const hasSubChanged = normalizedOldSub !== normalizedNewSub && normalizedNewSub !== 'unassigned' && normalizedNewSub !== '';
 
-        if (this.emailNotificationService && typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
-          // Fire and safely catch timeouts so it doesn't break response execution
-          this.emailNotificationService.sendPrimaryAssigneeChangedEmail(oldAssigneeObj, newAssigneeObj, updatedTicket)
-            .catch(mailErr => this.logger.error(`[Email Timeout Warning] SMTP connection timed out or failed: ${mailErr.message}`));
+      // MUTUALLY EXCLUSIVE EMAIL DISPATCH (Guarantees ONLY ONE email block evaluates per event)
+      if (hasAssigneeChanged && this.emailNotificationService) {
+        if (isAssignedToSomeone && !wasAssignedToSomeone) {
+          // Case 1: Ticket moved from Unassigned -> Assigned
+          const newAssigneeObj = await this.resolveUserObj(companyId, updatedTicket.assignee);
+          if (typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
+            this.emailNotificationService.sendPrimaryAssigneeChangedEmail(null, newAssigneeObj, updatedTicket)
+                .catch(mailErr => this.logger.error(`[Email Timeout Warning] Assignment email failed: ${mailErr.message}`));
+          }
+        } else if (!isAssignedToSomeone && wasAssignedToSomeone) {
+          // Case 2: Ticket moved from Assigned -> Unassigned
+          const oldAssigneeObj = await this.resolveUserObj(companyId, oldPrimaryAssigneeName);
+          if (typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
+            this.emailNotificationService.sendPrimaryAssigneeChangedEmail(oldAssigneeObj, null, updatedTicket)
+                .catch(mailErr => this.logger.error(`[Email Timeout Warning] Unassignment email failed: ${mailErr.message}`));
+          }
+        } else if (isAssignedToSomeone && wasAssignedToSomeone) {
+          // Case 3: Reassigned from Person A -> Person B
+          const oldAssigneeObj = await this.resolveUserObj(companyId, oldPrimaryAssigneeName);
+          const newAssigneeObj = await this.resolveUserObj(companyId, updatedTicket.assignee);
+          if (typeof this.emailNotificationService.sendPrimaryAssigneeChangedEmail === 'function') {
+            this.emailNotificationService.sendPrimaryAssigneeChangedEmail(oldAssigneeObj, newAssigneeObj, updatedTicket)
+                .catch(mailErr => this.logger.error(`[Email Timeout Warning] Reassignment email failed: ${mailErr.message}`));
+          }
         }
-      }
-
-      if (updatedTicket.subAssignment && updatedTicket.subAssignment !== 'Unassigned') {
-        const primaryAssigneeObj = await resolveUserObj(updatedTicket.assignee);
-        const subAssigneeObj = await resolveUserObj(updatedTicket.subAssignment);
+      } else if (hasSubChanged && this.emailNotificationService) {
+        // Case 4: Only Sub-assignee changed
+        const primaryAssigneeObj = await this.resolveUserObj(companyId, updatedTicket.assignee);
+        const subAssigneeObj = await this.resolveUserObj(companyId, updatedTicket.subAssignment);
 
         if (subAssigneeObj && typeof this.emailNotificationService.sendSubAssigneeAddedEmail === 'function') {
           this.emailNotificationService.sendSubAssigneeAddedEmail(primaryAssigneeObj, subAssigneeObj, updatedTicket)
@@ -383,6 +428,7 @@ export class TicketsService {
         }
       }
 
+      // Check for SLA Breach (Independent check kept safe)
       const newSlaStatus = (updatedTicket as any).slaStatus;
       if (oldSlaStatus !== 'Breached' && newSlaStatus === 'Breached') {
         if (typeof this.emailNotificationService.sendBreachEmailToManager === 'function') {
