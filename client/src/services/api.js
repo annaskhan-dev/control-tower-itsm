@@ -1,7 +1,27 @@
 import axios from 'axios';
 
-// Automatically use Railway in production, or localhost for local development
-const apiBaseUrl = import.meta.env?.VITE_API_URL || process.env?.REACT_APP_API_URL || 'https://control-tower-itsm-production.up.railway.app';
+// Automatically use Railway in production, or localhost for local development (safely avoiding process reference errors in Vite)
+const getApiBaseUrl = () => {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
+      return import.meta.env.VITE_API_URL;
+    }
+  } catch (e) {
+    // Ignore if import.meta is unavailable
+  }
+
+  try {
+    if (typeof process !== 'undefined' && process.env?.REACT_APP_API_URL) {
+      return process.env.REACT_APP_API_URL;
+    }
+  } catch (e) {
+    // Ignore if process is unavailable
+  }
+
+  return 'https://control-tower-itsm-production.up.railway.app';
+};
+
+const apiBaseUrl = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: `${apiBaseUrl}/api`,

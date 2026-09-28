@@ -1,7 +1,27 @@
 import axios from 'axios';
 
-// Logic to determine the base URL with a secure production fallback
-const apiBaseUrl = import.meta.env?.VITE_API_URL || process.env?.REACT_APP_API_URL || 'https://control-tower-itsm-production.up.railway.app';
+// Logic to determine the base URL with a secure production fallback (safely avoiding process reference errors in Vite)
+const getApiBaseUrl = () => {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
+      return import.meta.env.VITE_API_URL;
+    }
+  } catch (e) {
+    // Ignore if import.meta is unavailable
+  }
+
+  try {
+    if (typeof process !== 'undefined' && process.env?.REACT_APP_API_URL) {
+      return process.env.REACT_APP_API_URL;
+    }
+  } catch (e) {
+    // Ignore if process is unavailable
+  }
+
+  return 'control-tower-itsm-production.up.railway.app';
+};
+
+const apiBaseUrl = getApiBaseUrl();
 
 const axiosInstance = axios.create({
   baseURL: `${apiBaseUrl}/api`,
