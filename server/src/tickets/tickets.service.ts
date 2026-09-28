@@ -369,9 +369,19 @@ export class TicketsService {
       }
     }
 
+    // const updatedTicket = await this.ticketModel
+    //   .findOneAndUpdate({ ...baseQuery, companyId }, updateData, { new: true, runValidators: true })
+    //   .exec();
     const updatedTicket = await this.ticketModel
-      .findOneAndUpdate({ ...baseQuery, companyId }, updateData, { new: true, runValidators: true })
-      .exec();
+    .findOneAndUpdate(
+      { ...baseQuery, companyId },
+      updateData,
+      {
+        returnDocument: 'after',
+        runValidators: true,
+      }
+    )
+    .exec();
 
     if (!updatedTicket) {
       throw new NotFoundException(`Ticket with ID ${id} could not be updated`);
