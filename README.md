@@ -43,7 +43,9 @@ An enterprise-grade IT Service Management (ITSM) and operations platform built t
 
 ### 4. Cloud Deployments & Infrastructure
 ![Railway Backend Deployment](./pics/railway.png)
+
 ![Netlify Frontend Deployment](./pics/netlify.png)
+
 ![MongoDB Atlas Cloud](./pics/mongo%20atlas.png)
 
 * **Description**: Overview of cloud services showing the backend deployed on Railway, the frontend on Netlify, and MongoDB Atlas.
