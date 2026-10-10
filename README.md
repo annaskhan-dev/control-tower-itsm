@@ -26,35 +26,28 @@ An enterprise-grade IT Service Management (ITSM) and operations platform built t
 
 ## 🔄 System Flow Diagram
 
-> *[Insert System Flow Diagram Image Here]*
+![System Architecture Diagram](./pics/image.png)
 
----
-
-## 📸 Screenshots & Visual Walkthrough
-
-*(Swipe through the photos attached below to see screenshots of the Live Dashboard, SLA Configuration panel, Login screen, Cloud Deployments, and my Completion Certificate!)*
 
 ### 1. Live Operational Dashboard
-> *[Insert Live Dashboard Screenshot Here]*
+![Live Operational Dashboard](./pics/dashboard.png)
 * **Description**: Real-time analytics view providing complete visibility over system metrics and response times.
 
 ### 2. SLA Configuration Panel
-> *[Insert SLA Configuration Panel Screenshot Here]*
+![SLA Configuration Panel](./pics/sla%20settings.png)
 * **Description**: Dynamic configuration interface for setting category-based SLAs and priority thresholds.
 
 ### 3. Login & Authentication Screen
-> *[Insert Login Screen Screenshot Here]*
+![Login Screen](./pics/login%20page%20.png)
 * **Description**: Secure custom login and registration interface featuring role-based access controls and active session tracking.
 
 ### 4. Cloud Deployments & Infrastructure
-> *[Insert Cloud Deployments Screenshot Here]*
+![Railway Backend Deployment](./pics/railway.png)
+![Netlify Frontend Deployment](./pics/netlify.png)
+![MongoDB Atlas Cloud](./pics/mongo%20atlas.png)
+
 * **Description**: Overview of cloud services showing the backend deployed on Railway, the frontend on Netlify, and MongoDB Atlas.
 
-### 5. Completion Certificate
-> *[Insert Completion Certificate Screenshot Here]*
-* **Description**: Official program completion certificate.
-
----
 
 ## 🛠️ Installation & Quick Start
 
